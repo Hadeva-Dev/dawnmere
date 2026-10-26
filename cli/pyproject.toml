@@ -1,0 +1,28 @@
+[project]
+name = "lflabs-memory-cli"
+version = "0.1.0.dev0"
+description = "Installer and setup CLI for LF Labs memory"
+license = "MIT"
+requires-python = ">=3.12,<3.14"
+dependencies = []
+
+[project.scripts]
+dawnmere = "lflabs_memory_cli.main:main"
+
+[dependency-groups]
+dev = ["pytest>=8", "pyte>=0.8"]
+# tools/make_wordmark.py only (build time; the font never ships)
+art = ["pillow>=10"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/lflabs_memory_cli"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.uv]
+python-preference = "only-managed"

@@ -1,0 +1,35 @@
+                           ⢀⣠⣤⠶⠶⠶⠶⠶⠶⣤⣄⡀
+                         ⣠⡶⠛⠁        ⠈⠛⢶⣄
+                       ⢀⣼⠋              ⠙⣧⡀
+                       ⣾⠁                ⠈⣷
+                      ⢸⡇      \e[38;5;208m⣠⣴⣶⣶⣦⣄      \e[0m⢸⡇
+                      ⢸⡇    \e[38;5;208m⢀⣾⣿⣿⣿⣿⣿⣿⣷⡀    \e[0m⢸⡇
+                      ⢸⡇⠲⠶⠶⠶\e[38;5;208m⠾⠿⠿⠿⠿⠿⠿⠿⠿⠷\e[0m⠶⠶⠶⠖⢸⡇
+                       ⢿⡀     \e[38;5;94m⠶⠶⠰⠶⠆⠶⠆    \e[0m⢀⡿
+                       ⠈⢻⣄     \e[38;5;94m⠰⠶⠆⠆     \e[0m⣠⡟⠁
+                         ⠙⠷⣤⡀        ⢀⣤⠾⠋
+                           ⠈⠙⠛⠶⠶⠶⠶⠶⠶⠛⠋⠁
+
+ \e[38;5;252m⢸⡿⠛⠻⢶⣄    ⢀⣾⡄   ⢹⣷  ⢰⣧  ⣸⡿  ⢸⣦⡀  ⢸⡇  ⢰⣦   ⢠⣾   ⣿⠟⠛⠛⠃  ⣿⠟⠛⢷⡄  ⣿⠟⠛⠛⠃\e[0m
+ \e[38;5;252m⢸⡇   ⣿⡆  ⢀⣾⠋⣿⡄   ⢿⣇⢠⣿⢻⣆⢠⣿⠃  ⢸⡟⢿⣦⡀⢸⡇  ⢸⡿⣧⡀⣠⡿⣿   ⣿⣤⣤⣤⡄  ⣿⣀⣀⣼⠇  ⣿⣤⣤⣤⡄\e[0m
+ \e[38;5;252m⢸⡇  ⢀⣿⠃  ⣼⡿⠶⠾⣷⡀  ⠈⣿⣾⠃ ⢿⣾⠇   ⢸⡇ ⠙⢿⣾⡇  ⣿⡇⠘⣷⡟⠁⣿⡇  ⣿⠁     ⣿⠋⢻⣧   ⣿⠁\e[0m
+ \e[38;5;252m⠘⠛⠒⠚⠛⠁  ⠘⠛   ⠙⠓   ⠘⠃  ⠈⠛    ⠘⠃   ⠙⠃  ⠛⠃ ⠈  ⠛⠃  ⠛⠓⠒⠒⠂  ⠛  ⠛⠃  ⠛⠓⠒⠒⠂\e[0m
+
+                \e[38;5;243mone memory for every AI app you use\e[0m
+
+ \e[38;5;72m✓\e[0m \e[38;5;245mClaude Code     found, logged in\e[0m
+ \e[38;5;72m✓\e[0m \e[38;5;245mSearch models   57 MB, checked\e[0m
+ \e[38;5;72m✓\e[0m \e[38;5;245mMemory service  running\e[0m
+ \e[38;5;72m✓\e[0m \e[38;5;245mYour apps       connected\e[0m
+   \e[38;5;245m├ Claude Code   plugin\e[0m
+   \e[38;5;245m├ Codex         MCP + hook   \e[0m\e[38;5;208mtype /hooks once\e[0m
+   \e[38;5;245m└ Cursor        MCP          \e[0m\e[38;5;208mrestart Cursor\e[0m
+ \e[38;5;72m✓\e[0m \e[38;5;245mYour notes      14 imported from Claude Code\e[0m
+ \e[38;5;72m✓\e[0m \e[38;5;245mSelf-check      recall in 0.3 s\e[0m
+
+ \e[38;5;208m◉\e[0m \e[38;5;254mClaude Code\e[0m \e[38;5;130m─\e[0m\e[38;5;130m─\e[0m\e[38;5;130m─\e[0m\e[38;5;130m─\e[0m\e[38;5;130m─\e[0m\e[38;5;130m─\e[0m\e[38;5;130m─\e[0m\e[38;5;130m─\e[0m\e[38;5;130m─\e[0m \e[38;5;208m◉\e[0m \e[38;5;254mCodex\e[0m \e[38;5;130m─\e[0m\e[38;5;130m─\e[0m\e[38;5;130m─\e[0m\e[38;5;130m─\e[0m\e[38;5;130m─\e[0m\e[38;5;130m─\e[0m\e[38;5;130m─\e[0m\e[38;5;130m─\e[0m\e[38;5;130m─\e[0m \e[38;5;208m◉\e[0m \e[38;5;254mCursor\e[0m
+   \e[38;5;254m“always run tests before committing”\e[0m\e[38;5;243m is now in all 3\e[0m
+
+ \e[1;38;5;255mDawnmere is on.\e[0m
+ \e[38;5;243mTry it: in Claude Code, say “remember that …”, then ask Cursor in a new chat.\e[0m
+ \e[38;5;240m        e.g. remember that we deploy on Fridays\e[0m
