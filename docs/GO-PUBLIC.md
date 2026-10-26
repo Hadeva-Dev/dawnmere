@@ -16,8 +16,8 @@ In order. Nothing here is done yet; the repo is private.
 ## Publish
 
 5. **Flip the repo to public:** `gh repo edit Hadeva-Dev/wayfern-connector --visibility public --accept-visibility-change-consequences`.
-6. **Publish to npm** (needs an npm account; `wayfern-connector` is free as of 2026-10-25, `wayfern` is taken by an
-   unrelated browser project):
+6. **Publish to npm** (needs an npm account; `wayfern-connector` is free as of 2026-10-25, `wayfern` is taken by another
+   company's browser-automation tool that uses the Wayfern name):
    ```bash
    npm login
    npm publish --access public
