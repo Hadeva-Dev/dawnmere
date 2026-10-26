@@ -1,0 +1,63 @@
+{
+  "manifest_version": "0.3",
+  "name": "wayfern-connector",
+  "display_name": "Wayfern",
+  "version": "0.1.0",
+  "description": "One memory shared across your AI apps. Connects to the Wayfern app on your Mac.",
+  "long_description": "Wayfern gives Claude, Cursor, Codex and your other AI apps one shared memory, kept on your Mac. This extension connects Claude Desktop to the Wayfern app: it searches, saves and forgets memories through the app and stores nothing itself. Early beta: it needs the Wayfern app running on the same Mac.",
+  "author": {
+    "name": "LF Labs",
+    "url": "https://github.com/Hadeva-Dev"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Hadeva-Dev/wayfern-connector.git"
+  },
+  "homepage": "https://github.com/Hadeva-Dev/wayfern-connector",
+  "support": "https://github.com/Hadeva-Dev/wayfern-connector/issues",
+  "server": {
+    "type": "node",
+    "entry_point": "server/index.js",
+    "mcp_config": {
+      "command": "node",
+      "args": [
+        "${__dirname}/server/index.js"
+      ]
+    }
+  },
+  "tools": [
+    {
+      "name": "recall",
+      "description": "Search the user's memory by meaning and keywords."
+    },
+    {
+      "name": "remember",
+      "description": "Save one durable fact for future conversations."
+    },
+    {
+      "name": "forget",
+      "description": "Retire a memory that is wrong or that the user asked to forget."
+    },
+    {
+      "name": "access_status",
+      "description": "Say what this app can see in the user's memory."
+    }
+  ],
+  "keywords": [
+    "memory",
+    "mcp",
+    "claude",
+    "cursor",
+    "codex",
+    "cross-app"
+  ],
+  "license": "MIT",
+  "compatibility": {
+    "platforms": [
+      "darwin"
+    ],
+    "runtimes": {
+      "node": ">=18.0.0"
+    }
+  }
+}

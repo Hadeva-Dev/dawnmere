@@ -1,0 +1,54 @@
+{
+  "name": "wayfern-connector",
+  "version": "0.1.0",
+  "description": "Connect your AI apps to Wayfern, one memory shared across Claude, Cursor, Codex and more. Talks to the Wayfern app on your Mac.",
+  "mcpName": "io.github.Hadeva-Dev/wayfern-connector",
+  "type": "module",
+  "bin": {
+    "wayfern-connector": "dist/index.js"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json && chmod +x dist/index.js",
+    "test": "npm run build && node --test 'test/*.test.js'",
+    "bundle": "npm run build && esbuild dist/index.js --bundle --platform=node --format=esm --target=node18 --outfile=mcpb/server/index.js --banner:js=\"import { createRequire } from 'module'; const require = createRequire(import.meta.url);\" && cp LICENSE mcpb/LICENSE",
+    "test:bundle": "npm run bundle && CONNECTOR_BIN=mcpb/server/index.js node --test test/connector.test.js",
+    "pack:mcpb": "npm run bundle && npx -y @anthropic-ai/mcpb@2.1.2 validate mcpb/manifest.json && npx -y @anthropic-ai/mcpb@2.1.2 pack mcpb wayfern-connector.mcpb",
+    "prepublishOnly": "npm test"
+  },
+  "keywords": [
+    "mcp",
+    "mcp-server",
+    "memory",
+    "claude",
+    "cursor",
+    "codex",
+    "wayfern"
+  ],
+  "author": "LF Labs",
+  "license": "MIT",
+  "homepage": "https://github.com/Hadeva-Dev/wayfern-connector#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Hadeva-Dev/wayfern-connector.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Hadeva-Dev/wayfern-connector/issues"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "1.32.2",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "esbuild": "0.28.2",
+    "typescript": "7.0.2"
+  }
+}
