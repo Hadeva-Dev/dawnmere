@@ -1,4 +1,4 @@
-// A stand-in for the Wayfern app: answers docs/PROTOCOL.md on a socket in a temp folder, from a made-up memory.
+// A stand-in for the memory app: answers docs/PROTOCOL.md on a socket in a temp folder, from a made-up memory.
 // No real memory is ever read by the tests.
 import { mkdtempSync, rmSync } from "node:fs";
 import { createServer } from "node:net";
@@ -18,11 +18,11 @@ export async function startFakeDaemon({ mode = "normal" } = {}) {
   const requests = [];
 
   const answer = (req) => {
-    if (req.protocol !== "wayfern-connector/1") return { ok: false, error: "unknown protocol" };
+    if (req.protocol !== "lflabs-memory/1") return { ok: false, error: "unknown protocol" };
     const a = req.args || {};
     switch (req.tool) {
       case "ping":
-        return { ok: true, text: "Fake Wayfern 0.0.0" };
+        return { ok: true, text: "Fake memory app 0.0.0" };
       case "recall": {
         const words = String(a.query).toLowerCase().split(/\W+/).filter(Boolean);
         const hits = memories.filter((m) => words.some((w) => m.text.toLowerCase().includes(w))).slice(0, a.k ?? 8);

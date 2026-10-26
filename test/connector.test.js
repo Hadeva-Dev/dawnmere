@@ -31,11 +31,11 @@ async function connect(env, name = "test-app") {
 
 const text = (r) => r.content.map((c) => c.text).join("");
 
-describe("with no Wayfern app running", () => {
+describe("with no memory app running", () => {
   let c, dir;
   before(async () => {
     dir = mkdtempSync(join(tmpdir(), "wf-"));
-    c = await connect({ WAYFERN_SOCKET: join(dir, "missing.sock") });
+    c = await connect({ LFLABS_MEMORY_SOCKET: join(dir, "missing.sock") });
   });
   after(async () => {
     await c.close();
@@ -68,7 +68,7 @@ describe("with the fake daemon", () => {
   let d, c;
   before(async () => {
     d = await startFakeDaemon();
-    c = await connect({ WAYFERN_SOCKET: d.path, WAYFERN_CLIENT: "cursor", WAYFERN_CLIENT_KEY: "test-key-123" }, "cursor-vscode");
+    c = await connect({ LFLABS_MEMORY_SOCKET: d.path, LFLABS_MEMORY_CLIENT: "cursor", LFLABS_MEMORY_CLIENT_KEY: "test-key-123" }, "cursor-vscode");
   });
   after(async () => {
     await c.close();
@@ -80,7 +80,7 @@ describe("with the fake daemon", () => {
     assert.equal(r.isError, undefined);
     assert.match(text(r), /#1 Prefers dark mode/);
     const req = d.requests.at(-1);
-    assert.equal(req.protocol, "wayfern-connector/1");
+    assert.equal(req.protocol, "lflabs-memory/1");
     assert.equal(req.tool, "recall");
     assert.deepEqual(req.args, { query: "dark mode", k: 3 });
     assert.deepEqual(req.client, { name: "cursor", key: "test-key-123", hint: "cursor-vscode", connector: "0.1.0" });
@@ -141,7 +141,7 @@ describe("a broken or impostor daemon", () => {
   ]) {
     test(`${mode}: a clear tool error`, async () => {
       const d = await startFakeDaemon({ mode });
-      const c = await connect({ WAYFERN_SOCKET: d.path, WAYFERN_TIMEOUT_MS: "300" });
+      const c = await connect({ LFLABS_MEMORY_SOCKET: d.path, LFLABS_MEMORY_TIMEOUT_MS: "300" });
       try {
         const r = await c.client.callTool({ name: "recall", arguments: { query: "editor" } });
         assert.equal(r.isError, true);
@@ -157,7 +157,7 @@ describe("a broken or impostor daemon", () => {
     const dir = mkdtempSync(join(tmpdir(), "wf-"));
     const path = join(dir, "connector.sock");
     writeFileSync(path, "");
-    const c = await connect({ WAYFERN_SOCKET: path });
+    const c = await connect({ LFLABS_MEMORY_SOCKET: path });
     try {
       const r = await c.client.callTool({ name: "recall", arguments: { query: "editor" } });
       assert.match(text(r), NOT_RUNNING);
@@ -174,8 +174,8 @@ describe("the command line", () => {
   test("--check finds the fake daemon", async () => {
     const d = await startFakeDaemon();
     try {
-      const { stdout } = await run(process.execPath, [BIN, "--check"], { env: { ...process.env, WAYFERN_SOCKET: d.path } });
-      assert.match(stdout, /Connected to Fake Wayfern 0\.0\.0/);
+      const { stdout } = await run(process.execPath, [BIN, "--check"], { env: { ...process.env, LFLABS_MEMORY_SOCKET: d.path } });
+      assert.match(stdout, /Connected to Fake memory app 0\.0\.0/);
       assert.equal(d.requests[0].tool, "ping");
     } finally {
       await d.close();
@@ -184,7 +184,7 @@ describe("the command line", () => {
 
   test("--check exits 1 when nothing answers", async () => {
     await assert.rejects(
-      run(process.execPath, [BIN, "--check"], { env: { ...process.env, WAYFERN_SOCKET: "/nonexistent/x.sock" } }),
+      run(process.execPath, [BIN, "--check"], { env: { ...process.env, LFLABS_MEMORY_SOCKET: "/nonexistent/x.sock" } }),
       (e) => e.code === 1 && NOT_RUNNING.test(e.stdout),
     );
   });

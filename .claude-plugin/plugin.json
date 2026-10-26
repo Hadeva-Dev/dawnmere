@@ -1,13 +1,13 @@
 {
-  "name": "wayfern",
+  "name": "lflabs-memory",
   "version": "0.1.0",
   "description": "One memory shared across your AI apps. Connects Claude Code to the Wayfern app on your Mac.",
   "author": {
     "name": "LF Labs",
     "url": "https://github.com/Hadeva-Dev"
   },
-  "homepage": "https://github.com/Hadeva-Dev/wayfern-connector",
-  "repository": "https://github.com/Hadeva-Dev/wayfern-connector",
+  "homepage": "https://github.com/Hadeva-Dev/lflabs-memory-connector",
+  "repository": "https://github.com/Hadeva-Dev/lflabs-memory-connector",
   "license": "MIT",
   "keywords": [
     "memory",
@@ -15,11 +15,11 @@
     "cross-app"
   ],
   "mcpServers": {
-    "wayfern": {
+    "lflabs-memory": {
       "command": "npx",
       "args": [
         "-y",
-        "wayfern-connector@0.1.0"
+        "lflabs-memory-connector@0.1.0"
       ]
     }
   }

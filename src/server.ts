@@ -1,4 +1,4 @@
-// The four tools. Each checks its arguments, then hands the call to the Wayfern app unchanged (daemon.ts).
+// The four tools. Each checks its arguments, then hands the call to the memory app unchanged (daemon.ts).
 // Nothing here decides what an app may see: the app does, from who is asking.
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";

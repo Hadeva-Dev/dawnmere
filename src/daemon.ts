@@ -1,7 +1,7 @@
-// The one place the connector talks to the Wayfern app: one JSON line out, one back (docs/PROTOCOL.md).
+// The one place the connector talks to the memory app: one JSON line out, one back (docs/PROTOCOL.md).
 import { lstatSync } from "node:fs";
 import { createConnection } from "node:net";
-import { ENV, NOT_RUNNING, PROTOCOL, VERSION, defaultSocket } from "./brand.js";
+import { ENV, NOT_RUNNING, PRODUCT, PROTOCOL, VERSION, defaultSocket } from "./brand.js";
 
 export const MAX_REPLY = 1024 * 1024;
 const DEFAULT_TIMEOUT = 15000;
@@ -45,18 +45,18 @@ export function ask(tool: string, args: Record<string, unknown>, client: Client,
       resolve(r);
     };
     const timer = setTimeout(
-      () => finish({ ok: false, error: "Wayfern took too long to answer. Try again in a moment." }),
+      () => finish({ ok: false, error: `${PRODUCT} took too long to answer. Try again in a moment.` }),
       timeoutMs(env),
     );
     sock.setEncoding("utf8");
     sock.on("connect", () => sock.write(line));
     sock.on("data", (chunk: string) => {
       buf += chunk;
-      if (buf.length > MAX_REPLY) return finish({ ok: false, error: "Wayfern's answer was too large." });
+      if (buf.length > MAX_REPLY) return finish({ ok: false, error: `${PRODUCT}'s answer was too large.` });
       const nl = buf.indexOf("\n");
       if (nl >= 0) finish(parse(buf.slice(0, nl)));
     });
-    sock.on("end", () => finish(buf.trim() ? parse(buf) : { ok: false, error: "Wayfern closed without answering." }));
+    sock.on("end", () => finish(buf.trim() ? parse(buf) : { ok: false, error: `${PRODUCT} closed without answering.` }));
     sock.on("error", () => finish({ ok: false, error: NOT_RUNNING }));
   });
 }
@@ -66,12 +66,12 @@ function parse(text: string): Reply {
   try {
     v = JSON.parse(text);
   } catch {
-    return { ok: false, error: "Wayfern sent an answer this connector can't read. Update both to the latest version." };
+    return { ok: false, error: `${PRODUCT} sent an answer this connector can't read. Update both to the latest version.` };
   }
   if (v && typeof v === "object") {
     const r = v as Record<string, unknown>;
     if (r.ok === true && typeof r.text === "string") return { ok: true, text: r.text };
     if (r.ok === false && typeof r.error === "string") return { ok: false, error: r.error };
   }
-  return { ok: false, error: "Wayfern sent an answer this connector can't read. Update both to the latest version." };
+  return { ok: false, error: `${PRODUCT} sent an answer this connector can't read. Update both to the latest version.` };
 }
