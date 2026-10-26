@@ -1,6 +1,6 @@
 {
   "manifest_version": "0.3",
-  "name": "wayfern-connector",
+  "name": "lflabs-memory-connector",
   "display_name": "Wayfern",
   "version": "0.1.0",
   "description": "One memory shared across your AI apps. Connects to the Wayfern app on your Mac.",
@@ -11,10 +11,10 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/Hadeva-Dev/wayfern-connector.git"
+    "url": "https://github.com/Hadeva-Dev/lflabs-memory-connector.git"
   },
-  "homepage": "https://github.com/Hadeva-Dev/wayfern-connector",
-  "support": "https://github.com/Hadeva-Dev/wayfern-connector/issues",
+  "homepage": "https://github.com/Hadeva-Dev/lflabs-memory-connector",
+  "support": "https://github.com/Hadeva-Dev/lflabs-memory-connector/issues",
   "server": {
     "type": "node",
     "entry_point": "server/index.js",

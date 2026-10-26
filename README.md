@@ -9,10 +9,10 @@ flowchart LR
   A[Claude Desktop] --> C
   B[Claude Code] --> C
   D[Cursor, Codex, Windsurf, VS Code...] --> C
-  C["wayfern-connector<br/>(this repo, one per app)"] -- "local socket, one JSON line each way" --> W["Wayfern app on your Mac<br/>(memory, search, permissions)"]
+  C["lflabs-memory-connector<br/>(this repo, one per app)"] -- "local socket, one JSON line each way" --> W["Wayfern app on your Mac<br/>(memory, search, permissions)"]
 ```
 
-**Status: early beta, Mac only.** The connector works and is tested, but it needs the Wayfern app running on the same
+**Status: early beta, Mac only. Wayfern is a working name and will change; the package and settings names below will not.** The connector works and is tested, but it needs the Wayfern app running on the same
 Mac, and that app is in private beta. Without it every call answers "Wayfern isn't running on this computer".
 
 ## Why a connector and not a memory server
@@ -27,28 +27,28 @@ Claude sees everything). That keeps this repo small enough to read in a few minu
 Check that the Wayfern app answers first:
 
 ```bash
-npx -y wayfern-connector --check
+npx -y lflabs-memory-connector --check
 ```
 
-**Claude Desktop:** download `wayfern-connector.mcpb` from the latest release and open it.
+**Claude Desktop:** download `lflabs-memory-connector.mcpb` from the latest release and open it.
 
 **Claude Code:**
 
 ```bash
-claude mcp add wayfern -- npx -y wayfern-connector
+claude mcp add lflabs-memory -- npx -y lflabs-memory-connector
 ```
 
-or as a plugin: `/plugin marketplace add Hadeva-Dev/wayfern-connector`, then `/plugin install wayfern@wayfern`.
+or as a plugin: `/plugin marketplace add Hadeva-Dev/lflabs-memory-connector`, then `/plugin install lflabs-memory@lflabs`.
 
 **Cursor, Windsurf, Gemini CLI, VS Code** (each app's MCP config file):
 
 ```json
 {
   "mcpServers": {
-    "wayfern": {
+    "lflabs-memory": {
       "command": "npx",
-      "args": ["-y", "wayfern-connector"],
-      "env": { "WAYFERN_CLIENT": "cursor" }
+      "args": ["-y", "lflabs-memory-connector"],
+      "env": { "LFLABS_MEMORY_CLIENT": "cursor" }
     }
   }
 }
@@ -57,10 +57,10 @@ or as a plugin: `/plugin marketplace add Hadeva-Dev/wayfern-connector`, then `/p
 **Codex** (`~/.codex/config.toml`):
 
 ```toml
-[mcp_servers.wayfern]
+[mcp_servers.lflabs-memory]
 command = "npx"
-args = ["-y", "wayfern-connector"]
-env = { WAYFERN_CLIENT = "codex" }
+args = ["-y", "lflabs-memory-connector"]
+env = { LFLABS_MEMORY_CLIENT = "codex" }
 ```
 
 Needs Node 18 or later (Claude Desktop brings its own for the `.mcpb`).
@@ -78,10 +78,10 @@ Needs Node 18 or later (Claude Desktop brings its own for the `.mcpb`).
 
 | variable | default | meaning |
 | --- | --- | --- |
-| `WAYFERN_CLIENT` | none | a name for the app, shown in Wayfern and used for its permissions |
-| `WAYFERN_CLIENT_KEY` | none | a key the Wayfern app gives an app it trusts with more than its default |
-| `WAYFERN_SOCKET` | `~/Library/Application Support/Wayfern/connector.sock` | where the Wayfern app listens |
-| `WAYFERN_TIMEOUT_MS` | `15000` | how long to wait for an answer |
+| `LFLABS_MEMORY_CLIENT` | none | a name for the app, shown in Wayfern and used for its permissions |
+| `LFLABS_MEMORY_CLIENT_KEY` | none | a key the Wayfern app gives an app it trusts with more than its default |
+| `LFLABS_MEMORY_SOCKET` | `~/Library/Application Support/LF Labs/memory-connector.sock` | where the Wayfern app listens |
+| `LFLABS_MEMORY_TIMEOUT_MS` | `15000` | how long to wait for an answer |
 
 ## Limits
 
@@ -99,9 +99,9 @@ The full protocol is in [docs/PROTOCOL.md](docs/PROTOCOL.md), and why the repo i
 
 ```bash
 npm install
-npm test              # builds, then runs the connector against a fake Wayfern app
+npm test              # builds, then runs the connector against a fake memory app
 npm run test:bundle   # the same tests against the .mcpb bundle
-npm run pack:mcpb     # builds wayfern-connector.mcpb
+npm run pack:mcpb     # builds lflabs-memory-connector.mcpb
 ```
 
 Developing needs Node 22 or later (for the test runner).

@@ -1,23 +1,25 @@
-// Every user-facing name lives here, so a rename touches this file and the packaging manifests only
-// (test/packaging.test.js checks that they agree).
+// Names live here. PRODUCT is the user-facing product name and the only place code spells it; the rest are neutral
+// working identifiers that do not need to change when the product name does (docs/GO-PUBLIC.md, "Renaming").
+// test/packaging.test.js checks that the packaging files agree with these.
 import { homedir } from "node:os";
 import { join } from "node:path";
 
 export const PRODUCT = "Wayfern";
-export const SERVER_NAME = "wayfern";
+export const PACKAGE = "lflabs-memory-connector";
+export const SERVER_NAME = "lflabs-memory";
 export const VERSION = "0.1.0";
-export const PROTOCOL = "wayfern-connector/1";
+export const PROTOCOL = "lflabs-memory/1";
 
 export const ENV = {
-  socket: "WAYFERN_SOCKET",
-  client: "WAYFERN_CLIENT",
-  key: "WAYFERN_CLIENT_KEY",
-  timeout: "WAYFERN_TIMEOUT_MS",
+  socket: "LFLABS_MEMORY_SOCKET",
+  client: "LFLABS_MEMORY_CLIENT",
+  key: "LFLABS_MEMORY_CLIENT_KEY",
+  timeout: "LFLABS_MEMORY_TIMEOUT_MS",
 } as const;
 
 export function defaultSocket(): string | null {
   return process.platform === "darwin"
-    ? join(homedir(), "Library", "Application Support", PRODUCT, "connector.sock")
+    ? join(homedir(), "Library", "Application Support", "LF Labs", "memory-connector.sock")
     : null;
 }
 

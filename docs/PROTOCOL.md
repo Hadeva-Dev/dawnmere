@@ -1,20 +1,20 @@
 # Connector protocol, version 1
 
-How the connector talks to the Wayfern app on the same machine. Any program that answers this protocol on the socket
-can stand in for Wayfern (the tests do exactly that).
+How the connector talks to the memory app on the same machine. Any program that answers this protocol on the socket
+can stand in for it (the tests do exactly that).
 
 ## The socket
 
-- `WAYFERN_SOCKET` if set, else `~/Library/Application Support/Wayfern/connector.sock`.
+- `LFLABS_MEMORY_SOCKET` if set, else `~/Library/Application Support/LF Labs/memory-connector.sock`.
 - The connector connects only if the path is a socket owned by the user running the connector. Anything else (a
-  missing file, a regular file, another user's socket) is reported as "Wayfern isn't running".
+  missing file, a regular file, another user's socket) is reported as "isn't running".
 
 ## One request, one reply
 
 The connector opens a connection, writes one JSON object followed by `\n`, reads one JSON line back, and closes.
 
 ```json
-{"protocol": "wayfern-connector/1",
+{"protocol": "lflabs-memory/1",
  "tool": "recall",
  "args": {"query": "what editor does the user prefer", "k": 8},
  "client": {"name": "cursor", "key": null, "hint": "cursor-vscode", "connector": "0.1.0"}}
@@ -22,11 +22,11 @@ The connector opens a connection, writes one JSON object followed by `\n`, reads
 
 | field | meaning |
 |---|---|
-| `protocol` | always `wayfern-connector/1`. A daemon that does not speak it should answer `{"ok": false, "error": "..."}`. |
+| `protocol` | always `lflabs-memory/1`. A daemon that does not speak it should answer `{"ok": false, "error": "..."}`. |
 | `tool` | `recall`, `remember`, `forget`, `access_status`, or `ping` (the connector's `--check`). |
 | `args` | the tool's arguments, already checked against the schemas below. |
-| `client.name` | `WAYFERN_CLIENT`, the name the app's config gives, or `null`. A label the engine may hold to its narrowest default. |
-| `client.key` | `WAYFERN_CLIENT_KEY` or `null`. The connector never logs it. |
+| `client.name` | `LFLABS_MEMORY_CLIENT`, the name the app's config gives, or `null`. A label the engine may hold to its narrowest default. |
+| `client.key` | `LFLABS_MEMORY_CLIENT_KEY` or `null`. The connector never logs it. |
 | `client.hint` | the name the app reported when it connected (MCP `clientInfo.name`), or `null`. Never trusted on its own. |
 | `client.connector` | the connector's version. |
 
@@ -38,7 +38,7 @@ Reply:
 ```
 
 `text` is shown to the AI as the tool's result; an `error` comes back as a tool error. A reply larger than 1 MiB, a
-reply that is not one JSON object, or no reply within `WAYFERN_TIMEOUT_MS` (default 15000) is an error.
+reply that is not one JSON object, or no reply within `LFLABS_MEMORY_TIMEOUT_MS` (default 15000) is an error.
 
 ## Tool arguments
 

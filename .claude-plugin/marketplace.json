@@ -1,5 +1,5 @@
 {
-  "name": "wayfern",
+  "name": "lflabs",
   "owner": {
     "name": "LF Labs",
     "url": "https://github.com/Hadeva-Dev"
@@ -9,7 +9,7 @@
   },
   "plugins": [
     {
-      "name": "wayfern",
+      "name": "lflabs-memory",
       "source": "./",
       "description": "One memory shared across your AI apps. Connects Claude Code to the Wayfern app on your Mac.",
       "version": "0.1.0"

@@ -1,9 +1,10 @@
 // The packaging files must agree with the code: one version, one name, the same tools. A rename or a release that
 // forgets one of them fails here.
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
-import { VERSION } from "../dist/brand.js";
+import { PACKAGE, PRODUCT, SERVER_NAME, VERSION } from "../dist/brand.js";
 
 const json = (p) => JSON.parse(readFileSync(new URL(`../${p}`, import.meta.url), "utf8"));
 const pkg = json("package.json");
@@ -15,10 +16,12 @@ const market = json(".claude-plugin/marketplace.json");
 test("one version everywhere", () => {
   for (const v of [pkg.version, server.version, server.packages[0].version, manifest.version, plugin.version,
     market.plugins[0].version]) assert.equal(v, VERSION);
-  assert.deepEqual(plugin.mcpServers.wayfern.args, ["-y", `${pkg.name}@${VERSION}`]);
+  assert.deepEqual(plugin.mcpServers["lflabs-memory"].args, ["-y", `${pkg.name}@${VERSION}`]);
 });
 
 test("the registry name and the npm package point at each other", () => {
+  assert.equal(pkg.name, PACKAGE);
+  assert.ok(plugin.mcpServers[SERVER_NAME]);
   assert.equal(pkg.mcpName, server.name);
   assert.equal(server.packages[0].identifier, pkg.name);
   assert.equal(server.packages[0].registryType, "npm");
@@ -33,4 +36,21 @@ test("the bundle lists the tools the server registers", () => {
 test("MIT everywhere", () => {
   for (const l of [pkg.license, manifest.license, plugin.license]) assert.equal(l, "MIT");
   assert.match(readFileSync(new URL("../LICENSE", import.meta.url), "utf8"), /^MIT License/);
+});
+
+// The product name will change. It may appear only where a rename has to touch anyway: brand.ts, the README, the
+// listing text and the packaging files' display text (docs/GO-PUBLIC.md, "Renaming").
+const BRANDED = ["src/brand.ts", "README.md", "docs/LISTING.md", "package.json", "server.json",
+  "mcpb/manifest.json", ".claude-plugin/plugin.json", ".claude-plugin/marketplace.json"];
+
+test("the product name lives only in the files a rename touches", () => {
+  const tracked = execFileSync("git", ["ls-files", "--cached", "--others", "--exclude-standard"], {
+    cwd: new URL("..", import.meta.url),
+    encoding: "utf8",
+  }).split("\n").filter(Boolean);
+  const name = new RegExp(PRODUCT, "i");
+  const stray = tracked.filter((f) => !BRANDED.includes(f) && name.test(readFileSync(new URL(`../${f}`, import.meta.url), "utf8")));
+  assert.deepEqual(stray, []);
+  for (const id of [pkg.name, pkg.mcpName, server.name, manifest.name, plugin.name, market.name, SERVER_NAME])
+    assert.doesNotMatch(id, name, "identifiers stay neutral, so a rename never touches them");
 });
