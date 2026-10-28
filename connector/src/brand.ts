@@ -4,7 +4,8 @@
 import { homedir } from "node:os";
 import { join } from "node:path";
 
-export const PRODUCT = "Wayfern";
+export const PRODUCT = "Dawnmere";
+export const COMMAND = "dawnmere"; // the command that installs and checks it
 export const PACKAGE = "lflabs-memory-connector";
 export const SERVER_NAME = "lflabs-memory";
 export const VERSION = "0.1.0";
@@ -25,7 +26,7 @@ export function defaultSocket(): string | null {
 
 export const NOT_RUNNING =
   `${PRODUCT} isn't running on this computer, so memory is unavailable right now. ` +
-  `Open the ${PRODUCT} app, then try again.`;
+  `Run "${COMMAND} doctor" in Terminal to see why, then try again.`;
 
 export const INSTRUCTIONS =
   `${PRODUCT} is the user's memory, shared across the AI apps they use. ` +

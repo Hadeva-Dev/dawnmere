@@ -1,11 +1,12 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "io.github.Hadeva-Dev/lflabs-memory-connector",
-  "title": "Wayfern",
-  "description": "One memory shared across your AI apps. Connects to the Wayfern app on your Mac.",
+  "title": "Dawnmere",
+  "description": "One memory shared across your AI apps. Connects to Dawnmere on your Mac.",
   "repository": {
-    "url": "https://github.com/Hadeva-Dev/lflabs-memory-connector",
-    "source": "github"
+    "url": "https://github.com/Hadeva-Dev/dawnmere",
+    "source": "github",
+    "subfolder": "connector"
   },
   "version": "0.1.0",
   "packages": [
@@ -20,7 +21,7 @@
       "environmentVariables": [
         {
           "name": "LFLABS_MEMORY_CLIENT",
-          "description": "A name for this app (cursor, codex, windsurf...). The Wayfern app shows it and uses it for what this app may see.",
+          "description": "A name for this app (cursor, codex, windsurf...). The Dawnmere shows it and uses it for what this app may see.",
           "isRequired": false,
           "isSecret": false
         }

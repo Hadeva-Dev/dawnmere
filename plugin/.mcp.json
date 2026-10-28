@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "lflabs-memory": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "lflabs-memory-connector@0.1.0"
+      ]
+    }
+  }
+}

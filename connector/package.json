@@ -1,7 +1,7 @@
 {
   "name": "lflabs-memory-connector",
   "version": "0.1.0",
-  "description": "Connect your AI apps to Wayfern, one memory shared across Claude, Cursor, Codex and more. Talks to the Wayfern app on your Mac.",
+  "description": "Connect your AI apps to Dawnmere, one memory shared across Claude, Cursor, Codex and more. Talks to Dawnmere on your Mac.",
   "mcpName": "io.github.Hadeva-Dev/lflabs-memory-connector",
   "type": "module",
   "bin": {
@@ -33,13 +33,14 @@
   ],
   "author": "LF Labs",
   "license": "MIT",
-  "homepage": "https://github.com/Hadeva-Dev/lflabs-memory-connector#readme",
+  "homepage": "https://github.com/Hadeva-Dev/dawnmere/tree/main/connector#readme",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/Hadeva-Dev/lflabs-memory-connector.git"
+    "url": "git+https://github.com/Hadeva-Dev/dawnmere.git",
+    "directory": "connector"
   },
   "bugs": {
-    "url": "https://github.com/Hadeva-Dev/lflabs-memory-connector/issues"
+    "url": "https://github.com/Hadeva-Dev/dawnmere/issues"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "1.32.2",

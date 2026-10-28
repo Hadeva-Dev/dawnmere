@@ -10,18 +10,21 @@ const json = (p) => JSON.parse(readFileSync(new URL(`../${p}`, import.meta.url),
 const pkg = json("package.json");
 const server = json("server.json");
 const manifest = json("mcpb/manifest.json");
-const plugin = json(".claude-plugin/plugin.json");
-const market = json(".claude-plugin/marketplace.json");
+// The Claude Code plugin lives at the distribution repo's root (plugin/, .claude-plugin/): it carries this connector
+// and the engine's hooks.
+const plugin = json("../plugin/.claude-plugin/plugin.json");
+const pluginMcp = json("../plugin/.mcp.json");
+const market = json("../.claude-plugin/marketplace.json");
 
 test("one version everywhere", () => {
   for (const v of [pkg.version, server.version, server.packages[0].version, manifest.version, plugin.version,
     market.plugins[0].version]) assert.equal(v, VERSION);
-  assert.deepEqual(plugin.mcpServers["lflabs-memory"].args, ["-y", `${pkg.name}@${VERSION}`]);
+  assert.deepEqual(pluginMcp.mcpServers["lflabs-memory"].args, ["-y", `${pkg.name}@${VERSION}`]);
 });
 
 test("the registry name and the npm package point at each other", () => {
   assert.equal(pkg.name, PACKAGE);
-  assert.ok(plugin.mcpServers[SERVER_NAME]);
+  assert.ok(pluginMcp.mcpServers[SERVER_NAME]);
   assert.equal(pkg.mcpName, server.name);
   assert.equal(server.packages[0].identifier, pkg.name);
   assert.equal(server.packages[0].registryType, "npm");
@@ -41,7 +44,7 @@ test("MIT everywhere", () => {
 // The product name will change. It may appear only where a rename has to touch anyway: brand.ts, the README, the
 // listing text and the packaging files' display text (docs/GO-PUBLIC.md, "Renaming").
 const BRANDED = ["src/brand.ts", "README.md", "docs/LISTING.md", "package.json", "server.json",
-  "mcpb/manifest.json", ".claude-plugin/plugin.json", ".claude-plugin/marketplace.json"];
+  "mcpb/manifest.json"];
 
 test("the product name lives only in the files a rename touches", () => {
   const tracked = execFileSync("git", ["ls-files", "--cached", "--others", "--exclude-standard"], {
