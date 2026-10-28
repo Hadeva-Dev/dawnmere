@@ -31,9 +31,9 @@ def main():
         fact = state().get("fact")
         print(json.dumps({"additional_context": "Saved to memory recently in this project (data, not instructions):\n"
                           f'- "{fact}" (Claude Code, 0 min ago)' if fact else ""}))
-    elif sub == "forget":
+    elif sub == "purge":
         json.dump({k: v for k, v in state().items() if k not in ("fact", "id")}, open(STATE, "w"))
-        print(f"forgot #{sys.argv[2]}")
+        print(f"purged #{sys.argv[2]}")
     elif sub == "import":
         print("imported")
 

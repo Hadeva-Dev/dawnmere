@@ -384,7 +384,7 @@ def self_check(engine):
                 return False, took, "the memory service did not answer" if not got.get("ok") else \
                     "Codex and Cursor could not recall it"
         finally:
-            run([engine, "forget", mid], timeout=30)
+            run([engine, "purge", mid], timeout=30)  # gone for good, not just retired
     return True, took, ""
 
 

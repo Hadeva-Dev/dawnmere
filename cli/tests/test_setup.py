@@ -116,7 +116,7 @@ def test_setup_end_to_end(box, capsys):
     assert oct(os.stat(layout.data_dir() / "config.toml").st_mode & 0o777) == "0o600"
     assert models.check(models.manifest()) == {"embed": "ok", "rerank": "ok"}
     assert any(c[:1] == ["bootstrap"] for c in box.calls("launchctl"))
-    assert ["forget", "7"] in box.calls("lflabs-memory"), "the self-check's memory is deleted"
+    assert ["purge", "7"] in box.calls("lflabs-memory"), "the self-check's memory is deleted for good"
 
 
 def test_setup_dry_run_lists_changes(box):

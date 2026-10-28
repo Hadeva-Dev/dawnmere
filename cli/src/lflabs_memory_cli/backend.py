@@ -1,6 +1,6 @@
 """Which model reads transcripts in the background (spec 5.4), as setup asks and doctor reports it.
 
-The engine's own backends.status() decides once it is installed; until then (and as a fallback) this does the same
+The engine's own llm.status() decides once setup has run; until then (and as a fallback) this does the same
 checks: the claude version against MIN_CLAUDE, and a one-token ping that also tells whether it is logged in.
 """
 import json
@@ -29,14 +29,15 @@ class Status:
     note: str = ""
 
 
-def engine_status():
-    """The engine's own status, when it has one (Task 5): None otherwise."""
-    try:
-        from lflabs_memory import backends  # type: ignore
-    except Exception:
+def engine_status(ping=False):
+    """The engine's own status (lflabs_memory.llm.status), once setup has written config.toml: None before that
+    (loading the engine's config would create its data folder) or when the engine cannot say."""
+    from . import settings
+    if not settings.path().exists():
         return None
     try:
-        s = backends.status()
+        from lflabs_memory import llm
+        s = llm.status(ping=ping)
         return Status(s.name, bool(s.ok), getattr(s, "version", None), getattr(s, "logged_in", None),
                       getattr(s, "note", "") or "")
     except Exception:
