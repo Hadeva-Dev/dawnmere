@@ -36,7 +36,7 @@ def healthy(mac, monkeypatch, tmp_path, backend_name="claude-cli"):
         (data / "models" / name / "model.onnx").write_bytes(body)
         files[name] = [{"file": "model.onnx", "url": "x", "size": len(body), "sha256": hashlib.sha256(body).hexdigest()}]
     monkeypatch.setattr(models, "manifest", lambda: {"release": "models-x", "models": files})
-    monkeypatch.setattr(backend, "engine_status", lambda: None)
+    monkeypatch.setattr(backend, "engine_status", lambda ping=False: None)
     monkeypatch.setattr(doctor, "version", lambda dist: {"lflabs-memory-engine": "1.0.0b1"}.get(dist, "1.0.0b1"))
     mac.on("launchctl", ["print"], 0, "\tstate = running\n\tpid = 4120\n")
     mac.on("ps", [], 0, " 2-03:04:05\n")

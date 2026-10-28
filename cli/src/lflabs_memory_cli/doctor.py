@@ -137,7 +137,7 @@ def check_model(cfg, ping=True):
     if name == "none":
         return Check("model", "ok", f"none: {backend.NONE_LOSES}")
     model = backend.MODELS.get(llm["main_model"], llm["main_model"])
-    s = backend.engine_status() or (backend.claude_status(llm["main_model"], ping) if name == "claude-cli" else None)
+    s = backend.engine_status(ping) or (backend.claude_status(llm["main_model"], ping) if name == "claude-cli" else None)
     if name == "anthropic-api" and s is None:
         from . import keychain
         if not keychain.present():
