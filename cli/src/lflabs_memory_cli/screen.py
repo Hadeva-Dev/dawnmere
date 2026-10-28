@@ -575,8 +575,8 @@ def plain_lines(state):
 # ---------- the self-check row and the memory moment ----------
 
 def self_check_row(seconds):
-    """(status, note) for the self-check: the measured hook time, one decimal; slower than SLOW is a warning."""
-    note = f"recall in {seconds:.1f} s"
+    """(status, note) for the self-check: the measured hook time in hundredths; slower than SLOW is a warning."""
+    note = f"recall in {seconds:.2f} s"  # hundredths: Hao, 2026-10-28 (reads as fast and precise)
     return ("ok", note) if seconds <= SLOW else ("warn", f"{note} (slow: {COMMAND} doctor)")
 
 
