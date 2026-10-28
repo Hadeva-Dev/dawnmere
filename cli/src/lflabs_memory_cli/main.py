@@ -42,17 +42,40 @@ def cmd_setup(args):
     return 2
 
 
-def not_yet(args):
-    print(f"{COMMAND} {args.command} is not built yet.")
-    return 2
+def cmd_doctor(args):
+    from . import doctor
+    return doctor.main(as_json=args.json, as_report=args.report, licenses=args.licenses)
+
+
+def cmd_uninstall(args):
+    from . import uninstall
+    return uninstall.main(keep_data=args.keep_data, yes=args.yes)
+
+
+def cmd_export(args):
+    from . import export
+    return export.export(args.out, args.format, args.include_claims)
+
+
+def cmd_import(args):
+    from . import export
+    return export.import_file(args.file)
+
+
+def cmd_update(args):
+    from . import update
+    if args.finish:
+        return update.finish(args.finish)
+    return update.main(check_only=args.check, yes=args.yes)
 
 
 COMMANDS = {
     "setup": (cmd_setup, "connect your AI apps to one memory on this Mac"),
-    "doctor": (not_yet, "check that everything works"),
-    "uninstall": (not_yet, "remove everything setup added"),
-    "export": (not_yet, "save your memory to a file"),
-    "update": (not_yet, f"update {PRODUCT}"),
+    "doctor": (cmd_doctor, "check that everything works"),
+    "uninstall": (cmd_uninstall, "remove everything setup added"),
+    "export": (cmd_export, "save your memory to a file"),
+    "import": (cmd_import, "add memories from an export file"),
+    "update": (cmd_update, f"update {PRODUCT}"),
 }
 
 
@@ -68,6 +91,23 @@ def parser():
             sp.add_argument("--show", action="store_true", help="play the full intro again")
             sp.add_argument("--demo", nargs="?", const="default", choices=SCENARIOS, metavar="SCENARIO",
                             help=f"play the setup screen with fake steps ({', '.join(SCENARIOS)})")
+        elif name == "doctor":
+            sp.add_argument("--json", action="store_true", help="the checks as JSON")
+            sp.add_argument("--report", action="store_true", help="counts only, safe to paste into an issue")
+            sp.add_argument("--licenses", action="store_true", help="the models' licenses")
+        elif name == "uninstall":
+            sp.add_argument("--keep-data", action="store_true", help="keep your memory")
+            sp.add_argument("--yes", action="store_true", help="answer yes to every question")
+        elif name == "export":
+            sp.add_argument("--out", help="the file to write")
+            sp.add_argument("--format", choices=("json", "md"), default="json")
+            sp.add_argument("--include-claims", action="store_true")
+        elif name == "import":
+            sp.add_argument("file")
+        elif name == "update":
+            sp.add_argument("--check", action="store_true", help="only say whether there is a newer version")
+            sp.add_argument("--yes", action="store_true")
+            sp.add_argument("--finish", metavar="FROM", help=argparse.SUPPRESS)
     return p
 
 

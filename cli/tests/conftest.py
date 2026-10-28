@@ -1,4 +1,7 @@
 """Scripted setups: every step and app with fixed times, so frames are reproducible."""
+import json
+import os
+
 import pytest
 
 from lflabs_memory_cli.screen import AppResult, ScreenState, Step, done_at, self_check_row
@@ -78,3 +81,58 @@ def final():
         state = scripted(**kw)
         return state, done_at(state)
     return make
+
+
+@pytest.fixture
+def mac(tmp_path, monkeypatch):
+    """A fresh home folder with fake claude, launchctl, security, uv on PATH; no real file or program is touched."""
+    from fakes import Fakes
+    home = tmp_path / "home"
+    home.mkdir()
+    monkeypatch.setenv("HOME", str(home))
+    monkeypatch.delenv("LFLABS_MEMORY_HOME", raising=False)
+    monkeypatch.setenv("LFLABS_MEMORY_SOCKET", str(home / "connector.sock"))
+    fakes = Fakes(tmp_path)
+    fakes.env(monkeypatch)
+    fakes.home = home
+    return fakes
+
+
+class FakeConnector:
+    """A lflabs-memory/1 server on a Unix socket (short /tmp path: socket paths are capped at 104 bytes)."""
+
+    def __init__(self, reply=None):
+        import socketserver
+        import tempfile
+        import threading
+        self.dir = tempfile.mkdtemp(prefix="lfm", dir="/tmp")
+        self.path = os.path.join(self.dir, "c.sock")
+        self.requests = []
+        outer = self
+        reply = reply or (lambda req: {"ok": True, "text": "Dawnmere 0.2.0"} if req["tool"] == "ping"
+                          else {"ok": True, "text": ""})
+
+        class H(socketserver.StreamRequestHandler):
+            def handle(self):
+                line = self.rfile.readline()
+                if not line:
+                    return
+                req = json.loads(line)
+                outer.requests.append(req)
+                self.wfile.write((json.dumps(reply(req)) + "\n").encode())
+        self.server = socketserver.ThreadingUnixStreamServer(self.path, H)
+        threading.Thread(target=self.server.serve_forever, daemon=True).start()
+
+    def close(self):
+        import shutil
+        self.server.shutdown()
+        self.server.server_close()
+        shutil.rmtree(self.dir, ignore_errors=True)
+
+
+@pytest.fixture
+def connector(monkeypatch):
+    c = FakeConnector()
+    monkeypatch.setenv("LFLABS_MEMORY_SOCKET", c.path)
+    yield c
+    c.close()

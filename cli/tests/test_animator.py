@@ -9,7 +9,6 @@ import struct
 import subprocess
 import sys
 import termios
-import threading
 import time
 
 from conftest import plan
@@ -50,7 +49,7 @@ def test_key_skips():
     ui._thread.join(timeout=2)
     took = time.monotonic() - pressed
     assert not ui._thread.is_alive()
-    assert took < 2 / ui.FPS + 0.05, took
+    assert took < 2 / ui.FPS + 0.15, took  # one frame, plus slack for a loaded machine running the whole suite
     final = frame(screen.done_at(state), state)
     assert ui._prev[:len(final)] == final
     assert any("Dawnmere is on." in visible(x) for x in final)

@@ -1,0 +1,301 @@
+"""doctor: one line per check, then what to do about each warning or failure (spec 9.3)."""
+import json
+import os
+import re
+import sqlite3
+import tempfile
+import time
+from dataclasses import asdict, dataclass
+from importlib import metadata
+
+from . import apps, backend, launchd, models, settings, sockets
+from .brand import COMMAND
+from .layout import CONNECTOR, CONNECTOR_VERSION, ENGINE_DIST, SERVER, data_dir, engine_bin, home, short
+from .run import run
+
+SLOW = 1.5
+LICENSES = [("embed", "bge-small-en-v1.5", "MIT"), ("rerank", "ms-marco-MiniLM-L-6-v2", "Apache-2.0"),
+            ("sense", "friday-sense-v3 (mmBERT-base fine-tune)", "MIT base, LF Labs weights")]
+
+
+@dataclass
+class Check:
+    name: str
+    state: str   # ok | warn | fail
+    note: str
+    fix: str = ""
+
+
+def version(dist):
+    try:
+        return metadata.version(dist)
+    except metadata.PackageNotFoundError:
+        return None
+
+
+def _db():
+    """A read-only connection to the store, or None."""
+    p = data_dir() / "memory.db"
+    if not p.exists():
+        return None
+    db = sqlite3.connect(f"file:{p}?mode=ro", uri=True)
+    db.row_factory = sqlite3.Row
+    return db
+
+
+def _count(db, sql, *args):
+    try:
+        return db.execute(sql, args).fetchone()[0] or 0
+    except sqlite3.Error:
+        return None
+
+
+def _uptime(pid):
+    r = run(["ps", "-o", "etime=", "-p", str(pid)], timeout=5)
+    m = re.fullmatch(r"\s*(?:(\d+)-)?(?:(\d+):)?(\d+):(\d+)\s*", r.out or "")
+    if not r.ok or not m:
+        return ""
+    d, h, mi = int(m.group(1) or 0), int(m.group(2) or 0), int(m.group(3))
+    return f", up {d} d" if d else f", up {h} h" if h else f", up {mi} min"
+
+
+def check_engine():
+    v = version(ENGINE_DIST) or "?"
+    is_loaded, pid = launchd.loaded()
+    if pid:
+        return Check("engine", "ok", f"{v}, running (pid {pid}){_uptime(pid)}")
+    if is_loaded:
+        return Check("engine", "fail", f"{v}, loaded but not running",
+                     f"see ~/Library/Logs/LF Labs/memory.log, then run {COMMAND} setup again")
+    return Check("engine", "fail", f"{v}, not running", f"run {COMMAND} setup")
+
+
+def check_data(db):
+    d = short(data_dir())
+    if db is None:
+        return Check("data", "fail", f"{d}: no memory yet", f"run {COMMAND} setup")
+    mem = _count(db, "select count(*) from memories where status = 'active'") or 0
+    claims = _count(db, "select count(*) from claims where status = 'active'")
+    size = sum(f.stat().st_size for f in data_dir().glob("memory.db*")) / 1e6
+    parts = [f"{mem:,} memories"] + ([f"{claims:,} claims"] if claims is not None else []) + [f"{size:.0f} MB"]
+    mode = os.stat(data_dir()).st_mode & 0o777
+    if mode & 0o077:
+        return Check("data", "warn", f"{d}  ({', '.join(parts)})", f"the folder is readable by others: chmod 700 '{data_dir()}'")
+    return Check("data", "ok", f"{d}  ({', '.join(parts)})")
+
+
+def check_models():
+    man = models.manifest()
+    if man is None:
+        return Check("models", "warn", "cannot check: the engine has no models list",
+                     f"update with {COMMAND} update")
+    got = models.check(man)
+    bad = [n for n, s in got.items() if s != "ok" and n not in models.OPTIONAL]
+    missing_optional = [n for n, s in got.items() if s == "missing" and n in models.OPTIONAL]
+    names = ", ".join(n for n, s in got.items() if s == "ok")
+    if bad:
+        return Check("models", "fail", ", ".join(f"{n} {got[n]}" for n in bad),
+                     f"run {COMMAND} setup to download them again")
+    note = f"{names}: checksums match" + (f"; {', '.join(missing_optional)} not installed (word lists decide)"
+                                          if missing_optional else "")
+    return Check("models", "ok", note)
+
+
+def check_hook():
+    eng = engine_bin()
+    if not eng:
+        return Check("hook speed", "fail", "the engine command is missing", f"reinstall: {COMMAND} update")
+    with tempfile.TemporaryDirectory() as cwd:
+        payload = json.dumps({"session_id": f"doctor-{os.getpid()}", "hook_event_name": "UserPromptSubmit",
+                              "prompt": "doctor: what do you remember about this project?", "cwd": cwd,
+                              "transcript_path": os.path.join(cwd, "none.jsonl")})
+        t0 = time.monotonic()
+        r = run([eng, "hook-prompt"], input=payload, timeout=10)
+        took = time.monotonic() - t0
+    if not r.ok:
+        return Check("hook speed", "fail", "the prompt hook failed", "see ~/Library/Logs/LF Labs/memory.log")
+    if took > SLOW:
+        return Check("hook speed", "warn", f"recall in {took:.1f} s (limit {SLOW} s)",
+                     "is the background service running? (engine line above)")
+    return Check("hook speed", "ok", f"recall in {took:.2f} s (limit {SLOW} s)")
+
+
+def check_connector():
+    got = sockets.ping_connector()
+    if got:
+        return Check("connector", "ok", f"{sockets.PROTOCOL} on {short(sockets.connector_sock())}")
+    return Check("connector", "fail", "nothing answers on the connector socket",
+                 "Codex and Cursor cannot reach memory: is the background service running?")
+
+
+def check_model(cfg, ping=True):
+    llm = cfg["llm"]
+    name = llm["backend"]
+    if name == "none":
+        return Check("model", "ok", f"none: {backend.NONE_LOSES}")
+    model = backend.MODELS.get(llm["main_model"], llm["main_model"])
+    s = backend.engine_status() or (backend.claude_status(llm["main_model"], ping) if name == "claude-cli" else None)
+    if name == "anthropic-api" and s is None:
+        from . import keychain
+        if not keychain.present():
+            return Check("model", "fail", "API key missing from the Keychain", f"run {COMMAND} setup")
+        return Check("model", "ok", f"Anthropic API key, {model}")
+    if not s.ok:
+        return Check("model", "fail", s.note or "not working",
+                     s.note if "run claude" in (s.note or "") else f"run {COMMAND} setup to choose again")
+    who = f"Claude Code {s.version}" if name == "claude-cli" else "Anthropic API key"
+    login = ", logged in" if s.logged_in else ""
+    return Check("model", "warn" if s.note else "ok", f"{who}{login}, {model}" + (f" ({s.note})" if s.note else ""))
+
+
+def check_budget(db, cfg):
+    limit = cfg["llm"]["daily_calls"]
+    if db is None:
+        return Check("budget", "ok", f"no calls yet (limit {limit} a day)")
+    day = time.strftime("%Y-%m-%d")
+    today = _count(db, "select sum(calls) from llm_usage where day = ?", day)
+    if today is None:
+        return Check("budget", "ok", f"no calls recorded yet (limit {limit} a day)")
+    week = db.execute("select sum(in_tok), sum(out_tok) from llm_usage where day >= ?",
+                      (time.strftime("%Y-%m-%d", time.localtime(time.time() - 6 * 86400)),)).fetchone()
+    k = lambda n: f"{(n or 0) / 7 / 1000:.1f}k"  # noqa: E731
+    state = "warn" if today >= limit else "ok"
+    return Check("budget", state, f"today {today} of {limit} calls; last 7 days {k(week[0])} in / {k(week[1])} out "
+                 "tokens a day", "the rest waits for tomorrow; raise daily_calls in config.toml" if state == "warn"
+                 else "")
+
+
+def check_backlog(db):
+    if db is None:
+        return Check("backlog", "ok", "0 sessions waiting to be read")
+    try:
+        from lflabs_memory import mem  # the engine's own rule for what is due
+        n = len(mem.pending_sessions(db))
+    except Exception:
+        n = _count(db, "select count(*) from sessions where final = 1") or 0
+    state = "warn" if n > 20 else "ok"
+    return Check("backlog", state, f"{n} session{'s' if n != 1 else ''} waiting to be read",
+                 "the model may be over its budget or logged out (model line)" if state == "warn" else "")
+
+
+def check_claude():
+    if not apps.installed("claude-code"):
+        return Check("Claude Code", "ok", "not installed")
+    r = run(["claude", "plugin", "list"], timeout=30)
+    if r.ok and SERVER in r.out:
+        m = re.search(rf"{re.escape(SERVER)}\S*\s+v?(\d[\w.]*)", r.out)
+        return Check("Claude Code", "ok", f"plugin {SERVER}" + (f" {m.group(1)}" if m else "") + ", hooks on")
+    try:
+        text = (home() / ".claude/settings.json").read_text()
+    except OSError:
+        text = ""
+    if "hook-prompt" in text and "lflabs-memory" in text:
+        return Check("Claude Code", "ok", "hooks in ~/.claude/settings.json")
+    return Check("Claude Code", "warn", "not connected", f"run {COMMAND} setup")
+
+
+def _has(path, needle):
+    try:
+        return needle in path.read_text()
+    except OSError:
+        return False
+
+
+def check_codex():
+    if not apps.installed("codex"):
+        return Check("Codex", "ok", "not installed")
+    mcp = _has(home() / ".codex/config.toml", f"{CONNECTOR}@")
+    hook = _has(home() / ".codex/hooks.json", "hook-prompt")
+    if mcp and hook:
+        return Check("Codex", "ok", "MCP + hook (Codex asks you to trust the hook once: /hooks)")
+    if mcp:
+        return Check("Codex", "warn", "MCP only: no prompt hook", f"run {COMMAND} setup")
+    return Check("Codex", "warn", "not connected", f"run {COMMAND} setup")
+
+
+def check_cursor():
+    if not apps.installed("cursor"):
+        return Check("Cursor", "ok", "not installed")
+    mcp = _has(home() / ".cursor/mcp.json", f"{CONNECTOR}@")
+    hook = _has(home() / ".cursor/hooks.json", "hook-cursor-start")
+    if mcp:
+        return Check("Cursor", "ok" if hook else "warn", "MCP entry present (work only)" +
+                     ("" if hook else "; no session-start hook"), "" if hook else f"run {COMMAND} setup")
+    return Check("Cursor", "warn", "not connected", f"run {COMMAND} setup")
+
+
+def check_privacy(cfg):
+    p = cfg["privacy"]
+    return Check("privacy", "ok", "local only; Codex sessions " + ("on" if p["codex_sessions"] else "off") +
+                 "; chat index " + ("on" if p["chat_index"] else "off") + "; no telemetry")
+
+
+def check_backups():
+    snaps = sorted((data_dir() / "backup").glob("memory-*.db"), key=lambda p: p.stat().st_mtime)
+    if not snaps:
+        return Check("backups", "ok", "no local snapshot yet (the first one is made tonight)")
+    age = (time.time() - snaps[-1].stat().st_mtime) / 3600
+    when = f"{age:.0f} h ago" if age < 48 else f"{age / 24:.0f} d ago"
+    state = "warn" if age > 72 else "ok"
+    return Check("backups", state, f"last local snapshot {when} ({len(snaps)} kept)",
+                 "is the background service running? (engine line above)" if state == "warn" else "")
+
+
+def checks(ping=True):
+    cfg = settings.load()
+    db = _db()
+    try:
+        return [check_engine(), check_data(db), check_models(), check_hook(), check_connector(),
+                check_model(cfg, ping), check_budget(db, cfg), check_backlog(db), check_claude(), check_codex(),
+                check_cursor(), check_privacy(cfg), check_backups()]
+    finally:
+        if db is not None:
+            db.close()
+
+
+def report():
+    """Counts only: nothing a user would mind pasting into a public issue (no text, names or paths)."""
+    cfg = settings.load()
+    db = _db()
+    lines = [f"cli {version('lflabs-memory-cli') or '?'}, engine {version(ENGINE_DIST) or '?'}, connector "
+             f"{CONNECTOR_VERSION}", f"backend {cfg['llm']['backend']}, model {cfg['llm']['main_model']}, "
+             f"daily_calls {cfg['llm']['daily_calls']}"]
+    if db is not None:
+        try:
+            for row in db.execute("select kind, count(*) from memories where status = 'active' group by kind"):
+                lines.append(f"memories kind={row[0]}: {row[1]}")
+            for row in db.execute("select origin, count(*) from memories where status = 'active' group by origin"):
+                lines.append(f"memories origin={row[0]}: {row[1]}")
+            claims = _count(db, "select count(*) from claims where status = 'active'")
+            if claims is not None:
+                lines.append(f"claims: {claims}")
+            saves = _count(db, "select count(*) from saves where at > ?", time.time() - 7 * 86400)
+            if saves is not None:
+                lines.append(f"saves last 7 days: {saves}")
+        finally:
+            db.close()
+    for c in checks(ping=False):
+        lines.append(f"check {c.name}: {c.state}")
+    return "\n".join(lines)
+
+
+def main(as_json=False, as_report=False, licenses=False, out=print):
+    if licenses:
+        for name, model, lic in LICENSES:
+            out(f"{name:<8}{model:<42}{lic}")
+        return 0
+    if as_report:
+        out(report())
+        return 0
+    got = checks()
+    if as_json:
+        out(json.dumps([asdict(c) for c in got], indent=2))
+    else:
+        for c in got:
+            out(f"{c.name:<14}{c.state:<6}{c.note}")
+        todo = [c for c in got if c.state != "ok" and c.fix]
+        if todo:
+            out("")
+            for c in todo:
+                out(f"{c.name}: {c.fix}")
+    return 1 if any(c.state == "fail" for c in got) else 0
