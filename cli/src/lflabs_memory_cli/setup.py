@@ -100,6 +100,7 @@ class Answers:
         self.import_notes = True
         self.codex_sessions = False
         self.apps = list(apps.DEFAULT)
+        self.cursor_personal = False  # Cursor starts at work only unless the user says yes
 
 
 def ask(args, say):
@@ -111,12 +112,15 @@ def ask(args, say):
     a.name = first_name() if args.yes else prompt.text("What should your AI apps call you?", first_name())
     a.claude = backend.claude_status(a.model, ping=not args.dry_run) if shutil.which("claude") else \
         backend.Status("claude-cli", False, note="not installed")  # a dry run runs nothing, not even the ping
+    # Plan first (Hao, 2026-10-28): the user's Claude plan whenever Claude Code is there, logged in or not; an API key
+    # only when the user says yes to it, never as a fallback.
     if args.backend:
         a.backend = args.backend
-        if a.backend == "claude-cli" and not a.claude.ok:
+        if a.backend == "claude-cli" and not a.claude.usable:
             say(f"Claude Code cannot be used for memory's background reading: {a.claude.note}.")
             a.backend = "none"
-    elif a.claude.ok and prompt.yes_no("Use your Claude plan for memory's background reading?", True, assume=yes):
+    elif a.claude.usable and prompt.yes_no("Use your Claude plan for memory's background reading?", True,
+                                           assume=yes):
         a.backend = "claude-cli"
     elif not args.yes and prompt.yes_no("Use an Anthropic API key instead?", False):
         key = prompt.secret("Paste your Anthropic API key (it is kept in your Keychain only):")
@@ -125,10 +129,15 @@ def ask(args, say):
             a.backend, a.api_key = "anthropic-api", key
         else:
             say(f"That key did not work ({note}).")
+    if a.backend == "claude-cli" and a.claude.logged_in is False:
+        say("Claude Code is not logged in yet: run claude, then /login. Memory starts reading once you do.")
     if a.backend == "none":
         say(f"Memory will run without a model: {backend.NONE_LOSES}. `{COMMAND} setup` again to add one later.")
     if args.only:
         a.apps = [x.strip() for x in args.only.split(",") if x.strip()]
+    if "cursor" in a.apps and apps.installed("cursor"):
+        a.cursor_personal = prompt.yes_no(f"Let Cursor see your personal notes too? (Change it any time: {COMMAND} "
+                                          "access cursor work)", False, assume=False if args.yes else None)
     if args.no_import or not list(claude_notes()):
         a.import_notes = False
     else:
@@ -198,6 +207,9 @@ class RealSetup:
     def step_claude(self, ui):
         ui.step("Claude Code", "running")
         c = self.a.claude
+        if self.a.backend == "claude-cli" and c.logged_in is False:
+            ui.step("Claude Code", "warn", "found; log in to start reading (claude, then /login)")
+            return
         if self.a.backend == "claude-cli":
             note = "found, logged in"
         elif self.a.backend == "anthropic-api":
@@ -304,7 +316,14 @@ class RealSetup:
 
     def wire_cursor(self):
         changed, fine = self._apply(apps.file_plans("cursor", self.engine))
-        return "MCP", apps.HINTS["cursor"] if changed else None, fine
+        if not (fine and self.a.cursor_personal):
+            return "MCP", apps.HINTS["cursor"] if changed else None, fine
+        from . import access  # the key goes into Cursor's own files and the engine keeps its hash; never shown
+        widened = access.widen_cursor(self.engine, self.record,
+                                      say=lambda s: self.left_alone.append(("cursor", None, s, ""))) and \
+            access.set_level(self.engine, "cursor", "everything")
+        self.save()
+        return ("MCP (all)" if widened else "MCP"), apps.HINTS["cursor"], True
 
     def step_notes(self, ui):
         ui.step("Your notes", "running")
@@ -412,6 +431,9 @@ def dry_run(a, say):
             say(f"    {short(p.path)}: {p.note}")
             if p.snippet and p.state != "done":
                 say(textwrap.indent(p.snippet.rstrip("\n"), "      "))
+    if "cursor" in a.apps and apps.installed("cursor"):
+        say("\n  Cursor sees " + ("everything, personal notes too (a key in its two files)" if a.cursor_personal
+                                  else "work notes only"))
     if a.import_notes:
         say(f"\n  import {len(list(claude_notes()))} notes from ~/.claude/projects/*/memory")
     say(f"\n  record every change in {short(install_record.install_json())}")

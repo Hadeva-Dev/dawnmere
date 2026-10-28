@@ -249,3 +249,88 @@ def test_setup_then_uninstall_leaves_nothing(box, capsys, monkeypatch):
     assert after == before
     assert not layout.data_dir().exists() and not layout.plist_path().exists()
     assert ["mcp", "remove", "--scope", "user", "lflabs-memory"] in box.calls("claude")
+
+
+def answering(monkeypatch, answers):
+    """prompt.yes_no answering by question (substring -> answer); the rest take their default. Records the questions."""
+    from lflabs_memory_cli import prompt
+    asked = []
+
+    def yes_no(q, default, assume=None):
+        asked.append(q)
+        for part, answer in answers.items():
+            if part in q:
+                return answer
+        return default if assume is None else assume
+    monkeypatch.setattr(prompt, "yes_no", yes_no)
+    return asked
+
+
+def test_cursor_starts_at_work_only(box, capsys):
+    assert run_setup()[0] == 0
+    entry = json.loads((box.home / ".cursor/mcp.json").read_text())["mcpServers"]["lflabs-memory"]
+    assert entry["env"] == {"LFLABS_MEMORY_CLIENT": "cursor"}, "no key: held to work only"
+    hook = json.loads((box.home / ".cursor/hooks.json").read_text())["hooks"]["sessionStart"][0]["command"]
+    assert hook.startswith("LFLABS_MEMORY_CLIENT=cursor "), "its start block is filtered as Cursor's"
+    assert not [c for c in box.calls("lflabs-memory") if c[:2] == ["clients", "level"]]
+
+
+def test_cursor_personal_notes_when_asked(box, monkeypatch, capsys):
+    from lflabs_memory_cli import uninstall
+    asked = answering(monkeypatch, {"Let Cursor see your personal notes too?": True})
+    code, out = run_setup()
+    shown = capsys.readouterr().out
+    assert code == 0, out + shown
+    assert any("Let Cursor see your personal notes too?" in q for q in asked)
+    entry = json.loads((box.home / ".cursor/mcp.json").read_text())["mcpServers"]["lflabs-memory"]
+    key = entry["env"]["LFLABS_MEMORY_CLIENT_KEY"]
+    assert len(key) >= 24
+    hook = json.loads((box.home / ".cursor/hooks.json").read_text())["hooks"]["sessionStart"][0]["command"]
+    assert f"LFLABS_MEMORY_CLIENT=cursor LFLABS_MEMORY_CLIENT_KEY={key} " in hook
+    clients = json.loads((box.data / "clients.json").read_text())["clients"]
+    assert clients["cursor"]["key_sha256"] and key not in json.dumps(clients), "the engine keeps only its hash"
+    assert ["clients", "level", "cursor", "everything"] in box.calls("lflabs-memory")
+    for text in (out, shown, layout.install_json().read_text()):
+        assert key not in text, "the key is never shown or recorded"
+    assert "MCP (all)" in shown or "Cursor: MCP (all)" in shown
+    assert uninstall.main(keep_data=True, out=lambda s: None) == 0
+    assert key not in (box.home / ".cursor/mcp.json").read_text() if (box.home / ".cursor/mcp.json").exists() else True
+
+
+def test_plan_first_even_when_logged_out(box, monkeypatch, capsys):
+    box.rules["claude"] = [r for r in box.rules["claude"] if r[0][:1] != ["-p"]]
+    box.on("claude", ["-p"], 1, "Please run /login")
+    asked = answering(monkeypatch, {})
+    code, out = run_setup()
+    assert 'backend = "claude-cli"' in (layout.data_dir() / "config.toml").read_text()
+    assert "Claude Code is not logged in yet: run claude, then /login" in out
+    assert not any("API key" in q for q in asked), "an API key is never offered while the plan can be used"
+
+
+def test_no_api_key_unless_asked_for(box, monkeypatch, capsys):
+    """No Claude Code: with --yes it is none mode, never the API; the API question is asked only interactively, and
+    a no keeps none mode."""
+    box.remove("claude")
+    asked = answering(monkeypatch, {})
+    run_setup()
+    assert 'backend = "none"' in (layout.data_dir() / "config.toml").read_text()
+    assert not any("API key" in q for q in asked)
+    args = cli.parser().parse_args(["setup", "--plain", "--dry-run"])
+    out = []
+    a = setup.ask(args, out.append)
+    assert a.backend == "none" and any("Anthropic API key" in q for q in asked)
+
+
+def test_access_command(box, monkeypatch, capsys):
+    from lflabs_memory_cli import access
+    assert run_setup()[0] == 0
+    out = []
+    eng = layout.engine_bin()
+    assert access.main("cursor", "everything", eng, say=out.append) == 0
+    assert out[-1] == "Cursor now sees everything, personal notes too. Restart Cursor to load it."
+    entry = json.loads((box.home / ".cursor/mcp.json").read_text())["mcpServers"]["lflabs-memory"]
+    assert "LFLABS_MEMORY_CLIENT_KEY" in entry["env"]
+    assert access.main("cursor", "work", eng, say=out.append) == 0 and out[-1] == "Cursor now sees work notes only."
+    assert access.main("codex", "everything", eng, say=out.append) == 1
+    assert access.main("cursor", None, eng, say=out.append) == 0
+    assert out[-1].startswith("Cursor sees ") and "dawnmere access cursor everything | nothing-personal" in out[-1]

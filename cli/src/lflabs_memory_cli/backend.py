@@ -27,6 +27,7 @@ class Status:
     version: str | None = None
     logged_in: bool | None = None
     note: str = ""
+    usable: bool = False   # Claude Code installed and new enough, logged in or not: the plan can be the backend
 
 
 def engine_status(ping=False):
@@ -83,9 +84,9 @@ def claude_status(model="haiku", ping=True):
         return Status("claude-cli", False, text, note=f"Claude Code {text} is older than {floor}: update it "
                       "(claude update)")
     if not ping:
-        return Status("claude-cli", True, text)
+        return Status("claude-cli", True, text, usable=True)
     logged, note = claude_ping(model)
-    return Status("claude-cli", bool(logged), text, logged, note)
+    return Status("claude-cli", bool(logged), text, logged, note, usable=True)
 
 
 def api_ping(key, model="haiku"):

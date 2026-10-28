@@ -62,6 +62,12 @@ def cmd_import(args):
     return export.import_file(args.file)
 
 
+def cmd_access(args):
+    from . import access
+    from .layout import ENGINE, engine_bin
+    return access.main(args.app, args.level, engine_bin() or ENGINE)
+
+
 def cmd_update(args):
     from . import update
     if args.finish:
@@ -75,6 +81,7 @@ COMMANDS = {
     "uninstall": (cmd_uninstall, "remove everything setup added"),
     "export": (cmd_export, "save your memory to a file"),
     "import": (cmd_import, "add memories from an export file"),
+    "access": (cmd_access, "change what an AI app may see: access cursor everything|work"),
     "update": (cmd_update, f"update {PRODUCT}"),
 }
 
@@ -113,6 +120,9 @@ def parser():
             sp.add_argument("--include-claims", action="store_true")
         elif name == "import":
             sp.add_argument("file")
+        elif name == "access":
+            sp.add_argument("app", help="cursor, codex, ...")
+            sp.add_argument("level", nargs="?", help="everything, nothing-personal, work or nothing (none: show it)")
         elif name == "update":
             sp.add_argument("--check", action="store_true", help="only say whether there is a newer version")
             sp.add_argument("--yes", action="store_true")

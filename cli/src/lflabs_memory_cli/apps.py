@@ -17,6 +17,8 @@ from . import edits
 from .edits import Skip
 from .layout import CLIENT_ENV, CONNECTOR, CONNECTOR_VERSION, ENGINE, SERVER, home
 
+KEY_ENV = "LFLABS_MEMORY_CLIENT_KEY"  # an app trusted with more than work only carries its key (access.py)
+
 LABELS = {"claude-code": "Claude Code", "codex": "Codex", "cursor": "Cursor"}
 DEFAULT = ("claude-code", "codex", "cursor")
 # Claude Code's hooks (the plugin's hooks/hooks.json, and the fallback in ~/.claude/settings.json)
@@ -61,17 +63,18 @@ def ours_command(cmd):
         words[1].startswith("hook-")
 
 
-def engine_cmd(engine, sub, client=None):
-    return (f"{CLIENT_ENV}={client} " if client else "") + f"{shlex.quote(engine)} {sub}"
+def engine_cmd(engine, sub, client=None, key=None):
+    return ((f"{CLIENT_ENV}={client} " if client else "") + (f"{KEY_ENV}={shlex.quote(key)} " if key else "")
+            + f"{shlex.quote(engine)} {sub}")
 
 
 # ---------- plans: what setup adds ----------
 
-def _mcp_entry(client):
-    return {"command": "npx", "args": connector_args(), "env": {CLIENT_ENV: client}}
+def _mcp_entry(client, key=None):
+    return {"command": "npx", "args": connector_args(), "env": {CLIENT_ENV: client, **({KEY_ENV: key} if key else {})}}
 
 
-def plan_mcp_json(app, client, path, key="mcpServers"):
+def plan_mcp_json(app, client, path, key="mcpServers", client_key=None):
     """Cursor's mcp.json (and any app with the same shape): our server entry under `key`."""
     try:
         old = edits.read(path)
@@ -84,8 +87,8 @@ def plan_mcp_json(app, client, path, key="mcpServers"):
         if SERVER in servers:
             return Plan(app, "mcp-json", path, "stale", f"has another {SERVER} entry: left alone (remove it and rerun)")
         new = json.loads(json.dumps(data))
-        new.setdefault(key, {})[SERVER] = _mcp_entry(client)
-        added = json.dumps({SERVER: _mcp_entry(client)}, indent=2)
+        new.setdefault(key, {})[SERVER] = _mcp_entry(client, client_key)
+        added = json.dumps({SERVER: _mcp_entry(client, client_key)}, indent=2)
         return Plan(app, "mcp-json", path, "add", f'add {key}."{SERVER}"', added, edits.dump_json(new, old or ""), old,
                     added)
     except Skip as e:
@@ -150,8 +153,8 @@ def plan_codex_hooks(path, engine):
         return Plan("codex", "codex-hooks", path, "error", str(e), json.dumps(entry, indent=2))
 
 
-def plan_cursor_hooks(path, engine):
-    entry = {"command": engine_cmd(engine, "hook-cursor-start"), "timeout": 10}
+def plan_cursor_hooks(path, engine, client_key=None):
+    entry = {"command": engine_cmd(engine, "hook-cursor-start", "cursor", client_key), "timeout": 10}
     try:
         old = edits.read(path)
         data = edits.load_json(old)
