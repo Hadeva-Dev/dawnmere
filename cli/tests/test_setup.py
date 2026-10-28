@@ -233,9 +233,9 @@ def test_install_record_complete(box, capsys):
     assert record["plist"] == str(layout.plist_path())
 
 
-def test_setup_then_uninstall_leaves_nothing(box, capsys):
+def test_setup_then_uninstall_leaves_nothing(box, capsys, monkeypatch):
     """A3 in miniature: every app file back as it was, no agent, no data, no Keychain item; only backups remain."""
-    from lflabs_memory_cli import uninstall
+    from lflabs_memory_cli import prompt, uninstall
     (box.home / ".codex/config.toml").write_bytes(b'model = "o5"\r\n')
     (box.home / ".cursor/mcp.json").write_text('{\n  "mcpServers": {"gh": {"command": "gh"}}\n}\n')
     (box.home / ".claude/settings.json").write_text('{"theme": "dark"}\n')
@@ -243,7 +243,8 @@ def test_setup_then_uninstall_leaves_nothing(box, capsys):
     box.on("claude", ["plugin", "marketplace"], 1, "")  # the fallback: it writes settings.json too
     assert run_setup()[0] == 0
     assert tree(box.home) != before
-    assert uninstall.main(yes=True, out=lambda s: None) == 0
+    monkeypatch.setattr(prompt, "yes_no", lambda q, default, assume=None: True)  # "Delete your memory too?" yes
+    assert uninstall.main(out=lambda s: None) == 0
     after = {k: v for k, v in tree(box.home).items() if ".lflabs-backup-" not in k}
     assert after == before
     assert not layout.data_dir().exists() and not layout.plist_path().exists()
