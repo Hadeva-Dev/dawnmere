@@ -118,7 +118,7 @@ def check_hook():
     if not r.ok:
         return Check("hook speed", "fail", "the prompt hook failed", "see ~/Library/Logs/LF Labs/memory.log")
     if took > SLOW:
-        return Check("hook speed", "warn", f"recall in {took:.1f} s (limit {SLOW} s)",
+        return Check("hook speed", "warn", f"recall in {took:.2f} s (limit {SLOW} s)",
                      "is the background service running? (engine line above)")
     return Check("hook speed", "ok", f"recall in {took:.2f} s (limit {SLOW} s)")
 

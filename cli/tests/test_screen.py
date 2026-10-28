@@ -185,13 +185,13 @@ def test_fallbacks(monkeypatch):
 
 
 def test_self_check_row(final):
-    assert self_check_row(0.34) == ("ok", "recall in 0.3 s")
+    assert self_check_row(0.34) == ("ok", "recall in 0.34 s")
     state, end = final(check=0.34)
-    assert " ✓ Self-check      recall in 0.3 s" in body_lines(state, end)
+    assert " ✓ Self-check      recall in 0.34 s" in body_lines(state, end)
 
     state, end = final(check=2.1)
     lines = body_lines(state, end)
-    assert " ! Self-check      recall in 2.1 s (slow: dawnmere doctor)" in lines
+    assert " ! Self-check      recall in 2.10 s (slow: dawnmere doctor)" in lines
     assert any("Dawnmere is on." in x for x in lines), "setup still finishes"
     coloured = frame(end, scripted(check=2.1, color=True))
     assert any(f"38;5;{screen.AMBER}m!" in x for x in coloured)
