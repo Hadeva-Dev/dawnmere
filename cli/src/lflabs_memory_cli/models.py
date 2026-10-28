@@ -1,4 +1,5 @@
-"""The local models (spec 10.2): listed in the engine's models.json with URL, size and sha256; downloaded into
+"""The local models (spec 10.2): listed in the engine's models.json (built by `python -m lflabs_memory.models
+FOLDER RELEASE`) with URL, size and sha256; downloaded into
 DATA_DIR/models/<name>/ and refused when a checksum differs.
 
 models.json: {"release": "models-<date>", "models": {"embed": [{"file", "url", "size", "sha256"}], ...}}
