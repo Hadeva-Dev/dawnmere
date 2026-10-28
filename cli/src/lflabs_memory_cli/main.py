@@ -38,8 +38,8 @@ def cmd_setup(args):
         from .demo import FakeSetup
         intro = args.demo != "rerun"
         return play(FakeSetup(args.demo), intro=intro, plain=args.plain, animate=not args.no_animation)
-    print(f"{COMMAND} setup is not built yet. To watch the setup screen: {COMMAND} setup --demo")
-    return 2
+    from . import setup
+    return setup.main(args)
 
 
 def cmd_doctor(args):
@@ -91,6 +91,14 @@ def parser():
             sp.add_argument("--show", action="store_true", help="play the full intro again")
             sp.add_argument("--demo", nargs="?", const="default", choices=SCENARIOS, metavar="SCENARIO",
                             help=f"play the setup screen with fake steps ({', '.join(SCENARIOS)})")
+            sp.add_argument("--yes", action="store_true", help="take the defaults (the screen is still shown)")
+            sp.add_argument("--backend", choices=("claude-cli", "anthropic-api", "none"))
+            sp.add_argument("--model", choices=("haiku", "sonnet"),
+                            help="sonnet remembers a few more of your rules, at about 10 times the usage")
+            sp.add_argument("--only", help="apps to connect: claude-code,codex,cursor")
+            sp.add_argument("--codex-sessions", action="store_true", help="also read Codex's saved sessions")
+            sp.add_argument("--no-import", action="store_true", help="do not import Claude Code's memory files")
+            sp.add_argument("--dry-run", action="store_true", help="show every change, make none")
         elif name == "doctor":
             sp.add_argument("--json", action="store_true", help="the checks as JSON")
             sp.add_argument("--report", action="store_true", help="counts only, safe to paste into an issue")

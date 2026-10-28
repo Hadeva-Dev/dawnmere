@@ -103,6 +103,8 @@ def check_models():
 
 
 def check_hook():
+    if not (data_dir() / "memory.db").exists():  # running the engine would create its data folder
+        return Check("hook speed", "fail", "not set up", f"run {COMMAND} setup")
     eng = engine_bin()
     if not eng:
         return Check("hook speed", "fail", "the engine command is missing", f"reinstall: {COMMAND} update")
