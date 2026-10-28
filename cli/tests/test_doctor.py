@@ -6,6 +6,8 @@ import re
 import sqlite3
 import time
 
+import pytest
+
 import store
 
 from lflabs_memory_cli import backend, doctor, export, layout, models, update
