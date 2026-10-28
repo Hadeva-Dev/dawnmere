@@ -593,6 +593,7 @@ class Memory:
 KIND_ORDER = {"feedback": 0, "project": 1, "reference": 2}  # a working rule first
 WORK_SECTIONS = {"projects", "prefs", "reference", "about"}  # what a work-only app may see
 MEMORY_MAX = 48
+CONTROL = re.compile(r"[\x00-\x08\x0b-\x1f\x7f-\x9f]")  # C0 and C1 controls (ESC, CSI, ...), not newline or tab
 
 # Health and money words, and private details, as the engine has them (mem.py WITHHELD_RE and REDACT). Copied until
 # the engine is its own package (spec 5); then this imports them.
@@ -638,7 +639,8 @@ def pick_memory(imported):
             continue
         if any(r.search(m.text) for r in WITHHELD_RE):
             continue
-        lines = [ln.strip().lstrip("#-* ").strip() for ln in m.text.strip().splitlines()]
+        text = CONTROL.sub(" ", m.text)  # outside text on the user's terminal: no escape codes, ever
+        lines = [ln.strip().lstrip("#-* ").strip() for ln in text.strip().splitlines()]
         first = next((ln for ln in lines if ln), "").rstrip(".")
         if not first:
             continue

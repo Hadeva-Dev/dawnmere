@@ -292,3 +292,8 @@ def test_alignment(final):
     assert all(b + 1 not in blanks for b in blanks), "exactly one blank line between groups"
     hints = [x.index(h) for x in body for h in ("type /hooks once", "restart Cursor") if h in x]
     assert len(set(hints)) == 1, "hints share a column"
+
+
+def test_memory_pick_strips_terminal_escapes():
+    got = pick_memory([mem("use pnpm\x1b]0;pwned\x07 \x1b[2Jalways\x9b31m")])
+    assert got and not any(ch in got for ch in "\x1b\x07\x9b")
