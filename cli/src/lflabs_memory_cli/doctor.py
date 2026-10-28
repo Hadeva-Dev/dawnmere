@@ -229,7 +229,9 @@ def check_cursor():
     mcp = _has(home() / ".cursor/mcp.json", f"{CONNECTOR}@")
     hook = _has(home() / ".cursor/hooks.json", "hook-cursor-start")
     if mcp:
-        return Check("Cursor", "ok" if hook else "warn", "MCP entry present (work only)" +
+        from . import access
+        level = access.current_level("cursor") or "work only"
+        return Check("Cursor", "ok" if hook else "warn", f"MCP, {level} (change it: {COMMAND} access cursor)" +
                      ("" if hook else "; no session-start hook"), "" if hook else f"run {COMMAND} setup")
     return Check("Cursor", "warn", "not connected", f"run {COMMAND} setup")
 

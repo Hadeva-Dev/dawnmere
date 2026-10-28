@@ -1,0 +1,154 @@
+"""What an AI app may see (setup's Cursor question, and `access APP LEVEL` to change it any time).
+
+An app named only by its config is held to work only. Seeing more needs proof: a key the engine registers (only its
+hash is kept) and that the app's own entries carry (LFLABS_MEMORY_CLIENT_KEY). The key is made here, handed to the
+engine on stdin and written into the app's config; it is never printed, logged or put on a command line.
+"""
+import json
+import secrets
+import subprocess
+import sys
+
+from . import apps, edits
+from .brand import COMMAND
+from .layout import CLIENT_ENV, data_dir, home, short
+from .run import run
+
+KEY_ENV = apps.KEY_ENV
+LEVELS = ("everything", "nothing-personal", "work", "nothing")
+SAYS = {"everything": "everything, personal notes too", "nothing-personal": "everything but personal notes",
+        "work": "work notes only", "nothing": "nothing"}
+WIDER = ("everything", "nothing-personal")  # beyond work only: needs the key
+
+
+def _engine(code, stdin=""):
+    """Run a few lines of the engine in this tool's Python (the CLI and the engine share one environment)."""
+    return subprocess.run([sys.executable, "-c", code], input=stdin, capture_output=True, text=True, timeout=60)
+
+
+def register_key(client):
+    """A new key for this client, registered with the engine (only its hash is stored there). None on failure."""
+    key = secrets.token_urlsafe(24)
+    r = _engine("import sys\nfrom lflabs_memory import mem\n"
+                f"mem.clients_add({client!r}, with_key=True, key=sys.stdin.read().strip())", key)
+    return key if r.returncode == 0 else None
+
+
+def set_level(engine, client, level):
+    return run([engine, "clients", "level", client, level], timeout=60).ok
+
+
+def current_level(client):
+    """The engine's word for what this client sees ("everything", "work only", ...), or None."""
+    if not (data_dir() / "config.toml").exists():
+        return None
+    r = _engine("from lflabs_memory import access, mem\n"
+                f"print(access.level_name(mem.client_hide({client!r}, True), mem) or 'custom')")
+    return (r.stdout.strip() or None) if r.returncode == 0 else None
+
+
+# ---------- Cursor's two files with a key ----------
+
+def cursor_plans(engine, key, h=None):
+    """Cursor's mcp.json entry and start hook, both carrying the key (added, or the key put in place)."""
+    h = h or home()
+    return [plan_key_json(h / ".cursor/mcp.json", key), plan_key_hook(h / ".cursor/hooks.json", engine, key)]
+
+
+def mask(text, key):
+    return text.replace(key, "<the key setup made>") if key and text else text
+
+
+def plan_key_json(path, key):
+    p = apps.plan_mcp_json("cursor", "cursor", path, client_key=key)
+    if p.state != "done":
+        return p
+    try:  # our entry is there already: give it the key
+        old = edits.read(path)
+        data = edits.load_json(old)
+        new = json.loads(json.dumps(data))
+        entry = next(v for v in new["mcpServers"].values() if apps.ours_server(v))
+        env = entry.get("env") if isinstance(entry.get("env"), dict) else {}
+        if env.get(KEY_ENV) == key:
+            return p
+        entry["env"] = {**env, CLIENT_ENV: "cursor", KEY_ENV: key}
+        return apps.Plan("cursor", "mcp-json", path, "add", "give its entry a key", "", edits.dump_json(new, old), old,
+                         "")
+    except edits.Skip as e:
+        return apps.Plan("cursor", "mcp-json", path, "error", str(e))
+
+
+def plan_key_hook(path, engine, key):
+    cmd = apps.engine_cmd(engine, "hook-cursor-start", "cursor", key)
+    try:
+        old = edits.read(path)
+        data = edits.load_json(old)
+        hooks = data.get("hooks") if isinstance(data.get("hooks"), dict) else {}
+        items = hooks.get("sessionStart") if isinstance(hooks.get("sessionStart"), list) else []
+        mine = [i for i, h in enumerate(items) if isinstance(h, dict) and apps.ours_command(h.get("command"))]
+        if not mine:
+            return apps.plan_cursor_hooks(path, engine, client_key=key)
+        new = json.loads(json.dumps(data))
+        for i in mine:
+            new["hooks"]["sessionStart"][i]["command"] = cmd
+        if new == data:
+            return apps.Plan("cursor", "cursor-hooks", path, "done", "already has the hook")
+        return apps.Plan("cursor", "cursor-hooks", path, "add", "give the hook the key", "", edits.dump_json(new, old),
+                         old, "")
+    except edits.Skip as e:
+        return apps.Plan("cursor", "cursor-hooks", path, "error", str(e))
+
+
+def widen_cursor(engine, record=None, say=print):
+    """Register a new key for Cursor and put it in both its files. True when Cursor will be recognised by it."""
+    key = register_key("cursor")
+    if not key:
+        say("The memory service could not register Cursor's key; Cursor stays at work only.")
+        return False
+    ok = True
+    for p in cursor_plans(engine, key):
+        if p.state == "add":
+            try:
+                if record is not None:
+                    p.added, p.snippet = mask(p.added, key), mask(p.snippet, key)
+                    backup = edits.write(p.path, p.new, p.old)
+                    from . import install_record
+                    install_record.add_file(record, p, backup, edits.sha256(p.new))
+                else:
+                    edits.write(p.path, p.new, p.old)
+            except edits.Skip as e:
+                say(f"{short(p.path)}: {e}")
+                ok = False
+        elif p.state in ("error", "stale"):
+            say(f"{short(p.path)}: {p.note}")
+            ok = False
+    return ok
+
+
+# ---------- access APP LEVEL ----------
+
+def main(app, level, engine, say=print):
+    app = app.lower()
+    if level is None:  # just say what it sees, and how to change it
+        now = current_level(app) or "not set up"
+        say(f"{apps.LABELS.get(app, app.capitalize())} sees {now}. To change it: {COMMAND} access {app} "
+            f"{' | '.join(LEVELS)}")
+        return 0
+    if level not in LEVELS:
+        say(f"Choose one of: {', '.join(LEVELS)}.")
+        return 2
+    if not (data_dir() / "config.toml").exists():
+        say(f"Memory is not set up yet: run {COMMAND} setup first.")
+        return 1
+    if app != "cursor" and level in WIDER:
+        say(f"Only Cursor can be widened from here for now. In Claude Code, say \"let {app} see everything\".")
+        return 1
+    if app == "cursor" and level in WIDER and not widen_cursor(engine, say=say):
+        return 1
+    if not set_level(engine, app, level):
+        say(f"The memory service did not take the change; {COMMAND} doctor says why.")
+        return 1
+    say(f"{apps.LABELS.get(app, app.capitalize())} now sees {SAYS[level]}." +
+        (" Restart Cursor to load it." if app == "cursor" and level in WIDER else ""))
+    return 0
+

@@ -64,7 +64,7 @@ budget        ok    today 41 of 200 calls; last 7 days 0.9k in / 0.2k out tokens
 backlog       ok    0 sessions waiting to be read
 Claude Code   ok    plugin lflabs-memory 1.0.0b1, hooks on
 Codex         ok    MCP + hook (Codex asks you to trust the hook once: /hooks)
-Cursor        ok    MCP entry present (work only)
+Cursor        ok    MCP, work only (change it: dawnmere access cursor)
 privacy       ok    local only; Codex sessions off; chat index off; no telemetry
 backups       ok    last local snapshot 6 h ago (1 kept)"""
 
