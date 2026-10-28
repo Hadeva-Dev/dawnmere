@@ -4,7 +4,7 @@ version = "0.1.0.dev0"
 description = "Installer and setup CLI for LF Labs memory"
 license = "MIT"
 requires-python = ">=3.12,<3.14"
-dependencies = []
+dependencies = ["lflabs-memory-engine>=0.1.0"]
 
 [project.scripts]
 dawnmere = "lflabs_memory_cli.main:main"
@@ -26,3 +26,8 @@ testpaths = ["tests"]
 
 [tool.uv]
 python-preference = "only-managed"
+
+# Development: the engine checkout beside this repo (CI clones it there at ENGINE_TAG). A release installs the engine
+# wheel from the same release instead (install.sh, --with).
+[tool.uv.sources]
+lflabs-memory-engine = { path = "../../lflabs-memory-engine" }

@@ -1,0 +1,24 @@
+name: test
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  cli:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - run: brew install shellcheck
+      - name: The engine beside this repo, at ENGINE_TAG (private until launch)
+        run: git clone --depth 1 --branch "$(cat ENGINE_TAG)" "https://x-access-token:${{ secrets.ENGINE_REPO_TOKEN }}@github.com/Hadeva-Dev/lflabs-memory-engine" ../lflabs-memory-engine
+      - run: cd cli && uv run pytest -q
+  connector:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: cd connector && npm ci && npm test
