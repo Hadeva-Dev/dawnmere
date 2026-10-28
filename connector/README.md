@@ -1,7 +1,7 @@
-# Wayfern connector
+# Dawnmere connector
 
 Lets your AI apps share one memory. Claude, Cursor, Codex and the rest each launch this small MCP server, and it
-passes their `recall`, `remember` and `forget` calls to the Wayfern app on your Mac. Tell Claude a project decision on Monday
+passes their `recall`, `remember` and `forget` calls to Dawnmere on your Mac. Tell Claude a project decision on Monday
 and Cursor knows it on Tuesday.
 
 ```mermaid
@@ -9,22 +9,24 @@ flowchart LR
   A[Claude Desktop] --> C
   B[Claude Code] --> C
   D[Cursor, Codex, Windsurf, VS Code...] --> C
-  C["lflabs-memory-connector<br/>(this repo, one per app)"] -- "local socket, one JSON line each way" --> W["Wayfern app on your Mac<br/>(memory, search, permissions)"]
+  C["lflabs-memory-connector<br/>(this repo, one per app)"] -- "local socket, one JSON line each way" --> W["Dawnmere on your Mac<br/>(memory, search, permissions)"]
 ```
 
-**Status: early beta, Mac only. Wayfern is a working name and will change; the package and settings names below will not.** The connector works and is tested, but it needs the Wayfern app running on the same
-Mac, and that app is in private beta. Without it every call answers "Wayfern isn't running on this computer".
+**Status: early beta, Mac only.** The connector is the small piece each AI app launches; Dawnmere itself installs with
+one line (see the [repo's README](../README.md)) and runs in the background on the same Mac. Without it every call
+answers "Dawnmere isn't running on this computer". The package and settings names below are neutral and will not
+change if the product name does.
 
 ## Why a connector and not a memory server
 
 Most MCP memory servers keep the memory inside the server, so each app gets its own pile. Here the memory lives in
-one place, the Wayfern app, and every app reaches the same one. The connector stores nothing, sends nothing over the
-network, and does not decide what an app may see: the app does, per AI app (Cursor can be held to work notes while
+one place, Dawnmere, and every app reaches the same one. The connector stores nothing, sends nothing over the
+network, and does not decide what an app may see: Dawnmere does, per AI app (Cursor can be held to work notes while
 Claude sees everything). That keeps this repo small enough to read in a few minutes.
 
 ## Install
 
-Check that the Wayfern app answers first:
+Check that Dawnmere answers first:
 
 ```bash
 npx -y lflabs-memory-connector --check
@@ -78,15 +80,15 @@ Needs Node 18 or later (Claude Desktop brings its own for the `.mcpb`).
 
 | variable | default | meaning |
 | --- | --- | --- |
-| `LFLABS_MEMORY_CLIENT` | none | a name for the app, shown in Wayfern and used for its permissions |
-| `LFLABS_MEMORY_CLIENT_KEY` | none | a key the Wayfern app gives an app it trusts with more than its default |
-| `LFLABS_MEMORY_SOCKET` | `~/Library/Application Support/LF Labs/memory-connector.sock` | where the Wayfern app listens |
+| `LFLABS_MEMORY_CLIENT` | none | a name for the app, shown in Dawnmere and used for its permissions |
+| `LFLABS_MEMORY_CLIENT_KEY` | none | a key Dawnmere gives an app it trusts with more than its default |
+| `LFLABS_MEMORY_SOCKET` | `~/Library/Application Support/LF Labs/memory-connector.sock` | where Dawnmere listens |
 | `LFLABS_MEMORY_TIMEOUT_MS` | `15000` | how long to wait for an answer |
 
 ## Limits
 
-- Mac only, and only with the Wayfern app running. No Windows or Linux app yet.
-- Cloud apps (claude.ai, ChatGPT) cannot launch a local server. They will connect to Wayfern's own URL instead, which
+- Mac only, and only with Dawnmere running. No Windows or Linux app yet.
+- Cloud apps (claude.ai, ChatGPT) cannot launch a local server. They will connect to Dawnmere's own URL instead, which
   is not live yet.
 - An app's name is a label, not a password: any program running as you can talk to the socket. Permissions keep each
   AI app to what suits it; they are not a wall against software you already run.

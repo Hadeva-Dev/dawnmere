@@ -1,20 +1,20 @@
 {
   "manifest_version": "0.3",
   "name": "lflabs-memory-connector",
-  "display_name": "Wayfern",
+  "display_name": "Dawnmere",
   "version": "0.1.0",
-  "description": "One memory shared across your AI apps. Connects to the Wayfern app on your Mac.",
-  "long_description": "Wayfern gives Claude, Cursor, Codex and your other AI apps one shared memory, kept on your Mac. This extension connects Claude Desktop to the Wayfern app: it searches, saves and forgets memories through the app and stores nothing itself. Early beta: it needs the Wayfern app running on the same Mac.",
+  "description": "One memory shared across your AI apps. Connects to Dawnmere on your Mac.",
+  "long_description": "Dawnmere gives Claude, Cursor, Codex and your other AI apps one shared memory, kept on your Mac. This extension connects Claude Desktop to Dawnmere: it searches, saves and forgets memories through Dawnmere and stores nothing itself. Early beta: it needs Dawnmere running on the same Mac.",
   "author": {
     "name": "LF Labs",
     "url": "https://github.com/Hadeva-Dev"
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/Hadeva-Dev/lflabs-memory-connector.git"
+    "url": "https://github.com/Hadeva-Dev/dawnmere.git"
   },
-  "homepage": "https://github.com/Hadeva-Dev/lflabs-memory-connector",
-  "support": "https://github.com/Hadeva-Dev/lflabs-memory-connector/issues",
+  "homepage": "https://github.com/Hadeva-Dev/dawnmere",
+  "support": "https://github.com/Hadeva-Dev/dawnmere/issues",
   "server": {
     "type": "node",
     "entry_point": "server/index.js",
