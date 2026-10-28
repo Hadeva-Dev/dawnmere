@@ -50,9 +50,11 @@ def current_level(client):
 # ---------- Cursor's two files with a key ----------
 
 def cursor_plans(engine, key, h=None):
-    """Cursor's mcp.json entry and start hook, both carrying the key (added, or the key put in place)."""
+    """Cursor's mcp.json entry with the key (added, or the key put in place), and its start hook as setup writes it.
+    The key is never put on the hook's command line (a shell's argv shows in `ps`): the start block is then held to
+    work only, while the recall tool, which carries the key, sees what Cursor may see."""
     h = h or home()
-    return [plan_key_json(h / ".cursor/mcp.json", key), plan_key_hook(h / ".cursor/hooks.json", engine, key)]
+    return [plan_key_json(h / ".cursor/mcp.json", key), apps.plan_cursor_hooks(h / ".cursor/hooks.json", engine)]
 
 
 def mask(text, key):
@@ -78,27 +80,6 @@ def plan_key_json(path, key):
         return apps.Plan("cursor", "mcp-json", path, "error", str(e))
 
 
-def plan_key_hook(path, engine, key):
-    cmd = apps.engine_cmd(engine, "hook-cursor-start", "cursor", key)
-    try:
-        old = edits.read(path)
-        data = edits.load_json(old)
-        hooks = data.get("hooks") if isinstance(data.get("hooks"), dict) else {}
-        items = hooks.get("sessionStart") if isinstance(hooks.get("sessionStart"), list) else []
-        mine = [i for i, h in enumerate(items) if isinstance(h, dict) and apps.ours_command(h.get("command"))]
-        if not mine:
-            return apps.plan_cursor_hooks(path, engine, client_key=key)
-        new = json.loads(json.dumps(data))
-        for i in mine:
-            new["hooks"]["sessionStart"][i]["command"] = cmd
-        if new == data:
-            return apps.Plan("cursor", "cursor-hooks", path, "done", "already has the hook")
-        return apps.Plan("cursor", "cursor-hooks", path, "add", "give the hook the key", "", edits.dump_json(new, old),
-                         old, "")
-    except edits.Skip as e:
-        return apps.Plan("cursor", "cursor-hooks", path, "error", str(e))
-
-
 def widen_cursor(engine, record=None, say=print):
     """Register a new key for Cursor and put it in both its files. True when Cursor will be recognised by it."""
     key = register_key("cursor")
@@ -111,11 +92,11 @@ def widen_cursor(engine, record=None, say=print):
             try:
                 if record is not None:
                     p.added, p.snippet = mask(p.added, key), mask(p.snippet, key)
-                    backup = edits.write(p.path, p.new, p.old)
+                    backup = edits.write(p.path, p.new, p.old, secret=KEY_ENV in p.new)
                     from . import install_record
                     install_record.add_file(record, p, backup, edits.sha256(p.new))
                 else:
-                    edits.write(p.path, p.new, p.old)
+                    edits.write(p.path, p.new, p.old, secret=KEY_ENV in p.new)
             except edits.Skip as e:
                 say(f"{short(p.path)}: {e}")
                 ok = False

@@ -286,7 +286,8 @@ def test_cursor_personal_notes_when_asked(box, monkeypatch, capsys):
     key = entry["env"]["LFLABS_MEMORY_CLIENT_KEY"]
     assert len(key) >= 24
     hook = json.loads((box.home / ".cursor/hooks.json").read_text())["hooks"]["sessionStart"][0]["command"]
-    assert f"LFLABS_MEMORY_CLIENT=cursor LFLABS_MEMORY_CLIENT_KEY={key} " in hook
+    assert hook.startswith("LFLABS_MEMORY_CLIENT=cursor ") and key not in hook, "never a key on a command line"
+    assert oct((box.home / ".cursor/mcp.json").stat().st_mode & 0o777) == "0o600", "the file with the key: owner only"
     clients = json.loads((box.data / "clients.json").read_text())["clients"]
     assert clients["cursor"]["key_sha256"] and key not in json.dumps(clients), "the engine keeps only its hash"
     assert ["clients", "level", "cursor", "everything"] in box.calls("lflabs-memory")

@@ -105,10 +105,11 @@ def backup_name(real):
     return b
 
 
-def write(path, new, old):
+def write(path, new, old, secret=False):
     """Back up and replace one file (through a symlink, keeping its mode), only if it still holds `old` and is not
-    read-only. new=None deletes it. Returns the backup's path, or None when there was no file. Raises Skip, and leaves
-    no temp file behind."""
+    read-only. new=None deletes it. secret: the new text holds a key, so the file is made readable by its owner only
+    (a stricter mode is kept, never loosened). Returns the backup's path, or None when there was no file. Raises Skip,
+    and leaves no temp file behind."""
     real = Path(os.path.realpath(path))
     mode, backup = 0o600, None
     tmp = real.with_name(real.name + ".lflabs-tmp")
@@ -118,6 +119,8 @@ def write(path, new, old):
             if not st.st_mode & 0o200:
                 raise Skip("is read-only: left alone")
             mode = st.st_mode & 0o777
+        if secret:
+            mode &= 0o600
         if read(real) != old:
             raise Skip("changed while I was reading it (the app wrote it?): left alone; run this again")
         if old is not None:
