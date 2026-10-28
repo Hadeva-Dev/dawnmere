@@ -14,6 +14,7 @@ from .layout import CONNECTOR, CONNECTOR_VERSION, ENGINE_DIST, SERVER, data_dir,
 from .run import run
 
 SLOW = 1.5
+IDLE = 600  # the engine reads a session once it has been quiet this long (EXTRACT_IDLE) or has ended
 LICENSES = [("embed", "bge-small-en-v1.5", "MIT"), ("rerank", "ms-marco-MiniLM-L-6-v2", "Apache-2.0"),
             ("sense", "friday-sense-v3 (mmBERT-base fine-tune)", "MIT base, LF Labs weights")]
 
@@ -168,11 +169,18 @@ def check_budget(db, cfg):
 def check_backlog(db):
     if db is None:
         return Check("backlog", "ok", "0 sessions waiting to be read")
+    n = 0
     try:
-        from lflabs_memory import mem  # the engine's own rule for what is due
-        n = len(mem.pending_sessions(db))
-    except Exception:
-        n = _count(db, "select count(*) from sessions where final = 1") or 0
+        for s in db.execute("select transcript, done_line, activity, final from sessions"):
+            if not (s["final"] or time.time() - s["activity"] >= IDLE):
+                continue
+            try:
+                with open(s["transcript"], "rb") as f:
+                    n += sum(1 for _ in f) > s["done_line"]
+            except OSError:
+                continue
+    except sqlite3.Error:
+        pass
     state = "warn" if n > 20 else "ok"
     return Check("backlog", state, f"{n} session{'s' if n != 1 else ''} waiting to be read",
                  "the model may be over its budget or logged out (model line)" if state == "warn" else "")

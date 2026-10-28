@@ -224,3 +224,28 @@ def test_update_rolls_back_on_failed_migration(mac, monkeypatch):
     assert any("bootstrap" in c for c in mac.calls("launchctl")), "the service is started again"
     assert out[-1].startswith("Back on 0.1.0; your memory is as it was")
     assert list((data / "backup").glob("memory-*-before-update.db"))
+
+
+def test_models_download_checks_checksums(tmp_path):
+    import importlib.util
+    import io
+    from pathlib import Path
+    spec = importlib.util.spec_from_file_location("mm", Path(__file__).resolve().parents[1] / "tools/make_models_json.py")
+    mm = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mm)
+    src = tmp_path / "src"
+    (src / "embed").mkdir(parents=True)
+    (src / "embed/model.onnx").write_bytes(b"weights" * 100)
+    man = mm.manifest(src, "models-2026-10-28")
+    assert man["models"]["embed"][0]["url"].endswith("/models-2026-10-28/embed-model.onnx")
+    served = {"good": b"weights" * 100, "bad": b"evil" * 100}
+    for which in ("good", "bad"):
+        dest = tmp_path / which
+        opener = lambda url, timeout: io.BytesIO(served[which])  # noqa: E731
+        if which == "good":
+            models.download(man, ["embed"], where=dest, opener=opener)
+            assert models.check(man, dest) == {"embed": "ok"}
+        else:
+            with pytest.raises(models.ChecksumError):
+                models.download(man, ["embed"], where=dest, opener=opener)
+            assert not list(dest.rglob("*.onnx*")), "nothing half-downloaded is left"
