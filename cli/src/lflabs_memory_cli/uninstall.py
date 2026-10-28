@@ -72,7 +72,7 @@ def _file(entry, rep):
     rep.row(label, "removed", f"{short(path)}: {p.note}")
 
 
-def main(keep_data=False, yes=False, out=print):
+def main(keep_data=False, out=print):
     record = install_record.load()
     rep = Report(out)
     out(f"Removing memory from this Mac{'' if record else ' (no install record: looking for what is there)'}.\n")
@@ -96,22 +96,22 @@ def main(keep_data=False, yes=False, out=print):
                           ("gone", "none in the Keychain")))
 
     data = data_dir()
-    delete = not keep_data and prompt.yes_no(
-        f"Delete your memory too? It cannot be brought back. Export first with {COMMAND} export.", False,
-        assume=True if yes else None)
-    if keep_data:
+    # Always asked, --yes or not: the memory cannot be brought back. Nobody at a terminal to answer: it is kept.
+    delete = not keep_data and data.exists() and prompt.yes_no(
+        f"Delete your memory too? It cannot be brought back. Export first with {COMMAND} export.", False)
+    if not data.exists():
+        rep.row("Your memory", "gone", f"{short(data)}: already gone")
+        connector_sock().unlink(missing_ok=True)
+    elif keep_data:
         out(f"{'Your memory':<21}kept in {short(data)}")
     elif delete:
-        if data.exists():
-            shutil.rmtree(data, ignore_errors=True)
-            rep.row("Your memory", "removed", f"{short(data)} deleted")
-        else:
-            rep.row("Your memory", "gone", f"{short(data)}: already gone")
+        shutil.rmtree(data, ignore_errors=True)
+        rep.row("Your memory", "removed", f"{short(data)} deleted")
         connector_sock().unlink(missing_ok=True)
         for log in logs_dir().glob("memory.log*"):
             log.unlink(missing_ok=True)
     else:
-        out(f"{'Your memory':<21}kept in {short(data)}")
+        out(f"{'Your memory':<21}kept in {short(data)} (delete the folder yourself if you change your mind)")
 
     if shutil.which("uv"):
         r = run(["uv", "tool", "uninstall", CLI_DIST], timeout=120)

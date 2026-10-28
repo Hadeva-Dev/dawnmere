@@ -49,7 +49,7 @@ def cmd_doctor(args):
 
 def cmd_uninstall(args):
     from . import uninstall
-    return uninstall.main(keep_data=args.keep_data, yes=args.yes)
+    return uninstall.main(keep_data=args.keep_data)
 
 
 def cmd_export(args):
@@ -105,7 +105,8 @@ def parser():
             sp.add_argument("--licenses", action="store_true", help="the models' licenses")
         elif name == "uninstall":
             sp.add_argument("--keep-data", action="store_true", help="keep your memory")
-            sp.add_argument("--yes", action="store_true", help="answer yes to every question")
+            sp.add_argument("--yes", action="store_true",
+                            help="no effect: deleting your memory is always asked")
         elif name == "export":
             sp.add_argument("--out", help="the file to write")
             sp.add_argument("--format", choices=("json", "md"), default="json")
