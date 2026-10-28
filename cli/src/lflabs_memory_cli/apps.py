@@ -63,9 +63,9 @@ def ours_command(cmd):
         words[1].startswith("hook-")
 
 
-def engine_cmd(engine, sub, client=None, key=None):
-    return ((f"{CLIENT_ENV}={client} " if client else "") + (f"{KEY_ENV}={shlex.quote(key)} " if key else "")
-            + f"{shlex.quote(engine)} {sub}")
+def engine_cmd(engine, sub, client=None):
+    """A hook's command. Never a key: a shell's command line shows in `ps`."""
+    return (f"{CLIENT_ENV}={client} " if client else "") + f"{shlex.quote(engine)} {sub}"
 
 
 # ---------- plans: what setup adds ----------
@@ -153,8 +153,8 @@ def plan_codex_hooks(path, engine):
         return Plan("codex", "codex-hooks", path, "error", str(e), json.dumps(entry, indent=2))
 
 
-def plan_cursor_hooks(path, engine, client_key=None):
-    entry = {"command": engine_cmd(engine, "hook-cursor-start", "cursor", client_key), "timeout": 10}
+def plan_cursor_hooks(path, engine):
+    entry = {"command": engine_cmd(engine, "hook-cursor-start", "cursor"), "timeout": 10}
     try:
         old = edits.read(path)
         data = edits.load_json(old)
