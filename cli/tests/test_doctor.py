@@ -229,16 +229,13 @@ def test_update_rolls_back_on_failed_migration(mac, monkeypatch):
 
 
 def test_models_download_checks_checksums(tmp_path):
-    import importlib.util
     import io
-    from pathlib import Path
-    spec = importlib.util.spec_from_file_location("mm", Path(__file__).resolve().parents[1] / "tools/make_models_json.py")
-    mm = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(mm)
+
+    from lflabs_memory import models as engine_models  # the engine writes models.json; the CLI downloads by it
     src = tmp_path / "src"
     (src / "embed").mkdir(parents=True)
     (src / "embed/model.onnx").write_bytes(b"weights" * 100)
-    man = mm.manifest(src, "models-2026-10-28")
+    man = engine_models.build(src, "models-2026-10-28", files={"embed": ("model.onnx",)})
     assert man["models"]["embed"][0]["url"].endswith("/models-2026-10-28/embed-model.onnx")
     served = {"good": b"weights" * 100, "bad": b"evil" * 100}
     for which in ("good", "bad"):
