@@ -6,7 +6,7 @@ import pytest
 from conftest import THREE, plan, scripted
 
 from lflabs_memory_cli import screen
-from lflabs_memory_cli.screen import (BLOCK, LABEL, AppResult, Memory, ScreenState, done_at, frame, pick_memory,
+from lflabs_memory_cli.screen import (LABEL, AppResult, Memory, ScreenState, done_at, frame, pick_memory,
                                       self_check_row, sun_offset, track, visible)
 
 GOLDEN = Path(__file__).parent / "banner"
