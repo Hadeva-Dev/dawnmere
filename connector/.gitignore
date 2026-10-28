@@ -1,0 +1,7 @@
+node_modules/
+dist/
+mcpb/server/
+*.mcpb
+*.tgz
+.DS_Store
+mcpb/LICENSE
