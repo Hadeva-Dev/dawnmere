@@ -42,7 +42,8 @@ claude mcp add lflabs-memory -- npx -y lflabs-memory-connector
 
 or as a plugin: `/plugin marketplace add Hadeva-Dev/lflabs-memory-connector`, then `/plugin install lflabs-memory@lflabs`.
 
-**Cursor, Windsurf, Gemini CLI, VS Code** (each app's MCP config file):
+**Cursor, Windsurf, Gemini CLI** (`~/.cursor/mcp.json`, `~/.codeium/windsurf/mcp_config.json`,
+`~/.gemini/settings.json`):
 
 ```json
 {
@@ -51,6 +52,24 @@ or as a plugin: `/plugin marketplace add Hadeva-Dev/lflabs-memory-connector`, th
       "command": "npx",
       "args": ["-y", "lflabs-memory-connector"],
       "env": { "LFLABS_MEMORY_CLIENT": "cursor" }
+    }
+  }
+}
+```
+
+Set `LFLABS_MEMORY_CLIENT` to the app it is in: `cursor`, `windsurf` or `gemini`. The name decides what that app may
+see, so do not copy Cursor's into another app.
+
+**VS Code** (the user `mcp.json`: run "MCP: Open User Configuration" from the Command Palette):
+
+```json
+{
+  "servers": {
+    "lflabs-memory": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "lflabs-memory-connector"],
+      "env": { "LFLABS_MEMORY_CLIENT": "copilot" }
     }
   }
 }
