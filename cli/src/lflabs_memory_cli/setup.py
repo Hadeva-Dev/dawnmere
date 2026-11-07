@@ -87,6 +87,9 @@ def preflight(say):
         problems.append(f"{PRODUCT} needs 1 GB of free disk space (this Mac has {free / 1e9:.1f} GB).")
     if not shutil.which("uv"):
         say(f"Note: uv is not on PATH, so `{COMMAND} update` and `{COMMAND} uninstall` will ask you to install it.")
+    if not shutil.which("npx"):  # every app's MCP entry runs the connector with npx
+        say("Note: Node.js is not installed, so your apps cannot use memory's tools (recall, remember) until you "
+            "install it from nodejs.org.")
     return problems
 
 

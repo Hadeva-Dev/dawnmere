@@ -337,3 +337,11 @@ def test_access_command(box, monkeypatch, capsys):
     assert access.main("codex", "everything", eng, say=out.append) == 1
     assert access.main("cursor", None, eng, say=out.append) == 0
     assert out[-1].startswith("Cursor sees ") and "dawnmere access cursor everything | nothing-personal" in out[-1]
+
+
+def test_node_missing_is_said(box):
+    """No npx: setup still works (the hooks need no Node), and says the apps' memory tools wait for Node.js."""
+    code, out = run_setup()
+    assert code == 0 and "Node.js is not installed" in out
+    box.add("npx")
+    assert "Node.js" not in run_setup()[1]
