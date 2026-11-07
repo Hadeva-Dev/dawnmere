@@ -21,7 +21,7 @@
       "environmentVariables": [
         {
           "name": "LFLABS_MEMORY_CLIENT",
-          "description": "A name for this app (cursor, codex, windsurf...). The Dawnmere shows it and uses it for what this app may see.",
+          "description": "A name for this app (cursor, codex, windsurf...). Dawnmere shows it and uses it for what this app may see.",
           "isRequired": false,
           "isSecret": false
         }

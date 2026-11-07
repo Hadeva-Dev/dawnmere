@@ -1,11 +1,10 @@
 # Going public: what only the owner can do
 
-In order. Nothing here is done yet; the repo is private and nothing is published.
+In order. Nothing is published yet.
 
 ## Before anything is public
 
-1. **Pick the product name.** The first trademark pass knocked out the working name, so the listings wait for a new
-   one. Then follow "Renaming" below.
+1. **Pick the product name.** Done: it is in `src/brand.ts`, and "Renaming" below lists every place it appears.
 2. **The memory app answers the connector protocol.** Done: the engine's daemon answers `docs/PROTOCOL.md` on the
    connector socket (checked end to end on 2026-11-07). Users still need the engine installed and running.
 3. **Review the repo once:** README, `docs/`, `src/` (about 230 lines). Commits carry your git name and email, as in
@@ -20,7 +19,8 @@ The product name appears only in:
 
 - `src/brand.ts` (`PRODUCT`)
 - `README.md` and `docs/LISTING.md`
-- the display text in `package.json`, `server.json`, `mcpb/manifest.json` and `.claude-plugin/*.json`
+- the display text in `package.json`, `server.json`, `mcpb/manifest.json`, `../plugin/.claude-plugin/plugin.json` and
+  `../.claude-plugin/marketplace.json`
 
 `npm test` fails if the name turns up anywhere else, so a rename is a search and replace over those files plus a test
 run. If the new name should also be the package name, that is a bigger change: package, `mcpName`, registry name and
@@ -28,20 +28,18 @@ plugin name together (the tests check they agree), done before the first npm pub
 
 ## Publish
 
-5. **Flip the repo to public:** `gh repo edit Hadeva-Dev/lflabs-memory-connector --visibility public --accept-visibility-change-consequences`.
+5. **Flip the repo to public:** `gh repo edit Hadeva-Dev/dawnmere --visibility public --accept-visibility-change-consequences`.
 6. **Publish to npm** (needs an npm account; `lflabs-memory-connector` was free on 2026-10-25):
    ```bash
+   cd connector
    npm login
    npm publish --access public
    ```
-7. **Make a GitHub release** with the bundle, so Claude Desktop users can download it:
-   ```bash
-   npm run pack:mcpb
-   gh release create v0.1.0 lflabs-memory-connector.mcpb --title "0.1.0" --notes "Early beta, macOS only."
-   ```
+7. **Make a GitHub release** with the bundle, so Claude Desktop users can download it: push the tag `v0.1.0`, and
+   the repo's release workflow builds `lflabs-memory-connector.mcpb` and attaches it with the installer.
 8. **Official MCP Registry:** `brew install mcp-publisher`, `mcp-publisher login github` (a browser sign-in as a
-   member of Hadeva-Dev, which proves the `io.github.Hadeva-Dev/` namespace), then `mcp-publisher publish` from the
-   repo root.
+   member of Hadeva-Dev, which proves the `io.github.Hadeva-Dev/` namespace), then `mcp-publisher publish` from
+   `connector/`.
 
 ## Directories (text in `docs/LISTING.md`)
 

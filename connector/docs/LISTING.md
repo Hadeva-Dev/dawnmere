@@ -15,7 +15,7 @@ Shared by every listing:
 
 ## Official MCP Registry
 
-Nothing to paste: `server.json` in the repo root is the listing. After the npm package is published:
+Nothing to paste: `connector/server.json` is the listing. After the npm package is published, from `connector/`:
 
 ```bash
 mcp-publisher login github     # as a member of Hadeva-Dev
@@ -29,7 +29,7 @@ PulseMCP picks listings up from the registry.
 Section: **Knowledge & Memory**, alphabetical. Legend: 📇 TypeScript, 🏠 local, 🍎 macOS.
 
 ```markdown
-- [Hadeva-Dev/lflabs-memory-connector](https://github.com/Hadeva-Dev/dawnmere) 📇 🏠 🍎 - One memory shared across your AI apps (Claude, Cursor, Codex and more), kept on your Mac by Dawnmere. Recall, remember and forget, with per-app permissions.
+- [Hadeva-Dev/dawnmere](https://github.com/Hadeva-Dev/dawnmere) 📇 🏠 🍎 - One memory shared across your AI apps (Claude, Cursor, Codex and more), kept on your Mac by Dawnmere. Recall, remember and forget, with per-app permissions.
 ```
 
 Most entries now also carry a Glama score badge after the link; add it once Glama has indexed the repo. Check the
@@ -46,11 +46,11 @@ Local server, published as the `.mcpb` from the GitHub release.
 ## Claude plugin directory (claude.ai/directory/manage)
 
 - **Plugin name:** lflabs-memory
-- **Source:** https://github.com/Hadeva-Dev/dawnmere (`.claude-plugin/plugin.json`)
+- **Source:** https://github.com/Hadeva-Dev/dawnmere (`plugin/.claude-plugin/plugin.json`, listed by the root `.claude-plugin/marketplace.json`)
 - **Short description:** One memory shared across your AI apps, kept on your Mac.
 - **Long description:** Dawnmere gives Claude Code the same memory as your other AI apps. It adds four tools (recall, remember, forget, access_status) that talk to Dawnmere on your Mac. The plugin stores nothing and sends nothing over the network. Early beta: it needs Dawnmere running on the same Mac.
 - **Category:** Productivity
-- **Install snippet:** `/plugin marketplace add Hadeva-Dev/lflabs-memory-connector` then `/plugin install lflabs-memory@lflabs`
+- **Install snippet:** `/plugin marketplace add Hadeva-Dev/dawnmere` then `/plugin install lflabs-memory@lflabs`
 
 ## mcp.so (mcp.so/submit)
 
