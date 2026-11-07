@@ -248,3 +248,13 @@ def test_models_download_checks_checksums(tmp_path):
             with pytest.raises(models.ChecksumError):
                 models.download(man, ["embed"], where=dest, opener=opener)
             assert not list(dest.rglob("*.onnx*")), "nothing half-downloaded is left"
+
+
+def test_models_folder_is_the_engines(mac, monkeypatch, tmp_path):
+    """LFLABS_MEMORY_MODELS, then config.toml's models, then DATA_DIR/models: the order the engine reads them in."""
+    assert models.folder() == layout.data_dir() / "models"
+    layout.data_dir().mkdir(parents=True)
+    (layout.data_dir() / "config.toml").write_text(f'models = "{tmp_path / "cfg"}"\n')
+    assert models.folder() == tmp_path / "cfg"
+    monkeypatch.setenv("LFLABS_MEMORY_MODELS", str(tmp_path / "shared"))
+    assert models.folder() == tmp_path / "shared"

@@ -14,6 +14,7 @@ from pathlib import Path
 
 from .layout import data_dir
 
+MODELS_ENV = "LFLABS_MEMORY_MODELS"  # the engine reads it first too (config.load)
 OPTIONAL = ("sense",)  # without it the word lists decide (spec 10.2)
 
 
@@ -26,9 +27,10 @@ def manifest():
 
 
 def folder():
-    """Where the engine looks for models: config.toml's `models`, else DATA_DIR/models."""
+    """Where the engine looks for models: LFLABS_MEMORY_MODELS, else config.toml's `models`, else DATA_DIR/models."""
+    got = os.environ.get(MODELS_ENV)
     try:
-        got = tomllib.loads((data_dir() / "config.toml").read_text()).get("models")
+        got = got or tomllib.loads((data_dir() / "config.toml").read_text()).get("models")
     except (OSError, tomllib.TOMLDecodeError):
         got = None
     return Path(got).expanduser() if got else data_dir() / "models"
