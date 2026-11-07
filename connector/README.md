@@ -37,7 +37,7 @@ npx -y lflabs-memory-connector --check
 **Claude Code:**
 
 ```bash
-claude mcp add lflabs-memory -- npx -y lflabs-memory-connector
+claude mcp add --scope user lflabs-memory -- npx -y lflabs-memory-connector
 ```
 
 or as a plugin: `/plugin marketplace add Hadeva-Dev/lflabs-memory-connector`, then `/plugin install lflabs-memory@lflabs`.
