@@ -18,8 +18,8 @@
   "scripts": {
     "build": "tsc -p tsconfig.json && chmod +x dist/index.js",
     "test": "npm run build && node --test 'test/*.test.js'",
-    "bundle": "npm run build && esbuild dist/index.js --bundle --platform=node --format=esm --target=node18 --outfile=mcpb/server/index.js --banner:js=\"import { createRequire } from 'module'; const require = createRequire(import.meta.url);\" && cp LICENSE mcpb/LICENSE",
-    "test:bundle": "npm run bundle && CONNECTOR_BIN=mcpb/server/index.js node --test test/connector.test.js",
+    "bundle": "npm run build && esbuild dist/index.js --bundle --platform=node --format=esm --target=node18 --outfile=mcpb/server/index.mjs --banner:js=\"import { createRequire } from 'module'; const require = createRequire(import.meta.url);\" && cp LICENSE mcpb/LICENSE",
+    "test:bundle": "npm run bundle && CONNECTOR_BIN=mcpb/server/index.mjs node --test test/connector.test.js",
     "pack:mcpb": "npm run bundle && npx -y @anthropic-ai/mcpb@2.1.2 validate mcpb/manifest.json && npx -y @anthropic-ai/mcpb@2.1.2 pack mcpb lflabs-memory-connector.mcpb",
     "prepublishOnly": "npm test"
   },

@@ -11,7 +11,7 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import { startFakeDaemon } from "./fake-daemon.js";
 
-// CONNECTOR_BIN=mcpb/server/index.js runs the same tests against the .mcpb bundle (npm run test:bundle).
+// CONNECTOR_BIN=mcpb/server/index.mjs runs the same tests against the .mcpb bundle (npm run test:bundle).
 const BIN = process.env.CONNECTOR_BIN ?? fileURLToPath(new URL("../dist/index.js", import.meta.url));
 const NOT_RUNNING = /isn't running on this computer/;
 
