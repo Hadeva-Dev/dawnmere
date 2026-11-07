@@ -20,7 +20,7 @@ from pathlib import Path
 from . import apps, edits, launchd, models, prompt
 from .brand import COMMAND, PRODUCT, REPO
 from .layout import (CLI_DIST, CONNECTOR, CONNECTOR_VERSION, ENGINE_DIST, LABEL, SERVER, data_dir, engine_bin,
-                     home, short)
+                     home, short, uv_bin)
 from .run import run
 
 API = f"https://api.github.com/repos/{REPO}/releases"
@@ -76,7 +76,7 @@ def wheels(rel, get=fetch, where=None):
 
 
 def install_wheels(cli_whl, engine_whl):
-    return run(["uv", "tool", "install", "--force", "--managed-python", "--python", "3.12", str(cli_whl), "--with",
+    return run([uv_bin() or "uv", "tool", "install", "--force", "--managed-python", "--python", "3.12", str(cli_whl), "--with",
                 str(engine_whl), "--with-executables-from", ENGINE_DIST], timeout=600)
 
 
