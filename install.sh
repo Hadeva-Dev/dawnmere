@@ -42,7 +42,7 @@ printf 'Dawnmere installer\n'
 TMP=$(mktemp -d)
 trap 'rm -rf "$TMP"' EXIT INT TERM
 
-# One progress line for everything downloaded, redrawn in place: "Downloading  ──────      12.4 / 31 MB".
+# One progress line for everything downloaded, redrawn in place: "Downloading  ──────      12.4 / 31.0 MB".
 TOTAL=0
 progress() {
   got=$(cat "$TMP"/dl.* 2>/dev/null | wc -c | tr -d ' ')
@@ -55,7 +55,7 @@ progress() {
     i=$((i + 1))
   done
   printf '\rDownloading  %s  %s / %s MB ' "$bar" \
-    "$(awk "BEGIN { printf \"%.1f\", $got / 1000000 }")" "$(awk "BEGIN { printf \"%.0f\", $TOTAL / 1000000 }")"
+    "$(awk "BEGIN { printf \"%.1f\", $got / 1000000 }")" "$(awk "BEGIN { printf \"%.1f\", $TOTAL / 1000000 }")"
 }
 
 # fetch URL NAME: download into $TMP/dl.NAME, keeping the progress line moving.
