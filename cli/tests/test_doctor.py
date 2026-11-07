@@ -259,3 +259,22 @@ def test_models_folder_is_the_engines(mac, monkeypatch, tmp_path):
     assert models.folder() == tmp_path / "cfg"
     monkeypatch.setenv("LFLABS_MEMORY_MODELS", str(tmp_path / "shared"))
     assert models.folder() == tmp_path / "shared"
+
+
+def test_first_day_wording(mac, monkeypatch, tmp_path):
+    """One memory reads "1 memory"; the plugin's version is found in claude 2.1.301's multi-line plugin list."""
+    data = layout.data_dir()
+    data.mkdir(parents=True, mode=0o700)
+    store.make(data / "memory.db", MEMS[:1], ["c1"], [])
+    db = doctor._db()
+    try:
+        assert "(1 memory, 1 claim, " in doctor.check_data(db).note
+    finally:
+        db.close()
+    (mac.home / ".claude").mkdir()
+    mac.on("claude", ["plugin", "list"], 0, "Installed plugins:\n\n  > lflabs-memory@lflabs\n    Version: 0.1.0\n"
+           "    Scope: user\n    Status: enabled\n")
+    assert doctor.check_claude().note == "plugin lflabs-memory 0.1.0, hooks on"
+    out = []
+    export.export(str(tmp_path / "x.json"), say=out.append)
+    assert out[0].startswith("Exported 1 memory to ")
