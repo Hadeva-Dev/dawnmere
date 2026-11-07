@@ -25,9 +25,8 @@ public repo can be read in ten minutes and audited by a directory reviewer, and 
 
 ## What the engine needs before this works end to end
 
-The engine's daemon must answer `lflabs-memory/1` requests on the connector socket (`PROTOCOL.md`). Today its
-socket answers only `recall` for its own MCP server; `remember`, `forget` and `access_status` run inside that server.
-That handler is a small change in the private repo and is not part of this one.
+Nothing more: the engine's daemon answers `lflabs-memory/1` on the connector socket (`PROTOCOL.md`; the engine's
+`connector.py`), and recall, remember, forget and access_status went through end to end on 2026-11-07.
 
 ## Out of scope for 0.1
 
