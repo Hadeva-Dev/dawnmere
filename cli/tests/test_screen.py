@@ -297,3 +297,11 @@ def test_alignment(final):
 def test_memory_pick_strips_terminal_escapes():
     got = pick_memory([mem("use pnpm\x1b]0;pwned\x07 \x1b[2Jalways\x9b31m")])
     assert got and not any(ch in got for ch in "\x1b\x07\x9b")
+
+
+def test_long_note_stays_on_one_row(final):
+    """A note longer than the block is cut with an ellipsis: a wrapped tail would be drawn over by the next row."""
+    state, end = final()
+    state.steps[0].note = "found; background reading off (Claude Code 2.0.1 is older than 2.1.301: update it)"
+    row = next(visible(x) for x in frame(end, state) if "Claude Code" in x and "found" in x)
+    assert len(row) <= 68 and row.endswith("…")
