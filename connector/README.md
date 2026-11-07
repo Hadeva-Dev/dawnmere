@@ -9,7 +9,7 @@ flowchart LR
   A[Claude Desktop] --> C
   B[Claude Code] --> C
   D[Cursor, Codex, Windsurf, VS Code...] --> C
-  C["lflabs-memory-connector<br/>(this repo, one per app)"] -- "local socket, one JSON line each way" --> W["Dawnmere on your Mac<br/>(memory, search, permissions)"]
+  C["lflabs-memory-connector<br/>(this folder, one per app)"] -- "local socket, one JSON line each way" --> W["Dawnmere on your Mac<br/>(memory, search, permissions)"]
 ```
 
 **Status: early beta, Mac only.** The connector is the small piece each AI app launches; Dawnmere itself installs with
@@ -22,7 +22,7 @@ change if the product name does.
 Most MCP memory servers keep the memory inside the server, so each app gets its own pile. Here the memory lives in
 one place, Dawnmere, and every app reaches the same one. The connector stores nothing, sends nothing over the
 network, and does not decide what an app may see: Dawnmere does, per AI app (Cursor can be held to work notes while
-Claude sees everything). That keeps this repo small enough to read in a few minutes.
+Claude sees everything). That keeps this folder small enough to read in a few minutes.
 
 ## Install
 
@@ -40,7 +40,7 @@ npx -y lflabs-memory-connector --check
 claude mcp add --scope user lflabs-memory -- npx -y lflabs-memory-connector
 ```
 
-or as a plugin: `/plugin marketplace add Hadeva-Dev/lflabs-memory-connector`, then `/plugin install lflabs-memory@lflabs`.
+or as a plugin: `/plugin marketplace add Hadeva-Dev/dawnmere`, then `/plugin install lflabs-memory@lflabs`.
 
 **Cursor, Windsurf, Gemini CLI** (`~/.cursor/mcp.json`, `~/.codeium/windsurf/mcp_config.json`,
 `~/.gemini/settings.json`):
