@@ -109,8 +109,9 @@ fi
 # uv wants the wheels under their own names
 cp "$TMP/dl.$CLI_WHEEL" "$TMP/$CLI_WHEEL"
 cp "$TMP/dl.$ENGINE_WHEEL" "$TMP/$ENGINE_WHEEL"
+# --managed-python: uv's own arm64 Python, never an x86_64 one on PATH (onnxruntime has no Intel Mac wheels);
 # --with-executables-from: the engine's lflabs-memory command too, which the Claude Code plugin's hooks run
-if ! "$UV" tool install --force --python 3.12 "$TMP/$CLI_WHEEL" --with "$TMP/$ENGINE_WHEEL" \
+if ! "$UV" tool install --force --managed-python --python 3.12 "$TMP/$CLI_WHEEL" --with "$TMP/$ENGINE_WHEEL" \
   --with-executables-from lflabs-memory-engine >"$TMP/uv.log" 2>&1; then
   tail -n 5 "$TMP/uv.log" >&2
   fail "Could not install Dawnmere (uv stopped; its last lines are above)."
