@@ -13,7 +13,7 @@ flowchart LR
 ```
 
 **Status: early beta, Mac only.** The connector is the small piece each AI app launches; Dawnmere itself installs with
-one line (see the [repo's README](../README.md)) and runs in the background on the same Mac. Without it every call
+one line (see the [repo's README](https://github.com/Hadeva-Dev/dawnmere#readme)) and runs in the background on the same Mac. Without it every call
 answers "Dawnmere isn't running on this computer". The package and settings names below are neutral and will not
 change if the product name does.
 
