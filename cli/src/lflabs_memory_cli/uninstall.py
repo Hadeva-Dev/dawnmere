@@ -4,7 +4,7 @@ from pathlib import Path
 
 from . import apps, edits, install_record, keychain, launchd, prompt
 from .brand import COMMAND
-from .layout import CLI_DIST, MARKETPLACE, SERVER, connector_sock, data_dir, logs_dir, short
+from .layout import CLI_DIST, MARKETPLACE, SERVER, connector_sock, data_dir, home, logs_dir, short, uv_bin
 from .run import run
 
 
@@ -110,11 +110,16 @@ def main(keep_data=False, out=print):
         connector_sock().unlink(missing_ok=True)
         for log in logs_dir().glob("memory.log*"):
             log.unlink(missing_ok=True)
+        for folder in (home() / "Library/Application Support/LF Labs", logs_dir()):  # when nothing else is in them
+            try:
+                folder.rmdir()
+            except OSError:
+                pass
     else:
         out(f"{'Your memory':<21}kept in {short(data)} (delete the folder yourself if you change your mind)")
 
-    if shutil.which("uv"):
-        r = run(["uv", "tool", "uninstall", CLI_DIST], timeout=120)
+    if uv_bin():
+        r = run([uv_bin(), "tool", "uninstall", CLI_DIST], timeout=120)
         rep.row("Programs", "removed" if r.ok else "gone",
                 f"{CLI_DIST} and the engine removed" if r.ok else f"{CLI_DIST} was not installed with uv")
     else:

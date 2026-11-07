@@ -60,6 +60,15 @@ def engine_bin():
     return str(sibling) if sibling.exists() else None
 
 
+def uv_bin():
+    """uv: the one on PATH, else the one install.sh puts in ~/.local/bin (often not on PATH yet). None when neither."""
+    found = shutil.which("uv")
+    if found:
+        return found
+    local = home() / ".local/bin/uv"
+    return str(local) if os.access(local, os.X_OK) else None
+
+
 def short(path):
     """A path as the user reads it: ~ for the home folder."""
     s, h = str(path), str(home())

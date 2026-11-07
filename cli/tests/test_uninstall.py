@@ -29,6 +29,8 @@ def fake_setup(home):
     install_record.save(record)
     layout.plist_path().parent.mkdir(parents=True)
     layout.plist_path().write_text("<plist/>")
+    layout.logs_dir().mkdir(parents=True)
+    (layout.logs_dir() / "memory.log").write_text("log")
     (layout.data_dir() / "memory.db").write_text("db")
     return record
 
@@ -47,6 +49,7 @@ def test_uninstall_reverses_setup(mac, monkeypatch):
     assert not (home / ".codex/hooks.json").exists() and not (home / ".cursor/hooks.json").exists()
     assert not layout.plist_path().exists()
     assert not layout.data_dir().exists()
+    assert not (home / "Library/Application Support/LF Labs").exists() and not layout.logs_dir().exists()
     assert ["delete-generic-password", "-s", "LF Labs Memory", "-a", "anthropic-api-key"] in mac.calls("security")
     assert ["tool", "uninstall", "lflabs-memory-cli"] in mac.calls("uv")
     backups = list((home / ".codex").glob("config.toml.lflabs-backup-*"))
@@ -128,3 +131,17 @@ def test_uninstall_asks_before_deleting_memory(mac, monkeypatch):
     monkeypatch.undo()
     from lflabs_memory_cli import main as cli
     assert cli.parser().parse_args(["uninstall", "--yes"]).yes  # still accepted, and still asks
+
+
+def test_uv_in_local_bin_off_path(mac):
+    """A new user's uv is the one install.sh put in ~/.local/bin, often not on PATH yet: uninstall still uses it."""
+    import shutil
+    mac.remove("uv")
+    local = mac.home / ".local/bin"
+    local.mkdir(parents=True)
+    shutil.copy(mac.bin / "security", local / "uv")  # a fake program that logs its argv as "uv"
+    assert layout.uv_bin() == str(local / "uv")
+    out = []
+    uninstall.main(keep_data=True, out=out.append)
+    assert ["tool", "uninstall", "lflabs-memory-cli"] in mac.calls("uv")
+    assert any(line.startswith("Programs             lflabs-memory-cli and the engine removed") for line in out)

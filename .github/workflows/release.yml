@@ -14,6 +14,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v6
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22  # the connector's tests below need Node 22 or later
       - name: Engine source (checked out at ENGINE_TAG below)
         uses: actions/checkout@v4
         with:

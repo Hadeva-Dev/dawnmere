@@ -324,9 +324,11 @@ def test_no_api_key_unless_asked_for(box, monkeypatch, capsys):
 
 def test_access_command(box, monkeypatch, capsys):
     from lflabs_memory_cli import access
-    assert run_setup()[0] == 0
     out = []
     eng = layout.engine_bin()
+    assert access.main("cursor", None, eng, say=out.append) == 1
+    assert out[-1] == "Memory is not set up yet: run dawnmere setup first.", "not \"Cursor sees not set up\""
+    assert run_setup()[0] == 0
     assert access.main("cursor", "everything", eng, say=out.append) == 0
     assert out[-1] == "Cursor now sees everything, personal notes too. Restart Cursor to load it."
     entry = json.loads((box.home / ".cursor/mcp.json").read_text())["mcpServers"]["lflabs-memory"]
@@ -335,3 +337,11 @@ def test_access_command(box, monkeypatch, capsys):
     assert access.main("codex", "everything", eng, say=out.append) == 1
     assert access.main("cursor", None, eng, say=out.append) == 0
     assert out[-1].startswith("Cursor sees ") and "dawnmere access cursor everything | nothing-personal" in out[-1]
+
+
+def test_node_missing_is_said(box):
+    """No npx: setup still works (the hooks need no Node), and says the apps' memory tools wait for Node.js."""
+    code, out = run_setup()
+    assert code == 0 and "Node.js is not installed" in out
+    box.add("npx")
+    assert "Node.js" not in run_setup()[1]
