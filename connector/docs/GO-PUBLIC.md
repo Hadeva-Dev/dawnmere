@@ -14,11 +14,11 @@ In order. Nothing is published yet.
 
 ## Renaming
 
-The package, server id, settings, socket, protocol and repo names are neutral (`lflabs-memory-*`) and do not change.
-The product name appears only in:
+The package, server id, settings, socket and protocol names are neutral (`lflabs-memory-*`) and do not change. The
+repo is named after the product. The product name appears only in:
 
 - `src/brand.ts` (`PRODUCT`)
-- `README.md` and `docs/LISTING.md`
+- `README.md`, `docs/LISTING.md` and this file (the repo's URL)
 - the display text in `package.json`, `server.json`, `mcpb/manifest.json`, `../plugin/.claude-plugin/plugin.json` and
   `../.claude-plugin/marketplace.json`
 
