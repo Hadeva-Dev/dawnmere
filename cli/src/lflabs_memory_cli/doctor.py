@@ -78,7 +78,8 @@ def check_data(db):
     mem = _count(db, "select count(*) from memories where status = 'active'") or 0
     claims = _count(db, "select count(*) from claims where status = 'active'")
     size = sum(f.stat().st_size for f in data_dir().glob("memory.db*")) / 1e6
-    parts = [f"{mem:,} memories"] + ([f"{claims:,} claims"] if claims is not None else []) + [f"{size:.0f} MB"]
+    parts = [f"{mem:,} memor{'y' if mem == 1 else 'ies'}"] + \
+        ([f"{claims:,} claim{'' if claims == 1 else 's'}"] if claims is not None else []) + [f"{size:.0f} MB"]
     mode = os.stat(data_dir()).st_mode & 0o777
     if mode & 0o077:
         return Check("data", "warn", f"{d}  ({', '.join(parts)})", f"the folder is readable by others: chmod 700 '{data_dir()}'")
@@ -193,7 +194,7 @@ def check_claude():
         return Check("Claude Code", "ok", "not installed")
     r = run(["claude", "plugin", "list"], timeout=30)
     if r.ok and SERVER in r.out:
-        m = re.search(rf"{re.escape(SERVER)}\S*\s+v?(\d[\w.]*)", r.out)
+        m = re.search(rf"{re.escape(SERVER)}\S*\s+(?:Version:\s*)?v?(\d[\w.]*)", r.out)  # 2.1.301 lists "Version: x"
         return Check("Claude Code", "ok", f"plugin {SERVER}" + (f" {m.group(1)}" if m else "") + ", hooks on")
     try:
         text = (home() / ".claude/settings.json").read_text()

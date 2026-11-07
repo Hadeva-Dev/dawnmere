@@ -84,7 +84,8 @@ def export(out_file=None, fmt="json", include_claims=False, say=print):
         if include_claims:
             doc["claims"] = claims
         _write(path, json.dumps(doc, indent=2, ensure_ascii=False) + "\n")
-    say(f"Exported {len(mems)} memories" + (f" and {len(claims)} claims" if include_claims else "") +
+    say(f"Exported {len(mems)} memor{'y' if len(mems) == 1 else 'ies'}" +
+        (f" and {len(claims)} claim{'' if len(claims) == 1 else 's'}" if include_claims else "") +
         f" to {short(path)} (only you can read it).")
     if secrets:
         say(f"{secrets} secret{'s' if secrets != 1 else ''} left out: they never leave the engine.")
@@ -128,5 +129,6 @@ def import_file(path, say=print, remember=None):
             added += 1
         else:
             same += 1
-    say(f"Imported {added} new memories; {same} were already here" + (f"; {refused} refused" if refused else "") + ".")
+    say(f"Imported {added} new memor{'y' if added == 1 else 'ies'}; {same} {'was' if same == 1 else 'were'} already "
+        "here" + (f"; {refused} refused" if refused else "") + ".")
     return 0
