@@ -77,6 +77,8 @@ check() {
 }
 
 UV=$(command -v uv 2>/dev/null || true)
+# an older uv cannot link the engine's command (below): the pinned one is used instead
+"$UV" tool install --help 2>/dev/null | grep -q -- --with-executables-from || UV=""
 if [ -z "$UV" ]; then
   case $(uname -m) in
     arm64) arch=aarch64 uv_sha=$UV_SHA256_arm64 uv_size=$UV_SIZE_arm64 ;;
@@ -107,7 +109,9 @@ fi
 # uv wants the wheels under their own names
 cp "$TMP/dl.$CLI_WHEEL" "$TMP/$CLI_WHEEL"
 cp "$TMP/dl.$ENGINE_WHEEL" "$TMP/$ENGINE_WHEEL"
-if ! "$UV" tool install --force --python 3.12 "$TMP/$CLI_WHEEL" --with "$TMP/$ENGINE_WHEEL" >"$TMP/uv.log" 2>&1; then
+# --with-executables-from: the engine's lflabs-memory command too, which the Claude Code plugin's hooks run
+if ! "$UV" tool install --force --python 3.12 "$TMP/$CLI_WHEEL" --with "$TMP/$ENGINE_WHEEL" \
+  --with-executables-from lflabs-memory-engine >"$TMP/uv.log" 2>&1; then
   tail -n 5 "$TMP/uv.log" >&2
   fail "Could not install Dawnmere (uv stopped; its last lines are above)."
 fi

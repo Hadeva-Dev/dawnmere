@@ -35,6 +35,7 @@ def release(tmp_path):
     tools.mkdir()
     shutil.copy(fakes.bin / "uv", tools / "dawnmere")
     fakes.on("uv", ["tool", "dir", "--bin"], 0, str(tools))
+    fakes.on("uv", ["tool", "install", "--help"], 0, "      --with-executables-from <WITH_EXECUTABLES_FROM>\n")
     env = {"HOME": str(home), "PATH": f"{fakes.bin}:/usr/bin:/bin", "FAKE_LOG": str(fakes.log),
            "FAKE_RULES": str(fakes.rules_file), "LFLABS_MEMORY_RELEASE_BASE": f"file://{rel}"}
     fakes.rel, fakes.script, fakes.env_vars, fakes.home = rel, script, env, home
@@ -63,7 +64,7 @@ def test_install_sh_checksum_mismatch_aborts(release):
     r = sh(release.script, release.env_vars)
     assert r.returncode != 0
     assert f"{ENGINE} did not match its checksum, so nothing was installed" in r.stderr
-    assert not [c for c in release.calls("uv") if c[:2] == ["tool", "install"]]
+    assert not [c for c in release.calls("uv") if c[:2] == ["tool", "install"] and "--help" not in c]
     assert not (release.home / ".local").exists()
 
 
@@ -71,8 +72,9 @@ def test_install_sh_installs_then_runs_setup(release):
     r = sh(release.script, release.env_vars)
     assert r.returncode == 0, r.stderr
     assert "Dawnmere installer" in r.stdout and "Checksums ok" in r.stdout and "Downloading  " in r.stdout
-    install = next(c for c in release.calls("uv") if c[:2] == ["tool", "install"])
+    install = next(c for c in release.calls("uv") if c[:2] == ["tool", "install"] and "--help" not in c)
     assert install[2:5] == ["--force", "--python", "3.12"] and install[5].endswith(CLI) and install[7].endswith(ENGINE)
+    assert install[8:] == ["--with-executables-from", "lflabs-memory-engine"], "the hooks' lflabs-memory is linked too"
     assert release.calls("dawnmere") == [["setup"]]
 
 
@@ -87,6 +89,19 @@ def test_uv_download_is_checked(release, tmp_path):
     r = sh(release.script, env)
     assert r.returncode != 0 and "uv.tar.gz did not match its checksum" in r.stderr
     assert not (release.home / ".local/bin/uv").exists()
+
+
+def test_old_uv_is_not_used(release, tmp_path):
+    """A uv too old to link the engine's command: the pinned uv is fetched instead (here: a tampered one, so it stops)."""
+    release.rules["uv"] = [r for r in release.rules["uv"] if r[0] != ["tool", "install", "--help"]]
+    release.save()
+    uvrel = tmp_path / "uvrel"
+    uvrel.mkdir()
+    for arch in ("aarch64", "x86_64"):
+        (uvrel / f"uv-{arch}-apple-darwin.tar.gz").write_bytes(b"not uv")
+    r = sh(release.script, {**release.env_vars, "LFLABS_MEMORY_UV_BASE": f"file://{uvrel}"})
+    assert r.returncode != 0 and "uv.tar.gz did not match its checksum" in r.stderr
+    assert not [c for c in release.calls("uv") if c[:2] == ["tool", "install"] and "--help" not in c]
 
 
 def test_render_fills_every_release_line(release):
