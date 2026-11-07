@@ -1,6 +1,8 @@
 // The one place the connector talks to the memory app: one JSON line out, one back (docs/PROTOCOL.md).
 import { lstatSync } from "node:fs";
 import { createConnection } from "node:net";
+import { homedir } from "node:os";
+import { join } from "node:path";
 import { ENV, NOT_RUNNING, PRODUCT, PROTOCOL, VERSION, defaultSocket } from "./brand.js";
 
 export const MAX_REPLY = 1024 * 1024;
@@ -10,7 +12,10 @@ export type Client = { name: string | null; key: string | null; hint: string | n
 export type Reply = { ok: true; text: string } | { ok: false; error: string };
 
 export function socketPath(env = process.env): string | null {
-  return env[ENV.socket] || defaultSocket();
+  const set = env[ENV.socket];
+  if (!set) return defaultSocket();
+  // A leading ~ is the home folder, as the engine reads it: app configs are JSON or TOML, where no shell expands it.
+  return set === "~" || set.startsWith("~/") ? join(homedir(), set.slice(1)) : set;
 }
 
 function timeoutMs(env = process.env): number {
