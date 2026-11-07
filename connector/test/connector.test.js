@@ -182,6 +182,18 @@ describe("the command line", () => {
     }
   });
 
+  test("--check reads a leading ~ in the socket setting as the home folder", async () => {
+    const d = await startFakeDaemon();
+    try {
+      const { stdout } = await run(process.execPath, [BIN, "--check"], {
+        env: { ...process.env, HOME: d.dir, LFLABS_MEMORY_SOCKET: "~/connector.sock" },
+      });
+      assert.match(stdout, /Connected to Fake memory app 0\.0\.0/);
+    } finally {
+      await d.close();
+    }
+  });
+
   test("--check exits 1 when nothing answers", async () => {
     await assert.rejects(
       run(process.execPath, [BIN, "--check"], { env: { ...process.env, LFLABS_MEMORY_SOCKET: "/nonexistent/x.sock" } }),

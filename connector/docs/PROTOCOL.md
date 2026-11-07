@@ -5,7 +5,8 @@ can stand in for it (the tests do exactly that).
 
 ## The socket
 
-- `LFLABS_MEMORY_SOCKET` if set, else `~/Library/Application Support/LF Labs/memory-connector.sock`.
+- `LFLABS_MEMORY_SOCKET` if set (a leading `~` is the home folder), else
+  `~/Library/Application Support/LF Labs/memory-connector.sock`.
 - The connector connects only if the path is a socket owned by the user running the connector. Anything else (a
   missing file, a regular file, another user's socket) is reported as "isn't running".
 
