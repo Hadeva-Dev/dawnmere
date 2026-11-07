@@ -21,7 +21,7 @@ from pathlib import Path
 from . import apps, backend, edits, install_record, keychain, launchd, models, prompt, settings, sockets
 from .brand import COMMAND, PRODUCT, REPO
 from .layout import (CLI_DIST, CONNECTOR_VERSION, ENGINE, ENGINE_DIST, MARKETPLACE, SERVER, data_dir,
-                     engine_bin, home, short)
+                     engine_bin, home, short, uv_bin)
 from .run import run
 from .screen import AppResult, Memory, Step, pick_memory, self_check_row
 
@@ -85,7 +85,7 @@ def preflight(say):
     free = shutil.disk_usage(home()).free
     if free < MIN_DISK:
         problems.append(f"{PRODUCT} needs 1 GB of free disk space (this Mac has {free / 1e9:.1f} GB).")
-    if not shutil.which("uv"):
+    if not uv_bin():
         say(f"Note: uv is not on PATH, so `{COMMAND} update` and `{COMMAND} uninstall` will ask you to install it.")
     if not shutil.which("npx"):  # every app's MCP entry runs the connector with npx
         say("Note: Node.js is not installed, so your apps cannot use memory's tools (recall, remember) until you "

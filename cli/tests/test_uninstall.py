@@ -131,3 +131,17 @@ def test_uninstall_asks_before_deleting_memory(mac, monkeypatch):
     monkeypatch.undo()
     from lflabs_memory_cli import main as cli
     assert cli.parser().parse_args(["uninstall", "--yes"]).yes  # still accepted, and still asks
+
+
+def test_uv_in_local_bin_off_path(mac):
+    """A new user's uv is the one install.sh put in ~/.local/bin, often not on PATH yet: uninstall still uses it."""
+    import shutil
+    mac.remove("uv")
+    local = mac.home / ".local/bin"
+    local.mkdir(parents=True)
+    shutil.copy(mac.bin / "security", local / "uv")  # a fake program that logs its argv as "uv"
+    assert layout.uv_bin() == str(local / "uv")
+    out = []
+    uninstall.main(keep_data=True, out=out.append)
+    assert ["tool", "uninstall", "lflabs-memory-cli"] in mac.calls("uv")
+    assert any(line.startswith("Programs             lflabs-memory-cli and the engine removed") for line in out)
