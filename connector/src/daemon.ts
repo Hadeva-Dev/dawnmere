@@ -6,7 +6,7 @@ import { join } from "node:path";
 import { ENV, NOT_RUNNING, PRODUCT, PROTOCOL, VERSION, defaultSocket } from "./brand.js";
 
 export const MAX_REPLY = 1024 * 1024;
-const DEFAULT_TIMEOUT = 15000;
+const DEFAULT_TIMEOUT = 20000; // longer than the engine's own 15 s limit, so its message reaches the user
 
 export type Client = { name: string | null; key: string | null; hint: string | null };
 export type Reply = { ok: true; text: string } | { ok: false; error: string };

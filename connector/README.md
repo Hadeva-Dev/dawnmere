@@ -102,7 +102,7 @@ Needs Node 18 or later (Claude Desktop brings its own for the `.mcpb`).
 | `LFLABS_MEMORY_CLIENT` | none | a name for the app, shown in Dawnmere and used for its permissions |
 | `LFLABS_MEMORY_CLIENT_KEY` | none | a key Dawnmere gives an app it trusts with more than its default |
 | `LFLABS_MEMORY_SOCKET` | `~/Library/Application Support/LF Labs/memory-connector.sock` | where Dawnmere listens |
-| `LFLABS_MEMORY_TIMEOUT_MS` | `15000` | how long to wait for an answer |
+| `LFLABS_MEMORY_TIMEOUT_MS` | `20000` | how long to wait for an answer |
 
 ## Limits
 

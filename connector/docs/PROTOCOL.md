@@ -39,7 +39,7 @@ Reply:
 ```
 
 `text` is shown to the AI as the tool's result; an `error` comes back as a tool error. A reply larger than 1 MiB, a
-reply that is not one JSON object, or no reply within `LFLABS_MEMORY_TIMEOUT_MS` (default 15000, at most 120000) is an
+reply that is not one JSON object, or no reply within `LFLABS_MEMORY_TIMEOUT_MS` (default 20000, at most 120000) is an
 error.
 
 ## Tool arguments
