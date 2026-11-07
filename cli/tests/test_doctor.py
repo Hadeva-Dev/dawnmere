@@ -274,7 +274,11 @@ def test_first_day_wording(mac, monkeypatch, tmp_path):
     (mac.home / ".claude").mkdir()
     mac.on("claude", ["plugin", "list"], 0, "Installed plugins:\n\n  > lflabs-memory@lflabs\n    Version: 0.1.0\n"
            "    Scope: user\n    Status: enabled\n")
+    mac.add("lflabs-memory")
     assert doctor.check_claude().note == "plugin lflabs-memory 0.1.0, hooks on"
+    mac.remove("lflabs-memory")
+    c = doctor.check_claude()
+    assert c.state == "warn" and c.note.endswith("but its hooks cannot find lflabs-memory") and "~/.local/bin" in c.fix
     out = []
     export.export(str(tmp_path / "x.json"), say=out.append)
     assert out[0].startswith("Exported 1 memory to ")
