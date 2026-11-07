@@ -30,7 +30,8 @@ def release(tmp_path):
     script.write_text(render_install.render("0.2.0", rel / CLI, rel / ENGINE))
     home = tmp_path / "home"
     home.mkdir()
-    fakes = Fakes(tmp_path, progs=("uv",))
+    fakes = Fakes(tmp_path, progs=("uv", "sysctl"))
+    fakes.on("sysctl", ["-n", "hw.optional.arm64"], 0, "1\n")
     tools = tmp_path / "tools-bin"
     tools.mkdir()
     shutil.copy(fakes.bin / "uv", tools / "dawnmere")
@@ -103,6 +104,14 @@ def test_old_uv_is_not_used(release, tmp_path):
     r = sh(release.script, {**release.env_vars, "LFLABS_MEMORY_UV_BASE": f"file://{uvrel}"})
     assert r.returncode != 0 and "uv.tar.gz did not match its checksum" in r.stderr
     assert not [c for c in release.calls("uv") if c[:2] == ["tool", "install"] and "--help" not in c]
+
+
+def test_intel_mac_refused_before_any_download(release):
+    release.rules["sysctl"] = [[["-n", "hw.optional.arm64"], 0, "0\n"]]
+    release.save()
+    r = sh(release.script, release.env_vars)
+    assert r.returncode == 1 and "Dawnmere needs a Mac with Apple silicon" in r.stderr
+    assert not release.calls("uv")
 
 
 def test_render_fills_every_release_line(release):
