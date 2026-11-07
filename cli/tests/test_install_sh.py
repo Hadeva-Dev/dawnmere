@@ -73,8 +73,9 @@ def test_install_sh_installs_then_runs_setup(release):
     assert r.returncode == 0, r.stderr
     assert "Dawnmere installer" in r.stdout and "Checksums ok" in r.stdout and "Downloading  " in r.stdout
     install = next(c for c in release.calls("uv") if c[:2] == ["tool", "install"] and "--help" not in c)
-    assert install[2:5] == ["--force", "--python", "3.12"] and install[5].endswith(CLI) and install[7].endswith(ENGINE)
-    assert install[8:] == ["--with-executables-from", "lflabs-memory-engine"], "the hooks' lflabs-memory is linked too"
+    assert install[2:6] == ["--force", "--managed-python", "--python", "3.12"]
+    assert install[6].endswith(CLI) and install[8].endswith(ENGINE)
+    assert install[9:] == ["--with-executables-from", "lflabs-memory-engine"], "the hooks' lflabs-memory is linked too"
     assert release.calls("dawnmere") == [["setup"]]
 
 

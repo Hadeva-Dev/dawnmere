@@ -76,8 +76,8 @@ def wheels(rel, get=fetch, where=None):
 
 
 def install_wheels(cli_whl, engine_whl):
-    return run(["uv", "tool", "install", "--force", "--python", "3.12", str(cli_whl), "--with", str(engine_whl),
-                "--with-executables-from", ENGINE_DIST], timeout=600)
+    return run(["uv", "tool", "install", "--force", "--managed-python", "--python", "3.12", str(cli_whl), "--with",
+                str(engine_whl), "--with-executables-from", ENGINE_DIST], timeout=600)
 
 
 def main(check_only=False, yes=False, say=print, get=fetch):
