@@ -10,7 +10,7 @@ from importlib import metadata
 
 from . import apps, backend, launchd, models, settings, sockets
 from .brand import COMMAND
-from .layout import CONNECTOR, CONNECTOR_VERSION, ENGINE_DIST, SERVER, data_dir, engine_bin, home, short
+from .layout import CONNECTOR, CONNECTOR_VERSION, ENGINE, ENGINE_DIST, SERVER, data_dir, engine_bin, home, short
 from .run import run
 
 SLOW = 1.5
@@ -195,7 +195,12 @@ def check_claude():
     r = run(["claude", "plugin", "list"], timeout=30)
     if r.ok and SERVER in r.out:
         m = re.search(rf"{re.escape(SERVER)}\S*\s+(?:Version:\s*)?v?(\d[\w.]*)", r.out)  # 2.1.301 lists "Version: x"
-        return Check("Claude Code", "ok", f"plugin {SERVER}" + (f" {m.group(1)}" if m else "") + ", hooks on")
+        plugin = f"plugin {SERVER}" + (f" {m.group(1)}" if m else "")
+        if not run(["zsh", "-lc", f"command -v {ENGINE}"], timeout=15).ok:  # the plugin's hooks run it by name
+            return Check("Claude Code", "warn", f"{plugin}, but its hooks cannot find {ENGINE}",
+                         'add ~/.local/bin to your PATH (export PATH="$HOME/.local/bin:$PATH" in ~/.zshrc), then '
+                         "restart Claude Code")
+        return Check("Claude Code", "ok", f"{plugin}, hooks on")
     try:
         text = (home() / ".claude/settings.json").read_text()
     except OSError:
