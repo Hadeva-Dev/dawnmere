@@ -222,7 +222,8 @@ def test_update_rolls_back_on_failed_migration(mac, monkeypatch):
     rows = sqlite3.connect(data / "memory.db").execute("select content from memories").fetchall()
     assert rows == [("we deploy on Fridays",)], "the store is back as it was"
     installs = [c for c in mac.calls("uv") if c[:2] == ["tool", "install"]]
-    assert installs and "lflabs_memory_cli-0.1.0-py3-none-any.whl" in installs[-1][-3]
+    assert installs and "lflabs_memory_cli-0.1.0-py3-none-any.whl" in installs[-1][6] and "--managed-python" in installs[-1]
+    assert installs[-1][-2:] == ["--with-executables-from", "lflabs-memory-engine"]
     assert any("bootstrap" in c for c in mac.calls("launchctl")), "the service is started again"
     assert out[-1].startswith("Back on 0.1.0; your memory is as it was")
     assert list((data / "backup").glob("memory-*-before-update.db"))
@@ -248,3 +249,36 @@ def test_models_download_checks_checksums(tmp_path):
             with pytest.raises(models.ChecksumError):
                 models.download(man, ["embed"], where=dest, opener=opener)
             assert not list(dest.rglob("*.onnx*")), "nothing half-downloaded is left"
+
+
+def test_models_folder_is_the_engines(mac, monkeypatch, tmp_path):
+    """LFLABS_MEMORY_MODELS, then config.toml's models, then DATA_DIR/models: the order the engine reads them in."""
+    assert models.folder() == layout.data_dir() / "models"
+    layout.data_dir().mkdir(parents=True)
+    (layout.data_dir() / "config.toml").write_text(f'models = "{tmp_path / "cfg"}"\n')
+    assert models.folder() == tmp_path / "cfg"
+    monkeypatch.setenv("LFLABS_MEMORY_MODELS", str(tmp_path / "shared"))
+    assert models.folder() == tmp_path / "shared"
+
+
+def test_first_day_wording(mac, monkeypatch, tmp_path):
+    """One memory reads "1 memory"; the plugin's version is found in claude 2.1.301's multi-line plugin list."""
+    data = layout.data_dir()
+    data.mkdir(parents=True, mode=0o700)
+    store.make(data / "memory.db", MEMS[:1], ["c1"], [])
+    db = doctor._db()
+    try:
+        assert "(1 memory, 1 claim, " in doctor.check_data(db).note
+    finally:
+        db.close()
+    (mac.home / ".claude").mkdir()
+    mac.on("claude", ["plugin", "list"], 0, "Installed plugins:\n\n  > lflabs-memory@lflabs\n    Version: 0.1.0\n"
+           "    Scope: user\n    Status: enabled\n")
+    mac.add("lflabs-memory")
+    assert doctor.check_claude().note == "plugin lflabs-memory 0.1.0, hooks on"
+    mac.remove("lflabs-memory")
+    c = doctor.check_claude()
+    assert c.state == "warn" and c.note.endswith("but its hooks cannot find lflabs-memory") and "~/.local/bin" in c.fix
+    out = []
+    export.export(str(tmp_path / "x.json"), say=out.append)
+    assert out[0].startswith("Exported 1 memory to ")

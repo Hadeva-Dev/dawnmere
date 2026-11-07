@@ -91,6 +91,7 @@ def mac(tmp_path, monkeypatch):
     home.mkdir()
     monkeypatch.setenv("HOME", str(home))
     monkeypatch.delenv("LFLABS_MEMORY_HOME", raising=False)
+    monkeypatch.delenv("LFLABS_MEMORY_MODELS", raising=False)
     monkeypatch.setenv("LFLABS_MEMORY_SOCKET", str(home / "connector.sock"))
     fakes = Fakes(tmp_path)
     fakes.env(monkeypatch)

@@ -110,17 +110,17 @@ def widen_cursor(engine, record=None, say=print):
 
 def main(app, level, engine, say=print):
     app = app.lower()
-    if level is None:  # just say what it sees, and how to change it
-        now = current_level(app) or "not set up"
-        say(f"{apps.LABELS.get(app, app.capitalize())} sees {now}. To change it: {COMMAND} access {app} "
-            f"{' | '.join(LEVELS)}")
-        return 0
-    if level not in LEVELS:
+    if level is not None and level not in LEVELS:
         say(f"Choose one of: {', '.join(LEVELS)}.")
         return 2
     if not (data_dir() / "config.toml").exists():
         say(f"Memory is not set up yet: run {COMMAND} setup first.")
         return 1
+    if level is None:  # just say what it sees, and how to change it
+        now = current_level(app) or "what the memory service decides"
+        say(f"{apps.LABELS.get(app, app.capitalize())} sees {now}. To change it: {COMMAND} access {app} "
+            f"{' | '.join(LEVELS)}")
+        return 0
     if app != "cursor" and level in WIDER:
         say(f"Only Cursor can be widened from here for now. In Claude Code, say \"let {app} see everything\".")
         return 1
