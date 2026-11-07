@@ -6,9 +6,9 @@ In order. Nothing here is done yet; the repo is private and nothing is published
 
 1. **Pick the product name.** The first trademark pass knocked out the working name, so the listings wait for a new
    one. Then follow "Renaming" below.
-2. **The memory app answers the connector protocol.** The engine needs a handler for `docs/PROTOCOL.md` on the
-   connector socket. Until then the listing would install something that only says the app isn't running.
-3. **Review the repo once:** README, `docs/`, `src/` (about 220 lines). Commits carry your git name and email, as in
+2. **The memory app answers the connector protocol.** Done: the engine's daemon answers `docs/PROTOCOL.md` on the
+   connector socket (checked end to end on 2026-11-07). Users still need the engine installed and running.
+3. **Review the repo once:** README, `docs/`, `src/` (about 230 lines). Commits carry your git name and email, as in
    your other public repos. Early commit messages mention the old working name; squash them before the flip if that
    matters.
 4. **Confirm the copyright holder.** `LICENSE` says "LF Labs"; change it if the company's legal name differs.
