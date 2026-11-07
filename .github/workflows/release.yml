@@ -1,5 +1,6 @@
 # A tag vX.Y.Z builds the CLI wheel and the engine wheel (the engine at the tag in ENGINE_TAG), writes their sha256 into
-# install.sh, and publishes all of it as one release: the install line downloads only from here.
+# install.sh, packs the connector's .mcpb for Claude Desktop, and publishes all of it as one release: the install line
+# downloads only from here.
 name: release
 on:
   push:
@@ -38,7 +39,12 @@ jobs:
         run: |
           ln -s "$PWD/engine" ../lflabs-memory-engine
           (cd cli && uv run pytest -q)
-          (cd connector && npm ci && npm test)
+          (cd connector && npm ci && npm test && npm run test:bundle)
+      - name: Claude Desktop extension (the connector's README sends users to the release for it)
+        run: |
+          (cd connector && npm run pack:mcpb)
+          cp connector/lflabs-memory-connector.mcpb dist/
+          (cd dist && shasum -a 256 lflabs-memory-connector.mcpb >> SHA256SUMS)
       - name: Publish
         env:
           GH_TOKEN: ${{ github.token }}
