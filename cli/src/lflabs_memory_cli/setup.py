@@ -215,7 +215,7 @@ class RealSetup:
         elif self.a.backend == "anthropic-api":
             note = "not used: reading with your API key"
         elif c and c.version:
-            note = f"found; background reading off ({c.note or 'not chosen'})"
+            note = f"found; background reading off ({'not chosen' if c.usable else c.note or 'not chosen'})"
         else:
             note = "not found; background reading off"
         ui.step("Claude Code", "ok" if self.a.backend != "none" or (c and c.version) else "warn", note)

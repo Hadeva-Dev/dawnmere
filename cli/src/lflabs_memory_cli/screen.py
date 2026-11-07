@@ -413,7 +413,8 @@ def _body(t, state, tl):
             out.append(row.rstrip())
         else:
             mark = {"ok": (GREEN, "✓"), "warn": (AMBER, "!"), "failed": (RED, "✗")}.get(s.status, (GREEN, "✓"))
-            text = (label + s.note).rstrip()
+            # one row: the next row would be drawn over a wrapped tail
+            text = cut((label + s.note).rstrip(), min(BLOCK, state.width) - len(IND) - 2)
             out.append(IND + paint(*mark) + " " + paint(ACTIVE if s.status == "failed" else GREY, text))
         if s.apps:
             out += _leaves(t, state, tl, active, spin)
