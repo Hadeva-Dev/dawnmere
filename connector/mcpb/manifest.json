@@ -17,11 +17,11 @@
   "support": "https://github.com/Hadeva-Dev/dawnmere/issues",
   "server": {
     "type": "node",
-    "entry_point": "server/index.js",
+    "entry_point": "server/index.mjs",
     "mcp_config": {
       "command": "node",
       "args": [
-        "${__dirname}/server/index.js"
+        "${__dirname}/server/index.mjs"
       ]
     }
   },
