@@ -222,7 +222,8 @@ def test_update_rolls_back_on_failed_migration(mac, monkeypatch):
     rows = sqlite3.connect(data / "memory.db").execute("select content from memories").fetchall()
     assert rows == [("we deploy on Fridays",)], "the store is back as it was"
     installs = [c for c in mac.calls("uv") if c[:2] == ["tool", "install"]]
-    assert installs and "lflabs_memory_cli-0.1.0-py3-none-any.whl" in installs[-1][-3]
+    assert installs and "lflabs_memory_cli-0.1.0-py3-none-any.whl" in installs[-1][5]
+    assert installs[-1][-2:] == ["--with-executables-from", "lflabs-memory-engine"]
     assert any("bootstrap" in c for c in mac.calls("launchctl")), "the service is started again"
     assert out[-1].startswith("Back on 0.1.0; your memory is as it was")
     assert list((data / "backup").glob("memory-*-before-update.db"))
