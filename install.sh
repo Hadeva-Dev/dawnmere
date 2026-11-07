@@ -20,8 +20,6 @@ ENGINE_SIZE=0
 UV_VERSION="0.12.5"
 UV_SHA256_arm64="5bb0e5fe008a773c3dbcb97ff79cd89e1241464fe9d2f986d52ad8f1b037bd62"
 UV_SIZE_arm64=18518284
-UV_SHA256_x86_64="b3b2137477cf96c9686ebfb71524614cec780c673fd73e59bce099aef02e70e8"
-UV_SIZE_x86_64=20848713
 
 BASE="${LFLABS_MEMORY_RELEASE_BASE:-https://github.com/Hadeva-Dev/dawnmere/releases/download/v$VERSION}"
 UV_BASE="${LFLABS_MEMORY_UV_BASE:-https://github.com/astral-sh/uv/releases/download/$UV_VERSION}"
@@ -36,6 +34,8 @@ fail() {
 [ "$(uname -s)" = Darwin ] || fail "Dawnmere runs on macOS only."
 os=$(sw_vers -productVersion)
 [ "${os%%.*}" -ge 14 ] 2>/dev/null || fail "Dawnmere needs macOS 14 or later (this Mac has $os)."
+# The engine's onnxruntime has no Intel Mac wheels. hw.optional.arm64 is 1 on Apple silicon even under Rosetta.
+[ "$(PATH="$PATH:/usr/sbin" sysctl -n hw.optional.arm64 2>/dev/null)" = 1 ] || fail "Dawnmere needs a Mac with Apple silicon (M1 or later)."
 command -v curl >/dev/null 2>&1 || fail "curl is missing, so nothing can be downloaded."
 
 printf 'Dawnmere installer\n'
@@ -80,11 +80,7 @@ UV=$(command -v uv 2>/dev/null || true)
 # an older uv cannot link the engine's command (below): the pinned one is used instead
 "$UV" tool install --help 2>/dev/null | grep -q -- --with-executables-from || UV=""
 if [ -z "$UV" ]; then
-  case $(uname -m) in
-    arm64) arch=aarch64 uv_sha=$UV_SHA256_arm64 uv_size=$UV_SIZE_arm64 ;;
-    x86_64) arch=x86_64 uv_sha=$UV_SHA256_x86_64 uv_size=$UV_SIZE_x86_64 ;;
-    *) fail "This Mac's processor ($(uname -m)) is not supported." ;;
-  esac
+  arch=aarch64 uv_sha=$UV_SHA256_arm64 uv_size=$UV_SIZE_arm64
   TOTAL=$uv_size
 fi
 TOTAL=$((TOTAL + CLI_SIZE + ENGINE_SIZE))
