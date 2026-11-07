@@ -43,7 +43,7 @@ test("MIT everywhere", () => {
 
 // The product name will change. It may appear only where a rename has to touch anyway: brand.ts, the README, the
 // listing text and the packaging files' display text (docs/GO-PUBLIC.md, "Renaming").
-const BRANDED = ["src/brand.ts", "README.md", "docs/LISTING.md", "package.json", "server.json",
+const BRANDED = ["src/brand.ts", "README.md", "docs/LISTING.md", "docs/GO-PUBLIC.md", "package.json", "server.json",
   "mcpb/manifest.json"];
 
 test("the product name lives only in the files a rename touches", () => {
