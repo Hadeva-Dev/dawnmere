@@ -15,6 +15,7 @@ import pytest
 from conftest import FakeConnector
 
 from lflabs_memory_cli import apps, launchd, layout, main as cli, models, setup
+from lflabs_memory_cli.run import Result
 
 HERE = Path(__file__).parent
 
@@ -86,19 +87,13 @@ def test_onboarding_text_golden():
     assert setup.onboarding() == """\
 Dawnmere gives Claude Code, Codex and Cursor one shared memory on this Mac.
 
-What it does
-  - Keeps your memory in one file on this Mac. It is never uploaded.
-  - After a Claude Code session goes quiet, sends that conversation to your
-    own model provider (your Claude plan, or your API key) to pick out what is
-    worth remembering. Nothing else is sent, and nothing goes to LF Labs.
-  - Lets each AI app see only what suits it. New apps see work notes only.
-  - Sends no usage data. Ever.
+Your memory is one file here, never uploaded. After a Claude Code session goes
+quiet, your own model (your Claude plan or API key) reads the conversation and
+keeps what is worth remembering. Nothing goes to LF Labs. No usage data, ever.
 
-What it changes
-  - Adds memory to Claude Code (a plugin), Codex and Cursor (their MCP
-    settings). Every file is backed up first. "dawnmere uninstall" puts
-    everything back.
-  - Starts a small background service that keeps search fast.
+Setup adds Dawnmere to Claude Code, Codex and Cursor, backing up every file it
+touches, and starts a small background service that keeps search fast.
+"dawnmere uninstall" puts everything back.
 """
     assert max(len(line) for line in setup.onboarding().splitlines()) <= 78
 
@@ -345,3 +340,24 @@ def test_node_missing_is_said(box):
     assert code == 0 and "Node.js is not installed" in out
     box.add("npx")
     assert "Node.js" not in run_setup()[1]
+
+
+def test_service_reload_waits_for_the_old_agent_to_leave(box, monkeypatch):
+    """bootout returns before the old daemon has exited; a bootstrap of the same label meanwhile fails with EIO."""
+    states = iter([(True, 41), (True, 41), (True, None), (False, None)])  # loaded; winding down twice; gone
+    calls = []
+    monkeypatch.setattr(launchd, "loaded", lambda: next(states, (False, None)))
+    monkeypatch.setattr(launchd, "run", lambda argv, timeout=60: (calls.append(argv[1]), Result(0, "", ""))[1])
+    monkeypatch.setattr(launchd.time, "sleep", lambda s: calls.append("wait"))
+    ran = launchd.install(box.bin / "lflabs-memory")
+    assert calls == ["bootout", "wait", "wait", "bootstrap"]
+    assert [(a[1], ok, note) for a, ok, note in ran] == [("bootout", True, ""), ("bootstrap", True, "")]
+
+
+def test_setup_reports_a_bootstrap_launchd_refused(box, capsys):
+    box.on("launchctl", ["bootstrap"], 5, "")
+    code, out = run_setup()
+    shown = capsys.readouterr().out
+    assert code != 0, out + shown
+    assert "did not start: launchctl exited 5" in shown + out
+    assert "see ~/Library/Logs" not in shown + out

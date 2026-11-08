@@ -35,19 +35,13 @@ def onboarding():
     return f"""\
 {PRODUCT} gives Claude Code, Codex and Cursor one shared memory on this Mac.
 
-What it does
-  - Keeps your memory in one file on this Mac. It is never uploaded.
-  - After a Claude Code session goes quiet, sends that conversation to your
-    own model provider (your Claude plan, or your API key) to pick out what is
-    worth remembering. Nothing else is sent, and nothing goes to LF Labs.
-  - Lets each AI app see only what suits it. New apps see work notes only.
-  - Sends no usage data. Ever.
+Your memory is one file here, never uploaded. After a Claude Code session goes
+quiet, your own model (your Claude plan or API key) reads the conversation and
+keeps what is worth remembering. Nothing goes to LF Labs. No usage data, ever.
 
-What it changes
-  - Adds memory to Claude Code (a plugin), Codex and Cursor (their MCP
-    settings). Every file is backed up first. "{COMMAND} uninstall" puts
-    everything back.
-  - Starts a small background service that keeps search fast.
+Setup adds {PRODUCT} to Claude Code, Codex and Cursor, backing up every file it
+touches, and starts a small background service that keeps search fast.
+"{COMMAND} uninstall" puts everything back.
 """
 
 
@@ -244,10 +238,15 @@ class RealSetup:
 
     def step_service(self, ui):
         ui.step("Memory service", "running")
-        for argv, ok in launchd.install(self.engine):
+        ran = launchd.install(self.engine)
+        for argv, ok, _ in ran:
             install_record.add_command(self.record, argv, ok)
         self.record["plist"] = str(launchd.plist_path())
         self.save()
+        _, ok, note = ran[-1]  # the bootstrap
+        if not ok:
+            ui.step("Memory service", "failed", f"did not start: {note}")
+            return False
         if not launchd.wait_ready(READY_WAIT):
             ui.step("Memory service", "failed", "did not start: see ~/Library/Logs/LF Labs/memory.log")
             return False
