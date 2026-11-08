@@ -14,7 +14,8 @@ def data_dir():
 
 
 def full_show(show=False):
-    """The full sunrise plays on the first setup (no install.json yet) or with --show; a re-run gets the short one."""
+    """The full show (Kip and the wordmark) plays on the first setup (no install.json yet) or with --show; a re-run
+    gets the short one."""
     return show or not (data_dir() / "install.json").exists()
 
 

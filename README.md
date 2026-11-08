@@ -139,5 +139,5 @@ Each app decides for itself what it sends to its own model, including what it re
 
 The installer, the `dawnmere` command, the plugin and the connector: MIT ([LICENSE](LICENSE)). The engine:
 [FSL-1.1-MIT](https://github.com/Hadeva-Dev/lflabs-memory-engine/blob/main/LICENSE). The models keep their own
-licenses (`dawnmere doctor --licenses`), and the setup screen's wordmark is drawn from the Jost font
+licenses (`dawnmere doctor --licenses`), and the setup screen's wordmark is drawn from the Fredoka font
 ([THIRD_PARTY.md](THIRD_PARTY.md)).
