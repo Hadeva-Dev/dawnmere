@@ -35,7 +35,6 @@ def play_through(cols, rows):
         ui.step(s.label, "ok", "done")
     ui.memory("use pnpm, never npm")
     state.finished = 0.0
-    out.write("\n")
     for i in range(int(screen.done_at(state) * 30) + 2):
         clock.t = i / 30
         ui._draw(frame(clock.t, state))
@@ -45,10 +44,36 @@ def play_through(cols, rows):
     return [line.rstrip() for line in term.display], [visible(x) for x in frame(clock.t, state)]
 
 
-@pytest.mark.parametrize("cols,rows", [(80, 40), (80, 14), (64, 20)])
+@pytest.mark.parametrize("cols,rows", [(100, 46), (120, 40), (80, 35), (80, 34), (80, 24), (80, 14), (64, 20)])
 def test_screen_shows_the_final_frame(cols, rows):
     shown, final = play_through(cols, rows)
     while shown and shown[-1] == "":
         shown.pop()
     k = min(len(shown), len(final))
     assert shown[-k:] == final[-k:], "the visible rows are the final frame's, with nothing garbled"
+    if len(final) < rows:
+        assert shown == final, "the whole screen is the final frame: no ghost copies of Kip above it"
+    expect = "full" if rows >= 35 and cols >= 70 else "compact"
+    assert screen._header(ScreenState(steps=plan(), width=cols, height=rows, expect_apps=3)) == expect
+
+
+@pytest.mark.parametrize("rows,golden", [(40, "final"), (30, "compact-final")])
+def test_no_ghosting(rows, golden):
+    """The demo in a real pseudo-terminal, 100 columns wide, read back through pyte: the screen it ends on is the
+    golden final frame (full at 40 rows, compact at 30), with no ghost copies of Kip and the cursor shown."""
+    import os
+    from pathlib import Path
+
+    from test_animator import read_for, spawn
+    proc, fd = spawn("setup", "--demo", cols=100, rows=rows, env={"COLUMNS": "100", "LINES": str(rows)})
+    term = pyte.Screen(100, rows)
+    stream = pyte.ByteStream(term)
+    stream.feed(read_for(fd, 15.0))
+    os.close(fd)
+    assert proc.wait(5) == 0
+    shown = [line.rstrip() for line in term.display]
+    while shown and shown[-1] == "":
+        shown.pop()
+    want = [visible(x) for x in (Path(__file__).parent / "banner" / f"{golden}.txt").read_text().splitlines()]
+    assert shown == want
+    assert not term.cursor.hidden

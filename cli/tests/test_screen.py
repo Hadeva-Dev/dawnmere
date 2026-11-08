@@ -1,17 +1,20 @@
 """The setup screen's frames (spec 9.1, Tests)."""
 import os
+import re
 from pathlib import Path
 
 import pytest
 from conftest import THREE, plan, scripted
 
 from lflabs_memory_cli import screen
-from lflabs_memory_cli.screen import (LABEL, AppResult, Memory, ScreenState, done_at, frame, pick_memory,
-                                      self_check_row, sun_offset, track, visible)
+from lflabs_memory_cli.kip_art import SPRITES
+from lflabs_memory_cli.screen import (LABEL, AppResult, Memory, ScreenState, cap_lit, done_at, frame, kip_at,
+                                      pick_memory, post_xs, self_check_row, visible)
 
 GOLDEN = Path(__file__).parent / "banner"
 UPDATE = bool(os.environ.get("UPDATE_GOLDEN"))
 TRY_PREFIX = "Try it:"
+BRAILLE = tuple(chr(c) for c in range(0x2801, 0x2900))
 
 
 def check_golden(name, lines):
@@ -22,17 +25,45 @@ def check_golden(name, lines):
     assert text == path.read_text(), f"{name} differs from {path} (UPDATE_GOLDEN=1 to accept)"
 
 
+def scene_times(state):
+    """(mid-hop, mid-dive): halfway through the second hop, and Kip beak first into the water."""
+    sc = screen._scene(state, screen._timeline(state))
+    return sc.hops[1][1] + screen.HOP / 2, sc.dive + 0.4
+
+
 def test_frames_golden():
     state = scripted()
     end = done_at(state)
-    for name, t in [("t0.4", 0.4), ("t1.0", 1.0), ("t2.0", 2.0), ("mid-download", 3.1), ("final", end)]:
+    hop, dive = scene_times(state)
+    for name, t in [("t0.4", 0.4), ("t1.0", 1.0), ("t2.0", 2.0), ("mid-download", 3.1), ("mid-hop", hop),
+                    ("mid-dive", dive), ("final", end)]:
         check_golden(name, frame(t, state))
     check_golden("final-colour", [line.replace("\x1b", "\\e") for line in frame(end, scripted(color=True))])
+    compact = scripted(height=30)
+    check_golden("compact-final", frame(done_at(compact), compact))
+
+
+def test_final_frame_matches_the_design():
+    """The last frame at 100 x 46 is the prototype's (research/dawnmere-kip/term/final_frame.txt), line for line.
+    Two rows differ on purpose: the tree's "how" lines up with the results (spec 9.1, One result column), and the
+    self-check shows hundredths (Hao, 2026-10-28)."""
+    design = (GOLDEN / "design-final.txt").read_text().splitlines()
+    state = scripted(width=100, height=46)
+    real = [visible(x) for x in frame(done_at(state), state)]
+    assert len(real) == len(design) == 34
+    for want, got in zip(design, real):
+        if want.lstrip().startswith(("├", "└")):
+            want = want[:17] + " " + want[17:]
+        elif "Self-check" in want:
+            want = want.replace("0.3 s", "0.34 s")
+        assert got == want
 
 
 def test_mid_download_shows_the_bar():
     row = next(visible(x) for x in frame(3.1, scripted()) if "Search models" in x)
-    assert "─" * 20 in row and row.rstrip().endswith("MB")
+    assert "─" * 20 in row and row.rstrip().endswith("/ 57 MB")
+    coloured = next(x for x in frame(3.1, scripted(color=True)) if "Search models" in visible(x))
+    assert f"38;5;{screen.ORANGE}m─" in coloured, "the bar fills in Kip's orange"
 
 
 def body_lines(state, t):
@@ -45,35 +76,57 @@ def times(state):
 
 
 def test_width():
-    """No line is wider than 68 columns, except the "Try it" line, which is one line only where the terminal fits it."""
+    """The art block is 67 columns after a margin of 1. Only the "Try it" line is wider: it ends at column 79."""
     for kw in ({}, {"color": True}, {"check": 2.1}, {"memory": None}, {"apps": THREE[:1]}):
         state = scripted(**kw)
         for t in times(state):
             for line in body_lines(state, t):
-                limit = state.width - 1 if line.lstrip().startswith(TRY_PREFIX) else 68
+                limit = 79 if line.lstrip().startswith(TRY_PREFIX) else 68
                 assert len(line) <= limit, (kw, t, line)
+    final = body_lines(scripted(), done_at(scripted()))
+    assert len(next(x for x in final if TRY_PREFIX in x)) == 79
     narrow = scripted(width=72)
-    assert all(len(x) <= 68 for x in body_lines(narrow, done_at(narrow)))
+    assert all(len(x) <= 71 for x in body_lines(narrow, done_at(narrow)))
 
 
-def test_sun_tracks_progress():
+def test_posts_track_apps():
+    """A cap turns orange, its name shows and Kip hops there only once that app's leaf has settled."""
     state = scripted()
-    end = done_at(state)
-    offs = [sun_offset(state, t) for t in times(state)]
-    assert offs[0] == pytest.approx(screen.SUN_START)
-    assert all(b <= a + 1e-9 for a, b in zip(offs, offs[1:])), "the sun never sinks"
-    last_step_end = state.finished
-    for t, off in zip(times(state), offs):
-        if t < last_step_end:
-            assert off > 0, f"sun clear of the horizon at {t} before setup finished"
-    assert sun_offset(state, end) == 0
+    tl = screen._timeline(state)
+    settled = [le for _, le in tl.leaves]
+    xs = post_xs(3)
+    assert xs == [46, 78, 108]
+    for t in times(state):
+        lit = cap_lit(state, t)
+        names = body_lines(state, t)[11] if len(body_lines(state, t)) > 11 else ""
+        x, y, sprite = kip_at(state, t)
+        for i, name in enumerate(THREE):
+            assert lit[i] == (t >= settled[i]), (t, i)
+            assert (name in names) == (t >= settled[i]), (t, name, names)
+        if t >= 1.3 and sprite:
+            reached = [xs[i] for i in range(3) if t >= settled[i]]
+            if not reached:
+                assert (x, y) == (screen.STUMP, screen.POST_TOP), "Kip waits on the stump"
+            else:
+                assert x <= reached[-1], (t, x, "Kip is never ahead of the last connected app")
+
+    none = scripted(apps=())
+    for t in times(none):
+        x, y, sprite = kip_at(none, t)
+        if t >= 1.3:
+            assert (x, y) == (screen.STUMP, screen.POST_TOP) and sprite in ("perch", "blink")
+    assert not any("is now in" in x for x in body_lines(none, done_at(none)))
 
 
-def test_sun_waits_for_a_slow_step():
-    state = scripted(until=3.0)          # the download is a third of the way
-    off = sun_offset(state, 3.0)
-    assert 0 < off < screen.SUN_START
-    assert sun_offset(state, 30.0) == pytest.approx(sun_offset(state, 3.6), abs=0.5)
+def test_kip_dives_and_comes_back_with_the_note():
+    state = scripted()
+    sc = screen._scene(state, screen._timeline(state))
+    last = sc.hops[-1][3]
+    assert kip_at(state, sc.dive + 0.4)[2] == "dive"
+    assert kip_at(state, sc.dive + 0.7)[2] is None, "under the water"
+    assert kip_at(state, done_at(state)) == (last, screen.POST_TOP, "fish")
+    empty = scripted(memory=None)
+    assert kip_at(empty, done_at(empty))[2] == "perch", "no note: no fish"
 
 
 @pytest.mark.parametrize("n", [1, 2, 3, 4, 6])
@@ -81,19 +134,21 @@ def test_ending_apps(n):
     names = ["Claude Code", "Codex", "Cursor", "Windsurf", "VS Code", "Gemini CLI"][:n]
     state = scripted(apps=names)
     lines = body_lines(state, done_at(state))
-    app_line = next(x for x in lines if "◉" in x)
-    assert len(app_line) <= 68
+    xs = post_xs(n)
+    assert len(xs) == (3 if n > 4 else n)
+    assert all(screen.STUMP + 2 < x and x + 2 < screen.BLOCK * 2 for x in xs), "every post inside the block"
+    assert all(x % 2 == 0 for x in xs), "a post fills one cell"
+    label = lines[11]
+    assert len(label) <= 68
+    shown = names[:3] if n > 4 else names
+    assert all(name in label for name in shown)
     if n == 6:
-        assert "◉ +3 more" in app_line and "Windsurf" not in app_line
-    else:
-        assert app_line.count("◉") == n
-    nodes, wire = track(names)
-    if n > 1:
-        assert 3 <= wire <= 11
-    tail = {1: "saved", 2: "is now in both"}.get(n, f"is now in all {n}")
+        assert label.endswith("+3 more") and "Windsurf" not in label
+    tail = {1: "  is saved", 2: "  is now in both"}.get(n, f"  is now in all {n}")
     assert any(tail in x for x in lines)
     if n == 1:
         assert any("Add Cursor or Codex later: dawnmere setup" in x for x in lines)
+    assert kip_at(state, done_at(state))[0] == xs[-1], "Kip dives at the last post"
 
 
 def mem(text, kind="feedback", section="prefs", created=0.0, **kw):
@@ -122,7 +177,7 @@ def test_memory_pick():
 def test_no_memory_gives_the_empty_travel_line():
     state = scripted(memory=None)
     lines = body_lines(state, done_at(state))
-    assert any("Anything you tell one of them now reaches the others." in x for x in lines)
+    assert "  Anything you tell one of them now reaches the others." in lines
     assert not any("“" in x for x in lines if "Try it" not in x)
 
 
@@ -149,62 +204,77 @@ def test_fallbacks(monkeypatch):
     monkeypatch.setattr(screen, "reduce_motion", lambda: True)
     assert not screen.detect(Out(True), utf8)["motion"]
 
-    # plain: lines only, no escapes
-    state = scripted(plain=True)
-    lines = frame(done_at(state), state)
-    assert lines[0] == "[ok] Claude Code: found, logged in" and "Dawnmere is on." in lines
-    assert not any("\x1b" in x or "⠀" <= x[:1] <= "⣿" for x in lines)
-
-    # non-UTF-8: the ASCII logo and the spaced name, all ASCII, no animation
+    # non-UTF-8: no art yet (the ASCII Kip is not drawn), the spaced name, all ASCII, no animation
     state = scripted(unicode=False, color=True)
     for t in (0.4, done_at(state)):
         lines = body_lines(state, t)
         assert all(x.isascii() for x in lines)
-        assert "      .--''''''--." in "\n".join(lines) and "D A W N M E R E" in "\n".join(lines)
+        assert lines[:3] == ["  d a w n m e r e", "  " + screen.TAGLINE, ""]
 
-    # Reduce Motion: still frames, sun at its height after each finished step, the ending drawn at once
+    # Reduce Motion: still frames. Kip on the post of the last connected app, at the end holding the fish
     still = scripted(motion=False)
     end = done_at(still)
-    assert end == screen._timeline(still).end, "no 3 s finale: the end is drawn at once"
+    assert end == screen._timeline(still).end, "no ending to wait for: it is drawn at once"
     assert frame(2.6, still) == frame(2.61, still), "nothing moves between steps"
-    assert sun_offset(still, 3.0) == sun_offset(still, 3.9), "the sun moves only when a step finishes"
+    settled = [le for _, le in screen._timeline(still).leaves]
+    assert kip_at(still, settled[0] - 0.01) == (screen.STUMP, screen.POST_TOP, "perch")
+    assert kip_at(still, settled[1]) == (78, screen.POST_TOP, "perch"), "no hop: Kip is just there"
+    assert kip_at(still, end) == (108, screen.POST_TOP, "fish")
     final = body_lines(still, end)
-    assert any("Dawnmere is on." in x for x in final) and not any("●" in x for x in final)
+    assert any("Dawnmere is on." in x for x in final)
     assert any(x.strip().startswith("•") for x in body_lines(still, 3.0)), "a still mark, not a spinner"
 
-    # under 70 columns: one centred spaced name, then the steps
-    narrow = scripted(width=60)
-    lines = body_lines(narrow, done_at(narrow))
-    assert lines[0].strip() == "D A W N M E R E" and lines[1] == ""
-    assert lines[2].startswith(" ✓ Claude Code")
+    # NO_COLOR: the same frames, without a colour code
+    assert not any("\x1b[38;5" in x for x in frame(done_at(scripted()), scripted()))
 
-    # fewer than 34 rows: no logo, the wordmark stays
-    short = scripted(height=33)
-    lines = body_lines(short, done_at(short))
-    assert lines[0] == screen.WORDMARK[0].rstrip()
+
+@pytest.mark.parametrize("display", [{"width": 60}, {"height": 34}, {"height": 24}])
+def test_compact_header(display):
+    """Under 70 columns or under 35 rows: one name line and the tagline, then the steps. No Kip, no wordmark."""
+    state = scripted(**display)
+    for t in times(state):
+        lines = body_lines(state, t)
+        assert not any(ch in x for x in lines for ch in BRAILLE if ch not in screen.SPIN), (t, "no art")
+    lines = body_lines(state, done_at(state))
+    assert lines[:4] == ["  dawnmere", "  " + screen.TAGLINE, "", "  ✓ Claude Code     found, logged in"]
+    assert "  “always run tests before committing”  is now in all 3" in lines
+    assert len(lines) + 1 <= state.height
+
+
+def test_full_header_needs_35_rows():
+    assert screen._header(scripted(height=35)) == "full"
+    assert screen._header(scripted(height=34)) == "compact"
+    assert screen._header(scripted(height=35, apps=["Claude Code", "Codex", "Cursor", "Windsurf"])) == "compact"
+    full = scripted(height=35)
+    assert len(frame(done_at(full), full)) + 1 == 35, "the screen and the cursor's line fill the window exactly"
+
+
+def test_plain_mode_has_no_escapes():
+    state = scripted(plain=True, color=True)
+    lines = frame(done_at(state), state)
+    assert lines[0] == "[ok] Claude Code: found, logged in" and "Dawnmere is on." in lines
+    assert not any("\x1b" in x or any(ch in x for ch in BRAILLE) for x in lines)
 
 
 def test_self_check_row(final):
     assert self_check_row(0.34) == ("ok", "recall in 0.34 s")
     state, end = final(check=0.34)
-    assert " ✓ Self-check      recall in 0.34 s" in body_lines(state, end)
+    assert "  ✓ Self-check      recall in 0.34 s" in body_lines(state, end)
 
     state, end = final(check=2.1)
     lines = body_lines(state, end)
-    assert " ! Self-check      recall in 2.10 s (slow: dawnmere doctor)" in lines
+    assert "  ! Self-check      recall in 2.10 s (slow: dawnmere doctor)" in lines
     assert any("Dawnmere is on." in x for x in lines), "setup still finishes"
     coloured = frame(end, scripted(check=2.1, color=True))
     assert any(f"38;5;{screen.AMBER}m!" in x for x in coloured)
 
     state, end = final(fail=True)
     lines = body_lines(state, end)
-    assert " ✗ Self-check      the memory service did not answer" in lines
-    assert not any("Dawnmere is on." in x or "Try it" in x or "◉" in x for x in lines)
-    off = sun_offset(state, end + 1)
-    assert off > 0 and sun_offset(state, end + 5) == off, "the sun stops where it is"
-    coloured = scripted(fail=True, color=True)
-    for t in (end, end + 0.5):
-        assert not any(f"38;5;{c}m" in x for x in frame(t, coloured) for c in screen.FLASH[1:]), "no flash"
+    assert "  ✗ Self-check      the memory service did not answer" in lines
+    assert not any("Dawnmere is on." in x or "Try it" in x or "is now in" in x for x in lines)
+    stays = kip_at(state, end)
+    assert stays == kip_at(state, end + 5) and stays[0] == 108 and stays[2] in ("perch", "blink"), "Kip does not dive"
+    assert all(kip_at(state, end + k / 10)[2] != "dive" for k in range(60))
 
 
 def fake_fast_machine():
@@ -251,10 +321,9 @@ def test_short_version_on_rerun(tmp_path, monkeypatch):
     state = scripted(intro=False, start=0.0)
     for t in times(state):
         lines = body_lines(state, t)
-        assert not any("⣿" in x or "⠶" in x for x in lines), "no logo or wordmark"
-        assert not any("◉" in x for x in lines)
+        assert not any(ch in x for x in lines for ch in BRAILLE if ch not in screen.SPIN), "no Kip or wordmark"
     lines = body_lines(state, done_at(state))
-    assert lines[0].startswith(" ✓ Claude Code") and lines[-1] == " Dawnmere is on."
+    assert lines[0].startswith("  ✓ Claude Code") and lines[-1] == "  Dawnmere is on."
 
 
 def test_apps_arrive_one_at_a_time():
@@ -264,34 +333,47 @@ def test_apps_arrive_one_at_a_time():
     for k in range(3):
         t = starts[k] + 0.01
         lines = body_lines(state, t)
-        leaves = [x for x in lines if x.startswith("   ├") or x.startswith("   └")]
+        leaves = [x for x in lines if x.startswith("    ├") or x.startswith("    └")]
         assert len(leaves) == k + 1, (t, lines)
         assert all("Your apps" not in x or f"{k} of 3" in x for x in lines if "Your apps" in x)
         assert any(c in leaves[-1] for c in screen.SPIN), "the newest leaf spins"
         assert all(not any(c in x for c in screen.SPIN) for x in leaves[:-1]), "earlier leaves settled"
         for later in THREE[k + 1:]:
             assert not any(later in x for x in leaves), f"{later} appeared before its wiring started"
+            assert later not in lines[11], f"{later}'s name appeared under its post before it was connected"
     assert any("1 of 3" in x for x in body_lines(state, starts[1] + 0.01))
 
 
 def test_alignment(final):
     state, end = final()
     lines = body_lines(state, end)
-    body = lines[lines.index(" ✓ Claude Code     found, logged in"):]
-    result_col = 1 + 2 + LABEL
+    body = lines[lines.index("  ✓ Claude Code     found, logged in"):]
+    result_col = 2 + 2 + LABEL
     for x in body:
-        if x[1:2] and x[1:2] in "✓!✗":
+        if x[2:3] and x[2:3] in "✓!✗":
             assert x[result_col - 1] == " " and x[result_col] != " ", x
-        if x.startswith("   ├") or x.startswith("   └"):
+        if x.startswith("    ├") or x.startswith("    └"):
             assert x[result_col - 1] == " " and x[result_col] != " ", x
-    edges = {len(x) - len(x.lstrip()) for x in body if x and not x.startswith("   ")}
-    assert edges == {1}, "the body has a single left edge"
-    first_ink = min(len(r) - len(r.lstrip()) for r in screen.WORDMARK)
-    assert first_ink == 1, "the body starts at the wordmark's left edge"
+    edges = {len(x) - len(x.lstrip()) for x in body if x and not x.startswith("    ")}
+    assert edges == {2}, "the body has a single left edge"
     blanks = [i for i, x in enumerate(lines) if x == ""]
     assert all(b + 1 not in blanks for b in blanks), "exactly one blank line between groups"
     hints = [x.index(h) for x in body for h in ("type /hooks once", "restart Cursor") if h in x]
     assert len(set(hints)) == 1, "hints share a column"
+    tag = next(x for x in lines if screen.TAGLINE in x)
+    left, right = len(tag) - len(tag.lstrip()) - 1, screen.BLOCK - len(tag.strip()) - (len(tag) - len(tag.lstrip()) - 1)
+    assert abs(left - right) <= 1, "the header is centred on the block"
+
+
+def test_sprites_on_model():
+    """In every perched pose the eye is a hole inside the orange band, and Kip stands on its feet."""
+    for name in ("perch", "fish"):
+        rows = SPRITES[name]["rows"]
+        band = [y for y, r in enumerate(rows) if re.search(r"o\.{1,3}o", r)]
+        assert band, f"{name}: no eye hole in the band"
+        y = band[0]
+        assert "b" in rows[y - 1] and "o" in rows[y + 1], f"{name}: the hole is inside Kip, not at an edge"
+        assert SPRITES[name]["ay"] == len(rows) - 1, "the anchor is the feet"
 
 
 def test_memory_pick_strips_terminal_escapes():

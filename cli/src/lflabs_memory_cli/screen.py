@@ -1,9 +1,11 @@
-"""The setup screen (spec 9.1): the sunrise intro, the live steps, the memory moment.
+"""The setup screen (spec 9.1): Kip, the live steps, the memory moment.
 
-The logo is the progress bar: the sun rises out of the water as setup does real work. Every frame comes from one pure
-function, frame(t, state). Animator draws those frames in place, at most 30 a second, redrawing only the rows that
-changed, while the caller does the work and reports it with step(), apps(), memory() and finish(). The screen never
-delays the work: a row stays up for at least FLOOR seconds so a 5 ms check is readable, and nothing else waits.
+The posts are the progress bar. Kip, the kingfisher, waits on a stump over the water; each app setup finds gets a post,
+and when setup connects that app its cap turns orange and Kip hops onto it. When the work is done Kip dives and comes
+back with one of the user's own notes, which is now in every app. Every frame comes from one pure function,
+frame(t, state). Animator draws those frames in place, at most 30 a second, redrawing only the rows that changed, while
+the caller does the work and reports it with step(), apps(), memory() and finish(). The screen never delays the work:
+a row stays up for at least FLOOR seconds so a 5 ms check is readable, and nothing else waits.
 """
 import atexit
 import math
@@ -18,40 +20,46 @@ import threading
 import time
 from dataclasses import dataclass, field
 
-from .banner_art import ASCII_LOGO, WORDMARK
+from .banner_art import WORDMARK
 from .brand import COMMAND, PRODUCT
+from .kip_art import SPRITES
 
-BLOCK = len(WORDMARK[0])  # 67: the header is centred on this block, and the body starts at its left edge
-IND = " "                 # the body's left edge, under the wordmark's first stroke
+BLOCK = 67                # the art block (Kip's scene): the header is centred on it
+MARGIN = " "              # the block's left margin
+IND = "  "                # the body's left edge
 LABEL = 16                # every result starts in one column: IND + mark + space + LABEL
 HOW = 13                  # a tree leaf's "how" column, then its hint
 FLOOR = 0.35              # each row is on screen at least this long
-INTRO = 2.2               # the steps appear once the ring, horizon and wordmark have drawn
+INTRO = 2.2               # the steps appear once the water, the posts, Kip and the wordmark are in
 SLOW = 1.5                # a self-check slower than this is a warning
 TAGLINE = "one memory for every AI app you use"
 SPIN = "⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏"
 STILL_SPIN = "•"
-MIN_WIDTH = 70            # narrower: one spaced name line instead of the art
+MIN_WIDTH = 70            # narrower: the compact header (one name line and the tagline) instead of the art
 
-# xterm-256 colours. Orange is the sun and what the user must do; green is only the tick; grey is finished work.
-ORANGE, TRAIL, RIPPLE = 208, 130, 94
-GREEN, AMBER, RED = 72, 214, 167
+# xterm-256 colours. Orange is Kip's own and marks what the user must do; green is only the tick; grey is finished
+# work. Kip's blues and the beak's grey appear only in Kip.
+ORANGE = 202
+GREEN, AMBER, RED = 114, 214, 167
 GREY, DIM, DIMMER = 245, 243, 240
-ACTIVE, WORD, NAME, BRIGHT = 253, 252, 254, 255
-WHITE, CREAM = 231, 223
-FLASH = (208, 214, 215, 222, 223, 230)
-TAG_FADE = (237, 239, 241, DIM)
+ACTIVE, WORD, NAME, BRIGHT = 253, 252, 252, 255
+WHITE = 231
+SCENE = {"b": 68, "w": 25, "o": ORANGE, "k": 245, "f": 147,      # Kip: blue, wing, mask and belly, beak, fish
+         "water": 67, "post": 60, "cap_off": 239, "cap_on": ORANGE, "white": WHITE}
+_WEIGHT = {"o": 1.7, "f": 1.5, "k": 1.4}   # thin features win their cell, so the band and the beak survive
 
-# Logo geometry: 22 x 11 braille cells = 44 x 44 dots.
-LOGO_COLS, LOGO_ROWS = 22, 11
-_W, _H = LOGO_COLS * 2, LOGO_ROWS * 4
-_CX, _CY = _W / 2 - 0.5, _H / 2 - 0.5
-_R = min(_W, _H) / 2 - 0.5
-_HY = 6 * 4 + 1.5                    # horizon: the middle dot rows of cell row 6
-_Y1, _Y2 = 7 * 4 + 1.5, 8 * 4 + 1.5  # the two reflection ripples
-_SUN_R = 0.42 * _R
-SUN_START = 9.5                      # dots below the horizon before any work is done
-_BITS = ((0x01, 0x08), (0x02, 0x10), (0x04, 0x20), (0x40, 0x80))
+# Kip's scene: 67 x 11 cells = 134 x 44 braille dots.
+SCENE_ROWS = 11
+_DW, _DH = BLOCK * 2, SCENE_ROWS * 4
+WATER_Y, POST_TOP = 41, 31   # dot rows: the water line, the top of every post (where Kip's feet go)
+STUMP = 14                   # dot x of the stump Kip waits on
+POSTS = (46, 108)            # the posts spread evenly between these dot x
+MAX_POSTS = 4                # 5 or more apps: the first three posts, then "+k more"
+HOP, ARC = 0.6, 9            # a hop: seconds, and dots high
+WATER_REST = 1               # the water's phase when it stands still, as in the design's last frame
+_BITS = ((0, 0, 0x01), (0, 1, 0x02), (0, 2, 0x04), (1, 0, 0x08), (1, 1, 0x10), (1, 2, 0x20), (0, 3, 0x40),
+         (1, 3, 0x80))
+_HEADER_ROWS = SCENE_ROWS + 1 + 1 + len(WORDMARK) + 1 + 1   # scene, names, gap, wordmark, tagline, gap
 
 
 # ---------- state ----------
@@ -92,7 +100,7 @@ class ScreenState:
     motion: bool = True            # False: still frames (Reduce Motion, --no-animation)
     plain: bool = False            # plain lines only: no art, colour or escapes
     intro: bool = True             # the full show; False is the short version for a re-run
-    expect_apps: int = 3           # for the height check, before the apps are known
+    expect_apps: int = 3           # the apps setup found: one post each, before they are wired
 
 
 # ---------- timeline: when each row is on screen ----------
@@ -105,7 +113,7 @@ class _Timeline:
 
 
 def _intro_len(state):
-    if not (state.intro and _moving_at_all(state)) or _header(state) == "compact":
+    if not (state.intro and _moving_at_all(state)) or _header(state) != "full":
         return 0.0
     return INTRO if state.skipped is None else min(INTRO, state.skipped)
 
@@ -149,66 +157,181 @@ def _failed(state):
     return any(s.status == "failed" for s in state.steps)
 
 
+# ---------- the scene: posts, hops, the dive ----------
+
+@dataclass
+class _Scene:
+    posts: list         # dot x of each post shown
+    lit: list           # per post: when its cap turns orange (its app's leaf settled), or None
+    hops: list          # (leaf settled, hop start, from x, to x): Kip hops once each app is connected
+    dive: float | None  # when Kip dives (None: it does not, because setup failed or connected nothing)
+    more: int           # apps without a post: "+k more"
+
+
+def post_xs(n):
+    """Dot x of the posts for n apps: 46, 78, 108 for three; 2 to 4 spread evenly; 5 or more show three."""
+    n = 3 if n > MAX_POSTS else n
+    if n < 2:
+        return [78] * n
+    lo, hi = POSTS
+    return [2 * int((lo + (hi - lo) * i / (n - 1)) / 2 + 0.5) for i in range(n)]  # even x: a post fills one cell
+
+
+def _scene(state, tl):
+    found = max(state.expect_apps, len(state.apps))
+    xs = post_xs(found)
+    lit, hops, x = [None] * len(xs), [], STUMP
+    for j, (_, le) in enumerate(tl.leaves):
+        if j >= len(xs) or le is None or state.apps[j].status != "ok":
+            continue
+        lit[j] = le
+        start = le if not hops else max(le, hops[-1][1] + HOP)   # never before the leaf settles
+        hops.append((le, start, x, xs[j]))
+        x = xs[j]
+    dive = None
+    if tl.end is not None and hops and not _failed(state):
+        dive = max(tl.end, hops[-1][1] + HOP)
+    return _Scene(xs, lit, hops, dive, max(0, found - len(xs)))
+
+
+def _ending(state, tl, sc):
+    """When the ending's clock starts: the dive, or the end of the work when Kip does not dive."""
+    return sc.dive if sc.dive is not None else tl.end
+
+
 def done_at(state):
-    """When the last frame is up (None while setup still works). The full show ends 3 s after the work."""
+    """When the last frame is up (None while setup still works). The full show ends 2.6 s after the dive."""
     tl = _timeline(state)
     if tl.end is None:
         return None
-    if state.plain or _failed(state) or not state.intro or not _moving_at_all(state):
+    if state.plain or not state.intro or not _moving_at_all(state):
         return tl.end
     if state.skipped is not None:
         return max(tl.end, state.skipped)
-    return tl.end + 3.0
+    sc = _scene(state, tl)
+    if _failed(state):   # Kip stays where it is, but lands first
+        return max([tl.end] + [start + HOP for _, start, _, _ in sc.hops])
+    return _ending(state, tl, sc) + 2.6
 
 
-# ---------- the sun ----------
-
-def _target(state, tl, t, partial=True):
-    """The finished share of the step weights at display time t (a download counts by bytes)."""
-    total = sum(s.weight for s in state.steps) or 1.0
-    done = 0.0
-    for (start, end), s in zip(tl.steps, state.steps):
-        if end is not None and t >= end:
-            if s.status != "failed":
-                done += s.weight
-        elif partial and t >= start and s.progress:
-            seen = [p for p in s.progress if p[0] <= t]
-            if seen and seen[-1][2]:
-                done += s.weight * min(1.0, seen[-1][1] / seen[-1][2])
-    return min(1.0, done / total)
-
-
-def _ease(x):
+def _smooth(x):
     x = min(1.0, max(0.0, x))
-    return 1 - (1 - x) ** 3
+    return x * x * (3 - 2 * x)
 
 
-def _ease_in_out(x):
-    x = min(1.0, max(0.0, x))
-    return 4 * x ** 3 if x < 0.5 else 1 - (-2 * x + 2) ** 3 / 2
-
-
-SUN_EASE = 0.6  # seconds the sun takes to settle at a new height
-
-
-def sun_progress(state, t):
-    """How far the sun has risen, 0..1: the finished share, eased so the sun never jumps. Still frames: no easing."""
+def kip_at(state, t):
+    """(dot x, dot y, sprite or None): where Kip is at time t, and in which pose."""
     tl = _timeline(state)
+    return _kip(state, tl, _scene(state, tl), t)
+
+
+def _kip(state, tl, sc, t):
+    catch = "fish" if state.memory else "perch"   # no note: Kip comes up with nothing
     if not _moving(state, t):
-        return _target(state, tl, t, partial=False)
-    times = sorted({e for _, e in tl.steps if e is not None and e <= t}
-                   | {p[0] for (st, _), s in zip(tl.steps, state.steps) for p in s.progress if st <= p[0] <= t}
-                   | {st for st, _ in tl.steps if st <= t})
-    seg_t, seg_a, seg_b = 0.0, 0.0, 0.0
-    for te in times:
-        now = seg_a + (seg_b - seg_a) * _ease((te - seg_t) / SUN_EASE)
-        seg_t, seg_a, seg_b = te, now, max(now, _target(state, tl, te))
-    return seg_a + (seg_b - seg_a) * _ease((t - seg_t) / SUN_EASE)
+        x = STUMP
+        for settled, _, _, to in sc.hops:
+            if t >= settled:
+                x = to
+        return x, POST_TOP, catch if sc.dive is not None and t >= tl.end else "perch"
+    x, y, hopping = STUMP, POST_TOP, False
+    for _, start, x0, x1 in sc.hops:
+        if t >= start:
+            p = _smooth((t - start) / HOP)
+            x, y, hopping = x0 + (x1 - x0) * p, POST_TOP - ARC * math.sin(math.pi * p), p < 1
+    waiting = not hopping and (sc.dive is None or t < sc.dive)
+    sprite = "blink" if waiting and t % 3.1 < 0.14 else "perch"
+    if sc.dive is not None and t >= sc.dive:
+        k = t - sc.dive
+        if k < 0.25:                                   # gather
+            y = POST_TOP - 3 * _smooth(k / 0.25)
+        elif k < 0.55:                                 # beak first into the water
+            sprite, y = "dive", POST_TOP - 6 + (WATER_Y + 2 - (POST_TOP - 6)) * _smooth((k - 0.25) / 0.3)
+        elif k < 0.85:                                 # under
+            sprite = None
+        elif k < 1.25:                                 # back up onto the post
+            sprite, y = catch, POST_TOP - 7 * math.sin(math.pi * _smooth((k - 0.85) / 0.4))
+        else:
+            sprite = catch
+    if state.intro:
+        if t < 0.9:
+            sprite = None
+        elif t < 1.3:                                  # drops onto the stump
+            y -= 14 * (1 - _smooth((t - 0.9) / 0.4))
+    return x, y, sprite
 
 
-def sun_offset(state, t):
-    """sunOff: dots below the horizon. 9.5 before any work, 0 only once everything is done."""
-    return SUN_START * (1 - sun_progress(state, t))
+def cap_lit(state, t):
+    """Per post: whether its cap is orange at time t."""
+    tl = _timeline(state)
+    return [at is not None and t >= at for at in _scene(state, tl).lit]
+
+
+def _art(t, state, tl, sc):
+    """The scene's 11 rows and the names row under it, each [(char, colour or None)]."""
+    moving = _moving(state, t)
+    intro = state.intro and moving
+    done = done_at(state)
+    dots = {}
+
+    def put(x, y, part):
+        if 0 <= x < _DW and 0 <= y < _DH:
+            dots[(x, y)] = part
+
+    reveal = _smooth(t / 0.9) * _DW / 2 if intro else _DW / 2
+    phase = int(t * 8) if moving and (done is None or t < done) else WATER_REST
+    for x in range(_DW):
+        if abs(x - _DW / 2) <= reveal and (x + phase) % 5:
+            put(x, WATER_Y, "water")
+    rise = _smooth((t - 0.6) / 0.6) if intro else 1.0
+    top = WATER_Y - (WATER_Y - POST_TOP) * rise
+    for px in [STUMP, *sc.posts]:
+        for y in range(int(top) + 2, WATER_Y):
+            put(px, y, "post")
+            put(px + 1, y, "post")
+    if rise >= 1:
+        for i, px in enumerate(sc.posts):
+            glint = sc.dive is not None and moving and 0 <= t - (sc.dive + 1.3 + i * 0.12) < 0.12
+            part = "white" if glint else "cap_on" if sc.lit[i] is not None and t >= sc.lit[i] else "cap_off"
+            for x in range(px - 1, px + 3):
+                put(x, POST_TOP, part)
+                put(x, POST_TOP + 1, part)
+    if sc.dive is not None and moving and 0.5 <= t - sc.dive < 1.1:   # the splash ring
+        r = 3 + 10 * _smooth((t - sc.dive - 0.5) / 0.6)
+        at = sc.hops[-1][3]
+        for x in range(_DW):
+            if abs(abs(x - at) - r) < 1.2:
+                put(x, WATER_Y - 1, "white")
+    x, y, sprite = _kip(state, tl, sc, t)
+    if sprite:
+        sp = SPRITES[sprite]
+        for dy, row in enumerate(sp["rows"]):
+            for dx, part in enumerate(row):
+                if part != ".":
+                    put(round(x) - sp["ax"] + dx, round(y) - sp["ay"] + dy, part)
+    rows = []
+    for cy in range(SCENE_ROWS):
+        row = []
+        for cx in range(BLOCK):
+            bits, votes = 0, {}
+            for dx, dy, bit in _BITS:
+                part = dots.get((cx * 2 + dx, cy * 4 + dy))
+                if part:
+                    bits |= bit
+                    votes[part] = votes.get(part, 0) + _WEIGHT.get(part, 1.0)
+            row.append((chr(0x2800 + bits), SCENE[max(votes, key=votes.get)]) if bits else (" ", None))
+        rows.append(row)
+    names = [(" ", None)] * BLOCK
+    end = 0
+    for i, px in enumerate(sc.posts):
+        if sc.lit[i] is not None and t >= sc.lit[i]:
+            name = state.apps[i].name
+            col = max(0, min(BLOCK - len(name), px // 2 + 1 - len(name) // 2))
+            names[col:col + len(name)] = [(ch, NAME) for ch in name]
+            end = col + len(name)
+    if sc.more and sc.lit[-1] is not None and t >= sc.lit[-1]:
+        tail = f"  +{sc.more} more"[:BLOCK - end]
+        names[end:end + len(tail)] = [(ch, GREY) for ch in tail]
+    return rows + [names]
 
 
 # ---------- drawing helpers ----------
@@ -241,44 +364,9 @@ def _cells(cells, state):
     return text + "\x1b[0m" if cur is not None else text
 
 
-def _logo(ring, horizon, sun_off, rip, phase):
-    """Rows of [(char, part)], part one of "sun", "rip", "line", "" (spec 9.1 geometry)."""
-    rows = []
-    for r in range(LOGO_ROWS):
-        row = []
-        for c in range(LOGO_COLS):
-            v, part = 0, ""
-            for dy in range(4):
-                for dx in range(2):
-                    x, y = c * 2 + dx, r * 4 + dy
-                    p = _dot(x, y, ring, horizon, sun_off, rip, phase)
-                    if p:
-                        v |= _BITS[dy][dx]
-                        if p == "sun" or (p == "rip" and part != "sun") or not part:
-                            part = p
-            row.append((chr(0x2800 + v) if v else " ", part))
-        rows.append(row)
-    return rows
-
-
-def _dot(x, y, ring, horizon, sun_off, rip, phase):
-    dx = x - _CX
-    d = math.hypot(dx, y - _CY)
-    if _R - 2 <= d <= _R:
-        a = math.atan2(dx, -(y - _CY))
-        if a < 0:
-            a += 2 * math.pi
-        if a <= ring * 2 * math.pi + 0.001:
-            return "line"
-    if y < _HY - 0.6 and math.hypot(dx, y - (_HY + sun_off)) <= _SUN_R:
-        return "sun"
-    if abs(y - _HY) < 0.6 and d < _R - 3.5 and abs(dx) <= horizon * (_R - 3.5):
-        return "line"
-    if rip > 0 and abs(y - _Y1) < 0.6 and abs(dx) <= 0.34 * _R * min(1, rip * 2) and (x + phase) % 5:
-        return "rip"
-    if rip > 0.5 and abs(y - _Y2) < 0.6 and abs(dx) <= 0.16 * _R and (x + phase + 2) % 5:
-        return "rip"
-    return None
+def _lead(pad, text):
+    """pad + text, or an empty line when there is nothing to show (no trailing blanks)."""
+    return pad + text if text else ""
 
 
 def _moving_at_all(state):
@@ -290,26 +378,24 @@ def _moving(state, t):
     return _moving_at_all(state) and (state.skipped is None or t < state.skipped)
 
 
-def _needed_rows(state, logo_rows):
-    steps = len(state.steps) + max(state.expect_apps, len(state.apps))
-    # logo, gap, wordmark, gap, tagline, gap, steps, gap, app line, memory line, gap, finish (3), the cursor line
-    return logo_rows + 1 + len(WORDMARK) + 1 + 1 + 1 + steps + 1 + 2 + 1 + 3 + 1
+def _needed_rows(state):
+    """The full screen's height, with the line the cursor returns to."""
+    apps = max(state.expect_apps, len(state.apps))
+    memory = 2 if apps == 1 else 1
+    finish = 3 if state.width >= 80 else 4        # "Try it" wraps below 80 columns
+    return _HEADER_ROWS + len(state.steps) + apps + 1 + memory + 1 + finish + 1
 
 
 def _header(state):
+    """full: Kip's scene and the wordmark. compact: one name line and the tagline (too narrow or too short for the
+    art: a screen taller than the window leaves ghost copies of Kip when it redraws). ascii: no UTF-8. none: re-run."""
     if not state.intro:
         return "none"
-    if state.width < MIN_WIDTH:
-        return "compact"
-    rows = LOGO_ROWS if state.unicode else len(ASCII_LOGO)
-    logo = state.height >= max(34, _needed_rows(state, rows))
     if not state.unicode:
-        return "ascii" if logo else "ascii-nologo"
-    return "full" if logo else "nologo"
-
-
-def _spaced():
-    return " ".join(PRODUCT.upper())
+        return "ascii"
+    if state.width < MIN_WIDTH or state.height < _needed_rows(state):
+        return "compact"
+    return "full"
 
 
 # ---------- the frame ----------
@@ -319,66 +405,31 @@ def frame(t, state):
     if state.plain:
         return plain_lines(state)
     tl = _timeline(state)
-    lines = _header_lines(t, state, tl) + _body(t, state, tl) + _finale(t, state, tl)
+    sc = _scene(state, tl)
+    lines = _header_lines(t, state, tl, sc) + _body(t, state, tl) + _finale(t, state, tl, sc)
     if not state.unicode:
         lines = [_ascii(line) for line in lines]
     return lines
 
 
-def _header_lines(t, state, tl):
+def _header_lines(t, state, tl, sc):
     kind = _header(state)
     paint = _paint(state)
     if kind == "none":
         return []
-    if kind == "compact":
-        name = _spaced()
-        return [" " * max(0, (state.width - len(name)) // 2) + paint(WORD, name), ""]
-    tag_pad = " " * ((BLOCK - len(TAGLINE)) // 2)
-    logo_pad = " " * ((BLOCK - LOGO_COLS) // 2)
-    if kind.startswith("ascii"):
-        name = _spaced()
-        out = [logo_pad + row for row in ASCII_LOGO] + [""] if kind == "ascii" else []
-        return out + [" " * ((BLOCK - len(name)) // 2) + paint(WORD, name), "", tag_pad + paint(DIM, TAGLINE), ""]
-
-    moving = _moving(state, t)
-    intro = state.intro and moving
-    end, failed = tl.end, _failed(state)
-    out = []
-    if kind == "full":
-        settled = end is not None and t >= end + 3.0
-        lit = end is not None and not failed and t >= end
-        logo = _logo(
-            ring=_ease(t / 0.9) if intro else 1.0,
-            horizon=_ease((t - 0.7) / 0.4) if intro else 1.0,
-            sun_off=sun_offset(state, t),
-            rip=(_ease((t - end) / 0.6) if moving else 1.0) if lit else 0.0,
-            phase=int(t * 8) if moving and not settled else 0,
-        )
-        sun = ORANGE
-        if moving and lit and t < end + 1.0:
-            sun = FLASH[round(math.sin(math.pi * (t - end)) * (len(FLASH) - 1))]
-        colours = {"sun": sun, "rip": RIPPLE, "line": None, "": None}
-        out += [logo_pad + _cells([(ch, colours[p]) for ch, p in row], state) for row in logo]
-        out.append("")
-    reveal = round(_ease((t - 1.0) / 1.0) * BLOCK) if intro else BLOCK
-    shine = None
-    if moving and end is not None and not failed and end + 0.2 < t < end + 1.6:
-        shine = (t - end - 0.2) / 1.4 * (BLOCK + 12) - 6
-    for row in WORDMARK:
-        cells = []
-        for i, ch in enumerate(row):
-            if i >= reveal:
-                cells.append((" ", None))
-                continue
-            d = abs(i - shine) if shine is not None else 99
-            cells.append((ch, WHITE if d < 2 else CREAM if d < 6 else WORD))
-        out.append(_cells(cells, state))
+    if kind in ("compact", "ascii"):
+        name = PRODUCT.lower() if kind == "compact" else " ".join(PRODUCT.lower())
+        return [IND + paint(WORD, name), IND + paint(GREY, TAGLINE), ""]
+    intro = state.intro and _moving(state, t)
+    out = [_lead(MARGIN, _cells(row, state)) for row in _art(t, state, tl, sc)]
     out.append("")
-    if not intro or t >= 1.95:
-        fade = TAG_FADE[min(len(TAG_FADE) - 1, int((t - 1.95) / 0.1))] if intro else DIM
-        out.append(tag_pad + paint(fade, TAGLINE))
-    else:
-        out.append("")
+    width = len(WORDMARK[0])
+    pad = MARGIN + " " * ((BLOCK - width) // 2)
+    wipe = _smooth((t - 1.0) / 1.0) * width if intro else width
+    for row in WORDMARK:
+        out.append(_lead(pad, _cells([(ch if i <= wipe else " ", WORD) for i, ch in enumerate(row)], state)))
+    show_tag = not intro or t >= 1.95
+    out.append(MARGIN + " " * ((BLOCK - len(TAGLINE)) // 2) + paint(GREY, TAGLINE) if show_tag else "")
     out.append("")
     return out
 
@@ -403,13 +454,13 @@ def _body(t, state, tl):
             row = IND + spin + " " + (_shimmer(label, t, state) if moving else paint(ACTIVE, label))
             seen = [p for p in s.progress if p[0] <= t]
             if seen:
-                frac = min(1.0, seen[-1][1] / seen[-1][2]) if seen[-1][2] else 0.0
-                fill = round(frac * 20)
-                row += paint(TRAIL, "─" * fill) + paint(DIM, "─" * (20 - fill))
-                row += "  " + paint(DIM, f"{seen[-1][1] / 1e6:.0f} MB")
+                done, total = seen[-1][1], seen[-1][2]
+                fill = round(min(1.0, done / total) * 20) if total else 0
+                row += paint(ORANGE, "─" * fill) + paint(DIMMER, "─" * (20 - fill))
+                row += paint(GREY, f"  {done / 1e6:4.1f} / {total / 1e6:.0f} MB")
             elif s.apps and state.apps:
                 done = sum(1 for _, le in tl.leaves if le is not None and t >= le)
-                row += paint(DIM, f"{done} of {len(state.apps)}")
+                row += paint(GREY, f"{done} of {len(state.apps)}")
             out.append(row.rstrip())
         else:
             mark = {"ok": (GREEN, "✓"), "warn": (AMBER, "!"), "failed": (RED, "✗")}.get(s.status, (GREEN, "✓"))
@@ -429,56 +480,19 @@ def _leaves(t, state, tl, parent_active, spin):
         a = state.apps[j]
         active = le is None or t < le
         last = n == len(shown) - 1 and (active or not parent_active or j == len(state.apps) - 1)
-        branch = "└" if last else "├"
+        branch = IND + "  " + paint(DIMMER, "└" if last else "├") + " "
         if active:
-            out.append(IND + "  " + paint(DIM, branch) + " " + spin + " " + paint(ACTIVE, a.name))
+            out.append(branch + spin + " " + paint(ACTIVE, a.name))
         elif a.status == "failed":
-            out.append(IND + "  " + paint(GREY, f"{branch} {a.name.ljust(LABEL - 2)}") + paint(RED, a.how or "failed"))
+            out.append(branch + paint(GREY, a.name.ljust(LABEL - 2)) + paint(RED, a.how or "failed"))
         else:
-            text = f"{branch} {a.name.ljust(LABEL - 2)}" + (a.how.ljust(HOW) if a.hint else a.how)
-            out.append(IND + "  " + paint(GREY, text) + (paint(ORANGE, a.hint) if a.hint else ""))
+            text = a.name.ljust(LABEL - 2) + (a.how.ljust(HOW) if a.hint else a.how)
+            out.append(branch + paint(GREY, text) + (paint(ORANGE, a.hint) if a.hint else ""))
     return out
 
 
 def _connected(state):
     return [a.name for a in state.apps if a.status == "ok"]
-
-
-def track(names, room=BLOCK - len(IND)):
-    """(nodes, wire length) for the app line: up to 4 apps, else the first 3 and "+k more"; wires 3 to 9 cells."""
-    nodes = list(names) if len(names) <= 4 else list(names[:3]) + [f"+{len(names) - 3} more"]
-    if len(nodes) < 2:
-        return nodes, 0
-    used = sum(len(n) + 2 for n in nodes)
-    return nodes, max(3, min(9, (room - used) // (len(nodes) - 1) - 2))
-
-
-def _app_line(state, names, p, room):
-    paint = _paint(state)
-    nodes, wire = track(names, room)
-    segs, x = [], 0
-    for i, n in enumerate(nodes):
-        segs.append((n, x))
-        x += len(n) + 2
-        if i < len(nodes) - 1:
-            segs.append((None, x + 1))
-            x += wire + 2
-    head = p * x
-    line = ""
-    for name, sx in segs:
-        if name is not None:
-            lit = head >= sx
-            line += paint(ORANGE if lit else DIM, "◉") + " " + paint(NAME if lit else DIM, name)
-            continue
-        line += " "
-        for i in range(wire):
-            cx = sx + i
-            if abs(cx - head) < 0.6 and p < 1:
-                line += paint(WHITE, "●")
-            else:
-                line += paint(TRAIL if cx < head else DIM, "─")
-        line += " "
-    return IND + line
 
 
 def cut(text, limit):
@@ -501,48 +515,47 @@ def _try_lines(width, names):
     return lines, pad + "e.g. remember that we deploy on Fridays"
 
 
-def _finale(t, state, tl):
+def _finale(t, state, tl, sc):
     end = tl.end
     if end is None or _failed(state):
         return []
     paint = _paint(state)
-    bold = (lambda s: f"\x1b[1;38;5;{BRIGHT}m{s}\x1b[0m") if state.color else (lambda s: f"\x1b[1m{s}\x1b[0m")
+    bold = (lambda s: f"\x1b[1;38;5;{WORD}m{s}\x1b[0m") if state.color else (lambda s: f"\x1b[1m{s}\x1b[0m")
     is_on = bold(f"{PRODUCT} is on.")
     if not state.intro:
         return ["", IND + is_on]
     moving = _moving(state, t)
-    out = []
+    at = _ending(state, tl, sc)
     names = _connected(state)
-    room = min(BLOCK, state.width) - len(IND)
-    if names and (t >= end + 0.3 or not moving):
-        p = 1.0 if len(names) == 1 or not moving else _ease_in_out((t - end - 0.6) / 2.0)
-        out += ["", _app_line(state, names, p, room)]
-        if p >= 1:
-            out += _memory_lines(state, names, room)
-    if t >= end + 3.0 or not moving:
+    out = []
+    if names and (not moving or t >= at + 1.3):
+        out += [""] + _memory_lines(state, names)
+    if not moving or t >= at + 2.6:
         out += ["", IND + is_on]
         if names:
             tries, eg = _try_lines(state.width, names)
-            out += [IND + paint(DIM, line) for line in tries] + [IND + paint(DIMMER, eg)]
+            out += [IND + paint(GREY, line) for line in tries] + [IND + paint(DIMMER, eg)]
     return out
 
 
-def _memory_lines(state, names, room):
+def _memory_lines(state, names):
+    """The memory moment's line: the note Kip came back with is now in every app (spec 9.1)."""
     paint = _paint(state)
+    room = BLOCK - len(IND)
     mem = state.memory
     if len(names) == 1:
         later = [n for n in ("Cursor", "Codex", "Claude Code") if n not in names][:2]
-        first = (paint(NAME, f"“{cut(mem, room - 10)}”") + paint(DIM, " saved")) if mem \
-            else paint(DIM, f"Memory is on in {names[0]}")
-        return [IND + "  " + first,
-                IND + "  " + paint(DIM, f"Add {' or '.join(later)} later: ") + paint(ORANGE, f"{COMMAND} setup")]
+        first = (paint(NAME, f"“{cut(mem, room - 12)}”") + paint(GREY, "  is saved")) if mem \
+            else paint(GREY, f"Memory is on in {names[0]}")
+        add = paint(GREY, f"Add {' or '.join(later)} later: ") + paint(ORANGE, f"{COMMAND} setup")
+        return [IND + first, IND + add]
     if not mem:
-        return [IND + "  " + paint(DIM, "Anything you tell one of them now reaches the others.")]
-    tail = " is now in both" if len(names) == 2 else f" is now in all {len(names)}"
-    return [IND + "  " + paint(NAME, f"“{cut(mem, room - 4 - len(tail))}”") + paint(DIM, tail)]
+        return [IND + paint(GREY, "Anything you tell one of them now reaches the others.")]
+    tail = "  is now in both" if len(names) == 2 else f"  is now in all {len(names)}"
+    return [IND + paint(NAME, f"“{cut(mem, room - 2 - len(tail))}”") + paint(GREY, tail)]
 
 
-_ASCII = str.maketrans({"✓": "+", "✗": "x", "─": "-", "├": "|", "└": "`", "◉": "o", "●": "*", "•": "*",
+_ASCII = str.maketrans({"✓": "+", "✗": "x", "─": "-", "├": "|", "└": "`", "•": "*",
                         "“": '"', "”": '"', "…": "..."})
 
 
@@ -729,7 +742,7 @@ class Animator:
             return
         self._restored = False
         self._setup_terminal()
-        self._write(HIDE + "\n")
+        self._write(HIDE)   # no blank line first: the full screen is exactly as tall as the window allows
         self._thread = threading.Thread(target=self._run, name="setup-screen", daemon=True)
         self._thread.start()
 
