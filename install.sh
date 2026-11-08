@@ -7,7 +7,7 @@
 # The release workflow fills the release lines below; the copy in the source tree refuses to run.
 set -eu
 
-# --- filled by .github/workflows/release.yml ---
+# --- filled by cli/tools/render_install.py at release time (RELEASING.md) ---
 VERSION=""
 CLI_WHEEL=""
 CLI_SHA256=""
