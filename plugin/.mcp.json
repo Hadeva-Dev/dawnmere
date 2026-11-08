@@ -4,7 +4,7 @@
       "command": "npx",
       "args": [
         "-y",
-        "lflabs-memory-connector@0.1.0"
+        "dawnmere-connector@0.1.0"
       ]
     }
   }

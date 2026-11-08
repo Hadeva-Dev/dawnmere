@@ -9,7 +9,7 @@ flowchart LR
   A[Claude Desktop] --> C
   B[Claude Code] --> C
   D[Cursor, Codex, Windsurf, VS Code...] --> C
-  C["lflabs-memory-connector<br/>(this folder, one per app)"] -- "local socket, one JSON line each way" --> W["Dawnmere on your Mac<br/>(memory, search, permissions)"]
+  C["dawnmere-connector<br/>(this folder, one per app)"] -- "local socket, one JSON line each way" --> W["Dawnmere on your Mac<br/>(memory, search, permissions)"]
 ```
 
 **Status: early beta, Mac only.** The connector is the small piece each AI app launches; Dawnmere itself installs with
@@ -29,15 +29,15 @@ Claude sees everything). That keeps this folder small enough to read in a few mi
 Check that Dawnmere answers first:
 
 ```bash
-npx -y lflabs-memory-connector --check
+npx -y dawnmere-connector --check
 ```
 
-**Claude Desktop:** download `lflabs-memory-connector.mcpb` from the latest release and open it.
+**Claude Desktop:** download `dawnmere-connector.mcpb` from the latest release and open it.
 
 **Claude Code:**
 
 ```bash
-claude mcp add --scope user lflabs-memory -- npx -y lflabs-memory-connector
+claude mcp add --scope user lflabs-memory -- npx -y dawnmere-connector
 ```
 
 or as a plugin: `/plugin marketplace add Hadeva-Dev/dawnmere`, then `/plugin install lflabs-memory@lflabs`.
@@ -50,7 +50,7 @@ or as a plugin: `/plugin marketplace add Hadeva-Dev/dawnmere`, then `/plugin ins
   "mcpServers": {
     "lflabs-memory": {
       "command": "npx",
-      "args": ["-y", "lflabs-memory-connector"],
+      "args": ["-y", "dawnmere-connector"],
       "env": { "LFLABS_MEMORY_CLIENT": "cursor" }
     }
   }
@@ -68,7 +68,7 @@ see, so do not copy Cursor's into another app.
     "lflabs-memory": {
       "type": "stdio",
       "command": "npx",
-      "args": ["-y", "lflabs-memory-connector"],
+      "args": ["-y", "dawnmere-connector"],
       "env": { "LFLABS_MEMORY_CLIENT": "copilot" }
     }
   }
@@ -80,7 +80,7 @@ see, so do not copy Cursor's into another app.
 ```toml
 [mcp_servers.lflabs-memory]
 command = "npx"
-args = ["-y", "lflabs-memory-connector"]
+args = ["-y", "dawnmere-connector"]
 env = { LFLABS_MEMORY_CLIENT = "codex" }
 ```
 
@@ -122,7 +122,7 @@ The full protocol is in [docs/PROTOCOL.md](docs/PROTOCOL.md), and why the repo i
 npm install
 npm test              # builds, then runs the connector against a fake memory app
 npm run test:bundle   # the same tests against the .mcpb bundle
-npm run pack:mcpb     # builds lflabs-memory-connector.mcpb
+npm run pack:mcpb     # builds dawnmere-connector.mcpb
 ```
 
 Developing needs Node 22 or later (for the test runner).

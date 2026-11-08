@@ -1,11 +1,11 @@
 {
-  "name": "lflabs-memory-connector",
+  "name": "dawnmere-connector",
   "version": "0.1.0",
   "description": "Connect your AI apps to Dawnmere, one memory shared across Claude, Cursor, Codex and more. Talks to Dawnmere on your Mac.",
-  "mcpName": "io.github.Hadeva-Dev/lflabs-memory-connector",
+  "mcpName": "io.github.Hadeva-Dev/dawnmere-connector",
   "type": "module",
   "bin": {
-    "lflabs-memory-connector": "dist/index.js"
+    "dawnmere-connector": "dist/index.js"
   },
   "files": [
     "dist",
@@ -20,7 +20,7 @@
     "test": "npm run build && node --test 'test/*.test.js'",
     "bundle": "npm run build && esbuild dist/index.js --bundle --platform=node --format=esm --target=node18 --outfile=mcpb/server/index.mjs --banner:js=\"import { createRequire } from 'module'; const require = createRequire(import.meta.url);\" && cp LICENSE mcpb/LICENSE",
     "test:bundle": "npm run bundle && CONNECTOR_BIN=mcpb/server/index.mjs node --test test/connector.test.js",
-    "pack:mcpb": "npm run bundle && npx -y @anthropic-ai/mcpb@2.1.2 validate mcpb/manifest.json && npx -y @anthropic-ai/mcpb@2.1.2 pack mcpb lflabs-memory-connector.mcpb",
+    "pack:mcpb": "npm run bundle && npx -y @anthropic-ai/mcpb@2.1.2 validate mcpb/manifest.json && npx -y @anthropic-ai/mcpb@2.1.2 pack mcpb dawnmere-connector.mcpb",
     "prepublishOnly": "npm test"
   },
   "keywords": [

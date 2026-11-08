@@ -4,7 +4,7 @@ Each app file gets a plan first: what would change, as exact text, before anythi
 (they read, never write); setup applies them through edits.write, uninstall builds the reverse plan.
 
 Ours, wherever it appears:
-- an MCP entry is ours when it runs the connector package (args hold "lflabs-memory-connector@...");
+- an MCP entry is ours when it runs the connector package (args hold layout.CONNECTOR followed by "@<version>");
 - a hook is ours when its command runs the engine's console script (lflabs-memory) with one of our subcommands.
 An entry named lflabs-memory that is not ours (another tool's) is left alone and reported.
 """
