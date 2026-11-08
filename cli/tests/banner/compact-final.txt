@@ -1,0 +1,18 @@
+  dawnmere
+  one memory for every AI app you use
+
+  ✓ Claude Code     found, logged in
+  ✓ Search models   57 MB, checked
+  ✓ Memory service  running
+  ✓ Your apps       connected
+    ├ Claude Code   plugin
+    ├ Codex         MCP + hook   type /hooks once
+    └ Cursor        MCP          restart Cursor
+  ✓ Your notes      14 imported from Claude Code
+  ✓ Self-check      recall in 0.34 s
+
+  “always run tests before committing”  is now in all 3
+
+  [1mDawnmere is on.[0m
+  Try it: in Claude Code, say “remember that …”, then ask Cursor in a new chat.
+          e.g. remember that we deploy on Fridays
