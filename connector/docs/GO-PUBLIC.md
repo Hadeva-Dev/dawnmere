@@ -14,29 +14,32 @@ In order. Nothing is published yet.
 
 ## Renaming
 
-The package, server id, settings, socket and protocol names are neutral (`lflabs-memory-*`) and do not change. The
-repo is named after the product. The product name appears only in:
+The npm package carries the product name (`dawnmere-connector`, with the registry name, the bundle name and the
+`bin` to match; decided 2026-11-07, before the first publish, because the `npx` line in every app's config is the
+most visible identifier after the install line). The server id, plugin name, settings, socket and protocol names
+stay neutral (`lflabs-memory-*`). The repo is named after the product. The product name appears only in:
 
-- `src/brand.ts` (`PRODUCT`)
-- `README.md`, `docs/LISTING.md` and this file (the repo's URL)
+- `src/brand.ts` (`PRODUCT`, `COMMAND`, `PACKAGE`) and the usage comment in `src/index.ts`
+- `README.md`, `docs/LISTING.md`, `docs/DESIGN.md` and this file (the repo's URL and the package name)
+- `package.json` and `package-lock.json` (the package name), `server.json` (the registry name), `mcpb/manifest.json`
+  (the bundle name), `../plugin/.mcp.json`, the CLI's `layout.py` and tests, and the release workflow (the bundle file)
 - the display text in `package.json`, `server.json`, `mcpb/manifest.json`, `../plugin/.claude-plugin/plugin.json` and
   `../.claude-plugin/marketplace.json`
 
 `npm test` fails if the name turns up anywhere else, so a rename is a search and replace over those files plus a test
-run. If the new name should also be the package name, that is a bigger change: package, `mcpName`, registry name and
-plugin name together (the tests check they agree), done before the first npm publish, never after.
+run. A product rename after the first npm publish also means a new package name, with the old one deprecated and
+pointing at the new one, so pick the name before publishing.
 
 ## Publish
 
 5. **Flip the repo to public:** `gh repo edit Hadeva-Dev/dawnmere --visibility public --accept-visibility-change-consequences`.
-6. **Publish to npm** (needs an npm account; `lflabs-memory-connector` was free on 2026-10-25):
+6. **Publish to npm** (needs an npm account with two-factor auth; `dawnmere-connector` was free on 2026-11-07):
    ```bash
-   cd connector
-   npm login
-   npm publish --access public
+   cd connector   npm login
+   npm publish --access public --otp=<the code from your authenticator>
    ```
 7. **Make a GitHub release** with the bundle, so Claude Desktop users can download it: push the tag `v0.1.0`, and
-   the repo's release workflow builds `lflabs-memory-connector.mcpb` and attaches it with the installer.
+   the repo's release workflow builds `dawnmere-connector.mcpb` and attaches it with the installer.
 8. **Official MCP Registry:** `brew install mcp-publisher`, `mcp-publisher login github` (a browser sign-in as a
    member of Hadeva-Dev, which proves the `io.github.Hadeva-Dev/` namespace), then `mcp-publisher publish` from
    `connector/`.
