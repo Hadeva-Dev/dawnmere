@@ -238,10 +238,15 @@ class RealSetup:
 
     def step_service(self, ui):
         ui.step("Memory service", "running")
-        for argv, ok in launchd.install(self.engine):
+        ran = launchd.install(self.engine)
+        for argv, ok, _ in ran:
             install_record.add_command(self.record, argv, ok)
         self.record["plist"] = str(launchd.plist_path())
         self.save()
+        _, ok, note = ran[-1]  # the bootstrap
+        if not ok:
+            ui.step("Memory service", "failed", f"did not start: {note}")
+            return False
         if not launchd.wait_ready(READY_WAIT):
             ui.step("Memory service", "failed", "did not start: see ~/Library/Logs/LF Labs/memory.log")
             return False
