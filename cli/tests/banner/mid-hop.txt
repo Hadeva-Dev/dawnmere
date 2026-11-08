@@ -1,0 +1,27 @@
+                             ⣿⣿⣿⣿⡿⠛⣿⣿⣧⣤⣀⣀
+                             ⣿⣿⣿⣿⣿⣶⣿⣿⠋⠉⠉⠉
+                            ⣼⣿⣿⣿⣿⣿⣿⡟⠁
+                            ⣿⣿⣿⣿⣿⣿⣿⡇
+                            ⢸⣿⣿⣿⣿⣿⡿⠃
+                           ⠰⠿⠟⠙⠛⠛⠋
+
+                       ⢀⣀⡀             ⢀⣀⡀            ⢀⣀⡀
+        ⣶              ⠈⣿⠁             ⠈⣿⠁            ⠈⣿⠁
+        ⣿               ⣿               ⣿              ⣿
+ ⠂⠒⠒⠐⠒⠂⠒⠛⠐⠒⠂⠒⠒⠐⠒⠂⠒⠒⠐⠒⠂⠒⠒⠙⠒⠂⠒⠒⠐⠒⠂⠒⠒⠐⠒⠂⠒⠒⠐⠛⠂⠒⠒⠐⠒⠂⠒⠒⠐⠒⠂⠒⠒⠐⠛⠂⠒⠒⠐⠒⠂⠒⠒⠐⠒⠂⠒
+                    Claude Code        Codex         Cursor
+
+          ⢸⣿⡇
+       ⢀⣴⣶⣾⣿⡇ ⣠⣶⣶⣶⣶⢠⣶⡆⢠⣶⡄⣰⣶⡄⣶⣶⣴⣶⣦ ⢰⣶⣶⣶⣦⣴⣶⣦⡀ ⣠⣶⣶⣶⣄ ⣶⣶⣶⣶⠄⢀⣴⣶⣶⣦⡀
+       ⣿⣿⡋⣻⣿⡇⢸⣿⣟⢙⣿⣿ ⢿⣿⣿⣿⣿⣿⡿ ⣿⣿⠉⢹⣿⡇⢸⣿⡏⢹⣿⡏⢹⣿⡇⢸⣿⣿⠿⠿⠟ ⣿⣿⠉⠉ ⣿⣿⡿⠿⠿⠃
+       ⠙⢿⣿⣿⣿⡇⠈⠻⣿⣿⣿⣿ ⠈⢿⡿⠉⢿⡿⠁ ⣿⣿ ⢸⣿⡇⢸⣿⡇⢸⣿⡇⢸⣿⡇⠈⠻⣿⣿⣿⠗ ⣿⣿   ⠙⢿⣿⣿⡿⠂
+                 one memory for every AI app you use
+
+  ✓ Claude Code     found, logged in
+  ✓ Search models   57 MB, checked
+  ✓ Memory service  running
+  ✓ Your apps       connected
+    ├ Claude Code   plugin
+    ├ Codex         MCP + hook   type /hooks once
+    └ Cursor        MCP          restart Cursor
+  ⠧ Your notes

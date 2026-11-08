@@ -11,7 +11,7 @@ dawnmere = "lflabs_memory_cli.main:main"
 
 [dependency-groups]
 dev = ["pytest>=8", "pyte>=0.8"]
-# tools/make_wordmark.py only (build time; the font never ships)
+# tools/make_wordmark.py and tools/make_sprites.py only (build time; the font and the drawing never ship)
 art = ["pillow>=10"]
 
 [build-system]
