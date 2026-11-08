@@ -51,7 +51,7 @@ progress() {
   [ "$cells" -le 12 ] || cells=12
   bar="" i=0
   while [ "$i" -lt 12 ]; do
-    if [ "$i" -lt "$cells" ]; then bar="$bar─"; else bar="$bar "; fi
+    if [ "$i" -lt "$cells" ]; then bar="${bar}─"; else bar="$bar "; fi
     i=$((i + 1))
   done
   printf '\rDownloading  %s  %s / %s MB ' "$bar" \
