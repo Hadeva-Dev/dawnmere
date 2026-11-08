@@ -1,4 +1,4 @@
-"""Fill install.sh's release lines with this release's wheels (run by .github/workflows/release.yml).
+"""Fill install.sh's release lines with this release's wheels (see RELEASING.md).
 
     python tools/render_install.py VERSION CLI_WHEEL ENGINE_WHEEL OUT
 """

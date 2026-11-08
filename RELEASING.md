@@ -1,0 +1,34 @@
+# Releasing
+
+This repo has no CI: releases are cut by hand on a Mac with Apple silicon, from a clean `main`.
+The engine checkout sits next to this repo as `../lflabs-memory-engine`.
+
+1. **Versions.** Set `version` in `cli/pyproject.toml` to the new `X.Y.Z`, and put the engine tag to ship in `ENGINE_TAG`.
+   Merge that to `main`, then tag it `vX.Y.Z`.
+2. **Wheels and the installer.**
+   ```bash
+   VERSION=X.Y.Z
+   (cd ../lflabs-memory-engine && git checkout "$(cat ../lflabs-memory/ENGINE_TAG)")
+   rm -rf dist && uv build --wheel --out-dir dist cli && uv build --wheel --out-dir dist ../lflabs-memory-engine
+   CLI=$(ls dist/lflabs_memory_cli-*.whl) ENGINE=$(ls dist/lflabs_memory_engine-*.whl)
+   uv run --no-project python cli/tools/render_install.py "$VERSION" "$CLI" "$ENGINE" dist/install.sh
+   (cd dist && shasum -a 256 *.whl install.sh > SHA256SUMS)
+   ```
+3. **Tests before publishing.**
+   ```bash
+   (cd cli && uv run pytest -q)
+   (cd connector && npm ci && npm test && npm run test:bundle)
+   ```
+4. **Claude Desktop extension.**
+   ```bash
+   (cd connector && npm run pack:mcpb) && cp connector/dawnmere-connector.mcpb dist/
+   (cd dist && shasum -a 256 dawnmere-connector.mcpb >> SHA256SUMS)
+   ```
+5. **Publish.** `gh release create "v$VERSION" dist/* --title "v$VERSION" --generate-notes`
+6. **Check the install line** in a throwaway home, with a UTF-8 locale like a real Terminal:
+   ```bash
+   H=$(mktemp -d)
+   env -i HOME="$H" PATH=/usr/bin:/bin:/usr/sbin LC_ALL=en_US.UTF-8 LFLABS_MEMORY_NO_SETUP=1 \
+     sh -c 'curl -fsSL https://github.com/Hadeva-Dev/dawnmere/releases/latest/download/install.sh | sh'
+   PATH="$H/.local/bin:$PATH" HOME="$H" dawnmere setup --yes --plain --backend none && PATH="$H/.local/bin:$PATH" HOME="$H" dawnmere doctor
+   ```
