@@ -304,7 +304,7 @@ wheels = [
 
 [[package]]
 name = "lflabs-memory-cli"
-version = "0.1.0"
+version = "0.1.1"
 source = { editable = "." }
 dependencies = [
     { name = "lflabs-memory-engine" },
@@ -331,7 +331,7 @@ dev = [
 
 [[package]]
 name = "lflabs-memory-engine"
-version = "0.1.0"
+version = "0.1.1"
 source = { directory = "../../lflabs-memory-engine" }
 dependencies = [
     { name = "mcp", extra = ["cli"] },
