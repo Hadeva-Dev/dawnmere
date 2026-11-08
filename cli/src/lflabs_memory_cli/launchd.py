@@ -31,7 +31,8 @@ def loaded():
 
 
 def install(engine_bin):
-    """Write the plist and (re)load it. Returns the commands run as [(argv, ok)]."""
+    """Write the plist and (re)load it. Returns the commands run as [(argv, ok, note)]: note is launchctl's first
+    line of error text when it failed, else ""."""
     logs_dir().mkdir(parents=True, exist_ok=True)
     path = plist_path()
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -40,10 +41,29 @@ def install(engine_bin):
     done = []
     if loaded()[0]:  # a previous install's agent: replace it
         argv = ["launchctl", "bootout", f"{domain()}/{LABEL}"]
-        done.append((argv, run(argv, timeout=30).ok))
+        done.append(_ran(argv))
+        # bootout returns before the old daemon has exited, and until it has, launchd answers a bootstrap of
+        # the same label with "Bootstrap failed: 5: Input/output error" (seen on macOS 26, 2026-11-08).
+        wait_gone()
     argv = ["launchctl", "bootstrap", domain(), str(path)]
-    done.append((argv, run(argv, timeout=30).ok))
+    done.append(_ran(argv))
     return done
+
+
+def _ran(argv):
+    r = run(argv, timeout=30)
+    lines = r.err.strip().splitlines()
+    return argv, r.ok, ("" if r.ok else lines[0] if lines else f"launchctl exited {r.code}")
+
+
+def wait_gone(timeout=15.0, step=0.25):
+    """Whether the agent has left the domain within timeout seconds (after a bootout)."""
+    end = time.monotonic() + timeout
+    while loaded()[0]:
+        if time.monotonic() >= end:
+            return False
+        time.sleep(step)
+    return True
 
 
 def wait_ready(timeout=20.0, step=0.25):
