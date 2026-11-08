@@ -108,7 +108,7 @@ def test_uninstall_leaves_jsonc_alone(mac):
     seed(home)
     fake_setup(home)
     layout.install_json().unlink()
-    jsonc = '// mine\n{"mcpServers": {"lflabs-memory": {"command": "npx", "args": ["-y", "lflabs-memory-connector@0.1.0"]}}}\n'
+    jsonc = '// mine\n{"mcpServers": {"lflabs-memory": {"command": "npx", "args": ["-y", "dawnmere-connector@0.1.0"]}}}\n'
     (home / ".cursor/mcp.json").write_text(jsonc)
     out = []
     assert uninstall.main(out=out.append) == 1

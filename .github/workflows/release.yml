@@ -43,8 +43,8 @@ jobs:
       - name: Claude Desktop extension (the connector's README sends users to the release for it)
         run: |
           (cd connector && npm run pack:mcpb)
-          cp connector/lflabs-memory-connector.mcpb dist/
-          (cd dist && shasum -a 256 lflabs-memory-connector.mcpb >> SHA256SUMS)
+          cp connector/dawnmere-connector.mcpb dist/
+          (cd dist && shasum -a 256 dawnmere-connector.mcpb >> SHA256SUMS)
       - name: Publish
         env:
           GH_TOKEN: ${{ github.token }}

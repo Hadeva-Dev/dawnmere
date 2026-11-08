@@ -75,7 +75,7 @@ Setup connects these when it finds them:
     "mcpServers": {
       "lflabs-memory": {
         "command": "npx",
-        "args": ["-y", "lflabs-memory-connector@0.1.0"]
+        "args": ["-y", "dawnmere-connector@0.1.0"]
       }
     }
   }

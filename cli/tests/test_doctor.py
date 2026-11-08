@@ -47,9 +47,9 @@ def healthy(mac, monkeypatch, tmp_path, backend_name="claude-cli"):
     mac.on("claude", ["-p"], 0, '{"is_error": false, "result": "ok"}')
     for d in (".claude", ".codex", ".cursor"):
         (h / d).mkdir()
-    (h / ".codex/config.toml").write_text('[mcp_servers.lflabs-memory]\nargs = ["-y", "lflabs-memory-connector@0.1.0"]\n')
+    (h / ".codex/config.toml").write_text('[mcp_servers.lflabs-memory]\nargs = ["-y", "dawnmere-connector@0.1.0"]\n')
     (h / ".codex/hooks.json").write_text('{"hooks": {"UserPromptSubmit": [{"hooks": [{"command": "lflabs-memory hook-prompt"}]}]}}')
-    (h / ".cursor/mcp.json").write_text('{"mcpServers": {"lflabs-memory": {"args": ["-y", "lflabs-memory-connector@0.1.0"]}}}')
+    (h / ".cursor/mcp.json").write_text('{"mcpServers": {"lflabs-memory": {"args": ["-y", "dawnmere-connector@0.1.0"]}}}')
     (h / ".cursor/hooks.json").write_text('{"version": 1, "hooks": {"sessionStart": [{"command": "x/lflabs-memory hook-cursor-start"}]}}')
 
 

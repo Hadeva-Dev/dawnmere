@@ -1,7 +1,7 @@
 #!/usr/bin/env node
-// lflabs-memory-connector            run as an MCP server over stdio (what AI apps launch)
-// lflabs-memory-connector --check    say whether the memory app answers on this machine
-// lflabs-memory-connector --version
+// dawnmere-connector            run as an MCP server over stdio (what AI apps launch)
+// dawnmere-connector --check    say whether the memory app answers on this machine
+// dawnmere-connector --version
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { PACKAGE, PRODUCT, VERSION } from "./brand.js";
 import { ask, socketPath } from "./daemon.js";

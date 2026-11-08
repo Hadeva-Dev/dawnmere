@@ -10,7 +10,7 @@ Shared by every listing:
 - **Short (100 characters max, the registry's limit):** One memory shared across your AI apps. Connects to Dawnmere on your Mac.
 - **Tags:** memory, knowledge-management, cross-app, claude, cursor, codex, local-first, macos
 - **Repo:** https://github.com/Hadeva-Dev/dawnmere
-- **Install:** `npx -y lflabs-memory-connector`
+- **Install:** `npx -y dawnmere-connector`
 - **Honest status line:** Early beta, macOS only; needs Dawnmere running on the same Mac.
 
 ## Official MCP Registry
@@ -76,7 +76,7 @@ the description comes from the README's first paragraph.
   "mcpServers": {
     "lflabs-memory": {
       "command": "npx",
-      "args": ["-y", "lflabs-memory-connector"]
+      "args": ["-y", "dawnmere-connector"]
     }
   }
 }
