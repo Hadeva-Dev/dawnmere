@@ -86,19 +86,13 @@ def test_onboarding_text_golden():
     assert setup.onboarding() == """\
 Dawnmere gives Claude Code, Codex and Cursor one shared memory on this Mac.
 
-What it does
-  - Keeps your memory in one file on this Mac. It is never uploaded.
-  - After a Claude Code session goes quiet, sends that conversation to your
-    own model provider (your Claude plan, or your API key) to pick out what is
-    worth remembering. Nothing else is sent, and nothing goes to LF Labs.
-  - Lets each AI app see only what suits it. New apps see work notes only.
-  - Sends no usage data. Ever.
+Your memory is one file here, never uploaded. After a Claude Code session goes
+quiet, your own model (your Claude plan or API key) reads the conversation and
+keeps what is worth remembering. Nothing goes to LF Labs. No usage data, ever.
 
-What it changes
-  - Adds memory to Claude Code (a plugin), Codex and Cursor (their MCP
-    settings). Every file is backed up first. "dawnmere uninstall" puts
-    everything back.
-  - Starts a small background service that keeps search fast.
+Setup adds Dawnmere to Claude Code, Codex and Cursor, backing up every file it
+touches, and starts a small background service that keeps search fast.
+"dawnmere uninstall" puts everything back.
 """
     assert max(len(line) for line in setup.onboarding().splitlines()) <= 78
 
