@@ -1,6 +1,6 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
-  "name": "io.github.Hadeva-Dev/lflabs-memory-connector",
+  "name": "io.github.Hadeva-Dev/dawnmere-connector",
   "title": "Dawnmere",
   "description": "One memory shared across your AI apps. Connects to Dawnmere on your Mac.",
   "repository": {
@@ -13,7 +13,7 @@
     {
       "registryType": "npm",
       "registryBaseUrl": "https://registry.npmjs.org",
-      "identifier": "lflabs-memory-connector",
+      "identifier": "dawnmere-connector",
       "version": "0.1.0",
       "transport": {
         "type": "stdio"

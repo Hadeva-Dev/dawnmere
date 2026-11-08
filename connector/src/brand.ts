@@ -6,7 +6,7 @@ import { join } from "node:path";
 
 export const PRODUCT = "Dawnmere";
 export const COMMAND = "dawnmere"; // the command that installs and checks it
-export const PACKAGE = "lflabs-memory-connector";
+export const PACKAGE = "dawnmere-connector";
 export const SERVER_NAME = "lflabs-memory";
 export const VERSION = "0.1.0";
 export const PROTOCOL = "lflabs-memory/1";

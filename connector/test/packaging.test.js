@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
-import { PACKAGE, PRODUCT, SERVER_NAME, VERSION } from "../dist/brand.js";
+import { COMMAND, PACKAGE, PRODUCT, SERVER_NAME, VERSION } from "../dist/brand.js";
 
 const json = (p) => JSON.parse(readFileSync(new URL(`../${p}`, import.meta.url), "utf8"));
 const pkg = json("package.json");
@@ -41,10 +41,11 @@ test("MIT everywhere", () => {
   assert.match(readFileSync(new URL("../LICENSE", import.meta.url), "utf8"), /^MIT License/);
 });
 
-// The product name will change. It may appear only where a rename has to touch anyway: brand.ts, the README, the
-// listing text and the packaging files' display text (docs/GO-PUBLIC.md, "Renaming").
-const BRANDED = ["src/brand.ts", "README.md", "docs/LISTING.md", "docs/GO-PUBLIC.md", "package.json", "server.json",
-  "mcpb/manifest.json"];
+// The product name may change. It may appear only where a rename has to touch anyway: brand.ts, the usage comment,
+// the README, the listing and design text, and the packaging files, whose package, registry and bundle names carry it
+// by decision (docs/GO-PUBLIC.md, "Renaming").
+const BRANDED = ["src/brand.ts", "src/index.ts", "README.md", "docs/LISTING.md", "docs/DESIGN.md", "docs/GO-PUBLIC.md",
+  "package.json", "package-lock.json", "server.json", "mcpb/manifest.json"];
 
 test("the product name lives only in the files a rename touches", () => {
   const tracked = execFileSync("git", ["ls-files", "--cached", "--others", "--exclude-standard"], {
@@ -53,7 +54,10 @@ test("the product name lives only in the files a rename touches", () => {
   }).split("\n").filter(Boolean);
   const name = new RegExp(PRODUCT, "i");
   const stray = tracked.filter((f) => !BRANDED.includes(f) && name.test(readFileSync(new URL(`../${f}`, import.meta.url), "utf8")));
-  assert.deepEqual(stray, []);
-  for (const id of [pkg.name, pkg.mcpName, server.name, manifest.name, plugin.name, market.name, SERVER_NAME])
-    assert.doesNotMatch(id, name, "identifiers stay neutral, so a rename never touches them");
+  assert.deepEqual(stray, []);  // The package family is the one branded identifier, and it is the command's name plus "-connector"; the server id,
+  // the plugin and the marketplace stay neutral, so a rename never touches a user's config keys.
+  assert.equal(PACKAGE, `${COMMAND}-connector`);
+  for (const id of [pkg.name, pkg.mcpName, server.name, manifest.name]) assert.match(id, name);
+  for (const id of [plugin.name, market.name, SERVER_NAME])
+    assert.doesNotMatch(id, name, "the server id, plugin and marketplace stay neutral");
 });
