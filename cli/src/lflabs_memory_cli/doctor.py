@@ -14,6 +14,7 @@ from .layout import CONNECTOR, CONNECTOR_VERSION, ENGINE_DIST, SERVER, data_dir,
 from .run import run
 
 SLOW = 1.5
+WARMING = 120  # seconds after the service starts in which a slow call is the models still loading
 IDLE = 600  # the engine reads a session once it has been quiet this long (EXTRACT_IDLE) or has ended
 LICENSES = [("embed", "bge-small-en-v1.5", "MIT"), ("rerank", "ms-marco-MiniLM-L-6-v2", "Apache-2.0"),
             ("sense", "friday-sense-v3 (mmBERT-base fine-tune)", "MIT base, LF Labs weights")]
@@ -51,12 +52,21 @@ def _count(db, sql, *args):
         return None
 
 
-def _uptime(pid):
+def _up_seconds(pid):
+    """How long the process has run, in seconds (ps etime), or None."""
     r = run(["ps", "-o", "etime=", "-p", str(pid)], timeout=5)
     m = re.fullmatch(r"\s*(?:(\d+)-)?(?:(\d+):)?(\d+):(\d+)\s*", r.out or "")
     if not r.ok or not m:
+        return None
+    d, h, mi, s = (int(m.group(i) or 0) for i in range(1, 5))
+    return ((d * 24 + h) * 60 + mi) * 60 + s
+
+
+def _uptime(pid):
+    up = _up_seconds(pid)
+    if up is None:
         return ""
-    d, h, mi = int(m.group(1) or 0), int(m.group(2) or 0), int(m.group(3))
+    d, h, mi = up // 86400, up // 3600, up // 60
     return f", up {d} d" if d else f", up {h} h" if h else f", up {mi} min"
 
 
@@ -114,12 +124,18 @@ def check_hook():
         payload = json.dumps({"session_id": f"doctor-{os.getpid()}", "hook_event_name": "UserPromptSubmit",
                               "prompt": "doctor: what do you remember about this project?", "cwd": cwd,
                               "transcript_path": os.path.join(cwd, "none.jsonl")})
+        run([eng, "hook-prompt"], input=payload, timeout=10)  # warm-up: the first call after a start loads the models
         t0 = time.monotonic()
         r = run([eng, "hook-prompt"], input=payload, timeout=10)
         took = time.monotonic() - t0
     if not r.ok:
         return Check("hook speed", "fail", "the prompt hook failed", "see ~/Library/Logs/LF Labs/memory.log")
     if took > SLOW:
+        pid = launchd.loaded()[1]
+        up = _up_seconds(pid) if pid else None
+        if up is not None and up < WARMING:
+            return Check("hook speed", "ok", f"recall in {took:.2f} s: the service started {up} s ago and is still "
+                         f"loading its models (limit {SLOW} s once warm)")
         return Check("hook speed", "warn", f"recall in {took:.2f} s (limit {SLOW} s)",
                      "is the background service running? (engine line above)")
     return Check("hook speed", "ok", f"recall in {took:.2f} s (limit {SLOW} s)")

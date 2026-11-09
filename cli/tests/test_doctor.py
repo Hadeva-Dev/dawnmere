@@ -614,3 +614,43 @@ def test_update_asks_the_api_for_the_file_itself(monkeypatch):
     update.fetch("https://api.github.com/repos/o/r/releases/assets/7")
     update.fetch("https://api.github.com/repos/o/r/releases/latest")
     assert seen == ["application/octet-stream", "application/vnd.github+json"]
+
+
+def slow_first(monkeypatch, *durations):
+    """The hook calls take these many seconds, in order (doctor's clock)."""
+    clock, at = iter(durations), [0.0]
+
+    def monotonic():
+        return at[0]
+    real = getattr(doctor.run, "real", doctor.run)
+
+    def run(argv, **kw):
+        if argv[1:] == ["hook-prompt"]:
+            at[0] += next(clock)
+        return real(argv, **kw)
+    run.real = real
+    monkeypatch.setattr(doctor.time, "monotonic", monotonic)
+    monkeypatch.setattr(doctor, "run", run)
+
+
+def test_hook_speed_is_measured_warm(mac, monkeypatch, tmp_path, connector):
+    """The first call after the service starts loads the models: doctor warms up first, then measures."""
+    healthy(mac, monkeypatch, tmp_path)
+    slow_first(monkeypatch, 1.9, 0.2)
+    c = doctor.check_hook()
+    assert (c.state, c.note) == ("ok", "recall in 0.20 s (limit 1.5 s)")
+    assert [a for a in mac.calls("lflabs-memory") if a == ["hook-prompt"]] == [["hook-prompt"]] * 2
+
+
+def test_hook_speed_right_after_the_service_started(mac, monkeypatch, tmp_path, connector):
+    healthy(mac, monkeypatch, tmp_path)
+    mac.rules["ps"] = [[[], 0, "   00:45\n"]]
+    mac.save()
+    slow_first(monkeypatch, 3.0, 1.8)
+    c = doctor.check_hook()
+    assert c.state == "ok" and c.note == ("recall in 1.80 s: the service started 45 s ago and is still loading its "
+                                          "models (limit 1.5 s once warm)")
+    mac.rules["ps"] = [[[], 0, " 2-03:04:05\n"]]
+    mac.save()
+    slow_first(monkeypatch, 3.0, 1.8)
+    assert doctor.check_hook().state == "warn", "warm and still slow"
