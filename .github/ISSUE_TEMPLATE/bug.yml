@@ -1,0 +1,46 @@
+name: Bug report
+description: Something in Dawnmere does not work as described
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Found a security problem? Please do not open an issue. Report it privately instead: see [SECURITY.md](https://github.com/Hadeva-Dev/dawnmere/blob/main/SECURITY.md).
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened, and what you expected
+      description: The command you ran or what you asked the app, and what you saw.
+    validations:
+      required: true
+  - type: textarea
+    id: report
+    attributes:
+      label: Output of `dawnmere doctor --report`
+      description: Counts and check results only, with no memory text, names or paths, so it is safe to paste here.
+      render: text
+    validations:
+      required: true
+  - type: input
+    id: macos
+    attributes:
+      label: macOS version
+      description: Apple menu, then About This Mac. For example 15.1.
+      placeholder: "15.1"
+    validations:
+      required: true
+  - type: checkboxes
+    id: apps
+    attributes:
+      label: Which apps were you using?
+      options:
+        - label: Claude Code
+        - label: Codex
+        - label: Cursor
+        - label: Claude Desktop
+        - label: Another MCP app (say which below)
+  - type: input
+    id: versions
+    attributes:
+      label: App versions
+      description: For example `claude --version`, `codex --version`, or Cursor's About window.
