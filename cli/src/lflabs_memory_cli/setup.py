@@ -12,6 +12,7 @@ import re
 import secrets
 import shutil
 import subprocess
+import sys
 import tempfile
 import textwrap
 import time
@@ -444,6 +445,10 @@ def main(args, say=print):
         say(onboarding())
         return dry_run(ask(args, say), say)
     say(onboarding())
+    if not args.yes and not sys.stdin.isatty():  # no one to say yes: consent is never assumed
+        say(f"There is no terminal to ask on, so nothing was changed. Run {COMMAND} setup in a Terminal window, or "
+            f"{COMMAND} setup --yes to take the defaults.")
+        return 1
     if not prompt.yes_no("Continue?", True, assume=True if args.yes else None):
         say("Nothing was changed.")
         return 0

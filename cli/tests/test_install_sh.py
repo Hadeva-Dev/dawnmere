@@ -40,14 +40,17 @@ def release(tmp_path):
     fakes.on("uv", ["tool", "dir"], 0, str(tmp_path / "uv tools"))
     fakes.on("uv", ["tool", "install", "--help"], 0, "      --with-executables-from <WITH_EXECUTABLES_FROM>\n")
     env = {"HOME": str(home), "PATH": f"{fakes.bin}:/usr/bin:/bin", "FAKE_LOG": str(fakes.log),
-           "FAKE_RULES": str(fakes.rules_file), "LFLABS_MEMORY_RELEASE_BASE": f"file://{rel}"}
+           "FAKE_RULES": str(fakes.rules_file), "LFLABS_MEMORY_RELEASE_BASE": f"file://{rel}",
+           "LFLABS_MEMORY_TTY": "/dev/null"}
     fakes.rel, fakes.script, fakes.env_vars, fakes.home = rel, script, env, home
     return fakes
 
 
 def sh(script, env):
+    """`curl | sh` with no terminal at all (a new session has no controlling terminal: /dev/tty cannot be opened).
+    LFLABS_MEMORY_TTY in env stands in for a terminal."""
     return subprocess.run(["/bin/sh", str(script)], env=env, capture_output=True, text=True, stdin=subprocess.DEVNULL,
-                          timeout=60)
+                          timeout=60, start_new_session=True)
 
 
 @pytest.mark.skipif(not shutil.which("shellcheck"), reason="shellcheck not installed")
@@ -166,3 +169,14 @@ def test_path_advice_is_setups(release, tmp_path):
     release.save()
     assert "~/.zshrc" not in sh(release.script, {**release.env_vars, "LFLABS_MEMORY_NO_SETUP": "1"}).stdout
     assert "~/.zshrc" not in sh(release.script, release.env_vars).stdout
+
+
+def test_no_terminal_means_no_setup(release):
+    """`curl | sh </dev/null`: nobody can say yes to changing the apps' files, so setup does not run, and the
+    installer says how to run it."""
+    env = {k: v for k, v in release.env_vars.items() if k != "LFLABS_MEMORY_TTY"}
+    r = sh(release.script, env)
+    assert r.returncode == 0, r.stderr
+    assert release.calls("dawnmere") == []
+    assert ("There is no terminal for setup's questions, so no app was changed. Run \"dawnmere setup\" in a "
+            "Terminal window, or \"dawnmere setup --yes\" to take the defaults.") in " ".join(r.stdout.split())
