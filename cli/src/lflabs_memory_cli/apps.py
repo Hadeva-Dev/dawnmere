@@ -102,7 +102,7 @@ def hook_engine():
 
 
 def connector_on_npm():
-    """Whether the connector version every app's entry pins (npx dawnmere-connector@X) is on npm: True, False, or None
+    """Whether the connector version every app's entry pins (npx CONNECTOR@X) is on npm: True, False, or None
     when it cannot be told (no npm, offline). A yes is remembered in the data folder; a no or a don't-know is asked
     again next time."""
     from .layout import data_dir

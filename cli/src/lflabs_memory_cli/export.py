@@ -1,18 +1,26 @@
 """export / import: your memory as one file, to keep or to move Macs (spec 9.5).
 
 Secrets (memories the engine marked `secret`) never leave: they are left out and counted. Import goes through the
-engine's own remember(), so a memory already there is not added twice. Imported by the user at a terminal, their own
-memories stay their own (import_origin); imported by an AI app, every one is of "unknown" origin.
+engine's own remember(), so a memory already there is not added twice. Every imported memory is saved as of
+"unknown" origin: a file can say anything about where it came from, and a person at a terminal can be imitated by an
+AI app. The rows the file says are the user's own are then handed to the engine's `trust`, which asks the user once,
+in a macOS dialog only they can click, before it makes them their own (owner_vouched); never from an AI app's shell.
+An export is signed (HMAC-SHA256, a key kept in the data folder) only to tell the user, in that dialog, whether the
+file was made on this Mac and is unchanged; the dialog is asked either way.
 """
+import hashlib
+import hmac
 import json
 import os
+import secrets as _secrets
 import sqlite3
 import time
 from collections import defaultdict
 from pathlib import Path
 
 from .brand import COMMAND
-from .layout import data_dir, home, short
+from .layout import ENGINE, data_dir, engine_bin, home, short
+from .run import run
 
 FORMAT = "lflabs-memory-export/1"
 FIELDS = ("id", "content", "kind", "project", "section", "origin", "created", "updated")
@@ -83,6 +91,7 @@ def export(out_file=None, fmt="json", include_claims=False, say=print):
         doc = {"format": FORMAT, "exported": time.time(), "memories": mems}
         if include_claims:
             doc["claims"] = claims
+        doc["signature"] = sign(doc)
         _write(path, json.dumps(doc, indent=2, ensure_ascii=False) + "\n")
     say(f"Exported {len(mems)} memor{'y' if len(mems) == 1 else 'ies'}" +
         (f" and {len(claims)} claim{'' if len(claims) == 1 else 's'}" if include_claims else "") +
@@ -95,15 +104,34 @@ def export(out_file=None, fmt="json", include_claims=False, say=print):
 OWN = {"owner_key", "owner_typed", "owner_vouched", "owner_desk"}  # the engine's OWNER_ORIGINS: the user's own words
 
 
-def import_origin(exported, by_person):
-    """The origin an imported memory is saved with. Run by the user at a terminal (access.person_at_terminal), they
-    vouch for their own file: an origin of their own stays, and a row without one is owner_vouched. Anything else,
-    and everything an AI app imports, is unknown (a file can say anything about where it came from)."""
-    if not by_person:
-        return "unknown"
-    if exported in OWN:
-        return exported
-    return "owner_vouched" if not exported else "unknown"
+def _export_key(create=False):
+    p = data_dir() / "export-key"
+    try:
+        return bytes.fromhex(p.read_text().strip())
+    except (OSError, ValueError):
+        if not create:
+            return None
+    key = _secrets.token_bytes(32)
+    p.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+    with os.fdopen(os.open(p, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600), "w") as f:
+        f.write(key.hex() + "\n")
+    return key
+
+
+def _body(doc):
+    return json.dumps({k: v for k, v in doc.items() if k != "signature"}, sort_keys=True, ensure_ascii=False,
+                      separators=(",", ":")).encode()
+
+
+def sign(doc):
+    return hmac.new(_export_key(create=True), _body(doc), hashlib.sha256).hexdigest()
+
+
+def made_here(doc):
+    """Whether the file was exported on this Mac and has not changed since (its HMAC checks with this Mac's key)."""
+    key, got = _export_key(), doc.get("signature")
+    return bool(key and isinstance(got, str) and hmac.compare_digest(hmac.new(key, _body(doc), hashlib.sha256)
+                                                                     .hexdigest(), got))
 
 
 def _engine_remember():
@@ -114,6 +142,18 @@ def _engine_remember():
     def save(content, kind, project, origin="unknown"):
         return mem.remember(db, content, kind, project, origin=origin, via="import")
     return save
+
+
+def ask_trust(ids, label, say):
+    """The engine's `trust`: one macOS dialog asks the user whether these memories are their own words; it says
+    what it did. Never from an AI app's shell (they stay unknown)."""
+    from .access import agent_ancestor, agent_shell
+    if agent_shell() or agent_ancestor() is not None:
+        say(f"{len(ids)} the file calls yours stay of unknown origin: an AI app ran this import. Run {COMMAND} import "
+            "yourself, in a Terminal window, to be asked.")
+        return
+    r = run([engine_bin() or ENGINE, "trust", *map(str, ids), "--from", label], timeout=300)
+    say((r.out or r.err).strip() or "not trusted")
 
 
 def load_file(path):
@@ -130,16 +170,16 @@ def import_file(path, say=print, remember=None):
         say(f"Cannot import {path}: {e}.")
         return 1
     save = remember or _engine_remember()
-    from .access import person_at_terminal
-    by_person = person_at_terminal()
     added = same = refused = 0
+    own = []
     for m in doc["memories"]:
         content = m.get("content") if isinstance(m, dict) else None
         if not isinstance(content, str) or not content.strip():
             refused += 1
             continue
-        mid, action = save(content, m.get("kind") or "note", m.get("project"),
-                           origin=import_origin(m.get("origin"), by_person))
+        mid, action = save(content, m.get("kind") or "note", m.get("project"), origin="unknown")
+        if mid is not None and m.get("origin") in OWN:
+            own.append(mid)
         if mid is None:
             refused += 1
         elif action == "added":
@@ -148,4 +188,8 @@ def import_file(path, say=print, remember=None):
             same += 1
     say(f"Imported {added} new memor{'y' if added == 1 else 'ies'}; {same} {'was' if same == 1 else 'were'} already "
         "here" + (f"; {refused} refused" if refused else "") + ".")
+    if own:
+        name = Path(path).name
+        ask_trust(own, f"{name} (made on this Mac)" if made_here(doc) else
+                  f"{name} (from another Mac, or changed since it was made)", say)
     return 0
