@@ -189,6 +189,7 @@ class RealSetup:
         self.a, self.record, self.say = answers, record, say
         self.engine = engine_bin() or ENGINE
         self.left_alone = []        # (app, path, note, snippet): printed after the screen
+        self.models_missing = []    # required models the download could not get
         self.connected = []
         self.expect_apps = sum(1 for x in self.a.apps if x in apps.LABELS and apps.installed(x))
 
@@ -201,7 +202,18 @@ class RealSetup:
 
     def run(self, ui):
         self.step_claude(ui)
-        if not self.step_models(ui) or not self.step_service(ui):
+        if not self.step_models(ui):
+            return False
+        if self.models_missing:  # the engine will not start without them: connect the apps, finish later
+            ui.step("Memory service", "warn", "waits for the models")
+            self.step_apps(ui)
+            ui.step("Your notes", "warn", "waits for the models")
+            ui.step("Self-check", "warn", "waits for the models")
+            if hasattr(ui, "state"):
+                ui.state.problem = (f"The search models could not be downloaded, so memory is not running yet. Your "
+                                    f"apps are connected: run {COMMAND} setup --models to finish.")
+            return False
+        if not self.step_service(ui):
             return False
         self.step_apps(ui)
         self.step_notes(ui)
@@ -233,12 +245,10 @@ class RealSetup:
         total = models.total_size(man, names)
         try:
             models.download(man, names, lambda done, tot: ui.step("Search models", "running", progress=(done, tot)))
-        except models.ChecksumError as e:
-            ui.step("Search models", "failed", str(e))
-            return False
-        except OSError:
-            ui.step("Search models", "failed", "the download stopped: check the connection, then run setup again")
-            return False
+        except (models.ChecksumError, OSError):  # retried and resumed already; what is got stays for next time
+            self.models_missing = [n for n, s in models.check(man, names=names).items() if s != "ok"] or names
+            ui.step("Search models", "warn", f"{', '.join(self.models_missing)} missing: {COMMAND} setup --models")
+            return True
         ui.step("Search models", "ok", f"{total / 1e6:.0f} MB, checked")
         return True
 
@@ -455,8 +465,47 @@ def dry_run(a, say):
     return 0
 
 
+def finish_models(say):
+    """`setup --models`: the search models a setup could not download (resumed where it stopped), then the memory
+    service it could not start without them, and the self-check."""
+    if not install_record.load() or not settings.path().exists():
+        say(f"Memory is not set up yet: run {COMMAND} setup first.")
+        return 1
+    man = models.manifest()
+    if man is None:
+        say("The engine has no models list: reinstall with the install line.")
+        return 1
+    names = [n for n in man["models"] if n not in models.OPTIONAL or shutil.disk_usage(home()).free >= SENSE_DISK]
+    todo = [n for n, s in models.check(man, names=names).items() if s != "ok"]
+    if todo:
+        say(f"Downloading {', '.join(todo)} ({models.total_size(man, todo) / 1e6:.0f} MB)...")
+        try:
+            models.download(man, todo)
+        except (models.ChecksumError, OSError) as e:
+            say(f"Still missing ({e}): check the connection, then run {COMMAND} setup --models again.")
+            return 1
+    record = install_record.load()
+    engine = engine_bin() or ENGINE
+    ran = launchd.install(engine)
+    for argv, ok, _ in ran:
+        install_record.add_command(record, argv, ok)
+    record["plist"] = str(launchd.plist_path())
+    install_record.save(record)
+    if not ran[-1][1] or not launchd.wait_ready(READY_WAIT):
+        say("The memory service did not start: see ~/Library/Logs/LF Labs/memory.log")
+        return 1
+    ok, _, why = self_check(engine)
+    if not ok:
+        say(f"Self-check: {why}")
+        return 1
+    say("The search models are all here and the memory service is running.")
+    return 0
+
+
 def main(args, say=print):
     from .main import full_show, play
+    if getattr(args, "models", False):
+        return finish_models(say)
     if args.dry_run:
         say(onboarding())
         return dry_run(ask(args, say), say)

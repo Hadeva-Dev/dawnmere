@@ -9,6 +9,7 @@ The only network call is GitHub's release API (and the release's own files). Two
    tag and the connector pins updated. A failed migration puts the snapshot back and reinstalls the old release.
 """
 import hashlib
+import http.client
 import json
 import os
 import re
@@ -42,18 +43,37 @@ def installed_version():
         return "0"
 
 
-def fetch(url, timeout=30):
-    req = urllib.request.Request(url, headers={"Accept": "application/vnd.github+json",
-                                               "User-Agent": f"{CLI_DIST}/{installed_version()}"})
-    with urllib.request.urlopen(req, timeout=timeout) as r:
-        return r.read()
+def fetch(url, timeout=30, tries=6, sleep=None):
+    """GET url, tried up to `tries` times 2 s apart (GitHub has answered 504 for minutes at a time). An API asset URL
+    asks for the file itself (octet-stream), anything else for the API's JSON."""
+    accept = "application/octet-stream" if "/releases/assets/" in url else "application/vnd.github+json"
+    req = urllib.request.Request(url, headers={"Accept": accept, "User-Agent": f"{CLI_DIST}/{installed_version()}"})
+    for n in range(1, tries + 1):
+        try:
+            with urllib.request.urlopen(req, timeout=timeout) as r:
+                return r.read()
+        except (OSError, http.client.HTTPException):
+            if n == tries:
+                raise
+            (sleep or time.sleep)(2)
 
 
 def release(tag=None, get=fetch):
-    """The latest release (or one tag's): {"version", "notes", "assets": {name: url}}."""
+    """The latest release (or one tag's): {"version", "notes", "assets": {name: url}, "api": {name: API url}}."""
     doc = json.loads(get(f"{API}/tags/{tag}" if tag else f"{API}/latest"))
     return {"version": doc["tag_name"].lstrip("v"), "notes": doc.get("body") or "",
-            "assets": {a["name"]: a["browser_download_url"] for a in doc.get("assets", [])}}
+            "assets": {a["name"]: a["browser_download_url"] for a in doc.get("assets", [])},
+            "api": {a["name"]: a["url"] for a in doc.get("assets", []) if a.get("url")}}
+
+
+def asset(rel, name, get=fetch):
+    """One release file: from its download URL, else (that kept failing) the same file through the API."""
+    try:
+        return get(rel["assets"][name])
+    except (OSError, http.client.HTTPException):
+        if name not in rel.get("api", {}):
+            raise
+        return get(rel["api"][name])
 
 
 def wheels(rel, get=fetch, where=None, need_lock=True):
@@ -63,7 +83,7 @@ def wheels(rel, get=fetch, where=None, need_lock=True):
     sums = {}
     if "SHA256SUMS" not in rel["assets"]:
         raise RuntimeError("the release has no SHA256SUMS")
-    for line in get(rel["assets"]["SHA256SUMS"]).decode().splitlines():
+    for line in asset(rel, "SHA256SUMS", get).decode().splitlines():
         parts = line.split()
         if len(parts) == 2:
             sums[parts[1].lstrip("*")] = parts[0]
@@ -77,7 +97,7 @@ def wheels(rel, get=fetch, where=None, need_lock=True):
                 out.append(None)
                 continue
             raise RuntimeError(f"the release has no checked {kind}: nothing was installed")
-        data = get(rel["assets"][name])
+        data = asset(rel, name, get)
         if hashlib.sha256(data).hexdigest() != sums[name]:
             raise RuntimeError(f"{name} did not match its checksum: nothing was installed")
         p = Path(where) / name

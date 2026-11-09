@@ -23,7 +23,9 @@ UV_VERSION="0.12.5"
 UV_SHA256_arm64="5bb0e5fe008a773c3dbcb97ff79cd89e1241464fe9d2f986d52ad8f1b037bd62"
 UV_SIZE_arm64=18518284
 
-BASE="${LFLABS_MEMORY_RELEASE_BASE:-https://github.com/Hadeva-Dev/dawnmere/releases/download/v$VERSION}"
+REPO="Hadeva-Dev/dawnmere"
+BASE="${LFLABS_MEMORY_RELEASE_BASE:-https://github.com/$REPO/releases/download/v$VERSION}"
+API="${LFLABS_MEMORY_API_BASE:-https://api.github.com}"
 UV_BASE="${LFLABS_MEMORY_UV_BASE:-https://github.com/astral-sh/uv/releases/download/$UV_VERSION}"
 BIN="$HOME/.local/bin"
 
@@ -62,15 +64,39 @@ progress() {
     "$(awk "BEGIN { printf \"%.1f\", $got / 1000000 }")" "$(awk "BEGIN { printf \"%.1f\", $TOTAL / 1000000 }")"
 }
 
-# fetch URL NAME: download into $TMP/dl.NAME, keeping the progress line moving.
+# get CURL-ARGS...: curl, retried (GitHub has answered 504 for minutes at a time): curl's own --retry-all-errors
+# (curl 7.71+; macOS 14 ships 8.x), else a loop here for an older curl.
+RETRIES="${LFLABS_MEMORY_RETRIES:-5}"
+RETRY="--retry $RETRIES --retry-delay 2 --connect-timeout 15" TRIES=$((RETRIES + 1))
+if curl --help all 2>/dev/null | grep -q -- --retry-all-errors; then RETRY="$RETRY --retry-all-errors" TRIES=1; fi
+get() {
+  n=1
+  # shellcheck disable=SC2086  # RETRY is several words
+  until curl -fsSL $RETRY "$@"; do
+    [ "$n" -lt "$TRIES" ] || return 1
+    n=$((n + 1))
+    sleep 2
+  done
+}
+
+# api_get REPO TAG ASSET OUT: the same release file through GitHub's API (api.github.com), found by its asset id
+api_get() {
+  json=$(get "$API/repos/$1/releases/tags/$2") || return 1
+  id=$(osascript -l JavaScript -e 'function run(a) { var x = JSON.parse(a[0]).assets.filter(function (s) {
+    return s.name === a[1] })[0]; return x ? String(x.id) : "" }' "$json" "$3" 2>/dev/null) || return 1
+  [ -n "$id" ] && get -H 'Accept: application/octet-stream' -o "$4" "$API/repos/$1/releases/assets/$id"
+}
+
+# fetch URL NAME REPO TAG ASSET: download into $TMP/dl.NAME, keeping the progress line moving; then the API's copy.
 fetch() {
-  curl -fsSL -o "$TMP/dl.$2" "$1" &
+  get -o "$TMP/dl.$2" "$1" &
   pid=$!
   while kill -0 "$pid" 2>/dev/null; do
     progress
     sleep 0.2
   done
-  wait "$pid" || fail "Could not download $1. Check the connection and run the install line again."
+  wait "$pid" || api_get "$3" "$4" "$5" "$TMP/dl.$2" ||
+    fail "Could not download $5: GitHub did not answer. Check the connection and run the install line again."
   progress
 }
 
@@ -90,12 +116,12 @@ fi
 TOTAL=$((TOTAL + CLI_SIZE + ENGINE_SIZE + CONSTRAINTS_SIZE))
 
 if [ -z "$UV" ]; then
-  fetch "$UV_BASE/uv-$arch-apple-darwin.tar.gz" uv.tar.gz
+  fetch "$UV_BASE/uv-$arch-apple-darwin.tar.gz" uv.tar.gz astral-sh/uv "$UV_VERSION" "uv-$arch-apple-darwin.tar.gz"
   check uv.tar.gz "$uv_sha"
 fi
-fetch "$BASE/$CLI_WHEEL" "$CLI_WHEEL"
-fetch "$BASE/$ENGINE_WHEEL" "$ENGINE_WHEEL"
-fetch "$BASE/constraints.txt" constraints.txt
+fetch "$BASE/$CLI_WHEEL" "$CLI_WHEEL" "$REPO" "v$VERSION" "$CLI_WHEEL"
+fetch "$BASE/$ENGINE_WHEEL" "$ENGINE_WHEEL" "$REPO" "v$VERSION" "$ENGINE_WHEEL"
+fetch "$BASE/constraints.txt" constraints.txt "$REPO" "v$VERSION" constraints.txt
 check "$CLI_WHEEL" "$CLI_SHA256"
 check "$ENGINE_WHEEL" "$ENGINE_SHA256"
 check constraints.txt "$CONSTRAINTS_SHA256"

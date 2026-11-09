@@ -719,3 +719,37 @@ def test_no_star_line_without_a_terminal_or_after_a_failure(box, monkeypatch, ca
     say = []
     assert setup.main(cli.parser().parse_args(["setup", "--no-animation"]), say=say.append) == 1
     assert not any(STAR in line for line in say) and not (layout.data_dir() / ".star-shown").exists()
+
+
+def test_a_failed_model_download_still_connects_the_apps(box, monkeypatch, capsys):
+    """The download keeps failing: the apps are connected anyway, the service waits for the models (the engine will
+    not start without them), and `dawnmere setup --models` finishes it later."""
+    from lflabs_memory_cli import doctor
+    real = models.download
+
+    def broken(man, names, *a, **kw):
+        raise models.DownloadError({"embed": "reset by peer"})
+    monkeypatch.setattr(models, "download", broken)
+    code, out = run_setup()
+    shown = capsys.readouterr().out
+    assert code == 1
+    assert "[warn] Search models: embed, rerank missing: dawnmere setup --models" in shown
+    assert "dawnmere-connector@" in (box.home / ".codex/config.toml").read_text(), "the apps are connected"
+    assert "[warn] Memory service: waits for the models" in shown
+    assert "dawnmere setup --models" in shown.split("[warn] Self-check")[-1], "the end says how to finish"
+    assert not any(c[:1] == ["bootstrap"] for c in box.calls("launchctl"))
+    c = doctor.check_models()
+    assert c.state == "fail" and c.fix == "run dawnmere setup --models"
+    monkeypatch.setattr(models, "download", real)
+    out = []
+    assert setup.main(cli.parser().parse_args(["setup", "--models"]), say=out.append) == 0, "\n".join(out)
+    assert models.check(models.manifest()) == {"embed": "ok", "rerank": "ok"}
+    assert any(c[:1] == ["bootstrap"] for c in box.calls("launchctl"))
+    assert out[-1] == "The search models are all here and the memory service is running."
+
+
+def test_setup_models_before_setup(mac, monkeypatch):
+    monkeypatch.setenv("LFLABS_MEMORY_HOME", str(mac.home / "data"))
+    out = []
+    assert setup.main(cli.parser().parse_args(["setup", "--models"]), say=out.append) == 1
+    assert out[-1] == "Memory is not set up yet: run dawnmere setup first."

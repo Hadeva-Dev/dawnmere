@@ -98,7 +98,7 @@ def check_models():
     names = ", ".join(n for n, s in got.items() if s == "ok")
     if bad:
         return Check("models", "fail", ", ".join(f"{n} {got[n]}" for n in bad),
-                     f"run {COMMAND} setup to download them again")
+                     f"run {COMMAND} setup --models")
     note = f"{names}: checksums match" + (f"; {', '.join(missing_optional)} not installed (word lists decide)"
                                           if missing_optional else "")
     return Check("models", "ok", note)
