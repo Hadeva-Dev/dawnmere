@@ -1,6 +1,6 @@
 {
   "name": "dawnmere-connector",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Connect your AI apps to Dawnmere, one memory shared across Claude, Cursor, Codex and more. Talks to Dawnmere on your Mac.",
   "mcpName": "io.github.Hadeva-Dev/dawnmere-connector",
   "type": "module",
