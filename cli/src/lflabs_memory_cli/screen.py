@@ -603,7 +603,7 @@ def plain_lines(state):
 
 def self_check_row(seconds):
     """(status, note) for the self-check: the measured hook time in hundredths; slower than SLOW is a warning."""
-    note = f"recall in {seconds:.2f} s"  # hundredths: Hao, 2026-10-28 (reads as fast and precise)
+    note = f"recall in {seconds:.2f} s"  # hundredths (decided 2026-10-28): reads as fast and precise
     return ("ok", note) if seconds <= SLOW else ("warn", f"{note} (slow: {COMMAND} doctor)")
 
 

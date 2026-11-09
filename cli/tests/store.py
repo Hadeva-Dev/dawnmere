@@ -22,7 +22,7 @@ def make(path, memories=(), claims=(), usage=()):
     for i, (content, kind, section, *rest) in enumerate(memories, 1):
         secret = rest[0] if rest else None
         db.execute("insert into memories(id, content, kind, section, origin, secret, created, updated, project) "
-                   "values (?, ?, ?, ?, 'hao_typed', ?, ?, ?, ?)", (i, content, kind, section, secret, now, now,
+                   "values (?, ?, ?, ?, 'owner_typed', ?, ?, ?, ?)", (i, content, kind, section, secret, now, now,
                                                                      "shop" if section == "projects" else None))
         db.execute("insert into saves(memory_id, at, via) values (?, ?, 'claude-code')", (i, now))
     for i, c in enumerate(claims, 1):

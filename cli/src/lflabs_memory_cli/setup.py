@@ -114,7 +114,7 @@ def ask(args, say):
     a.name = first_name() if args.yes else prompt.text("What should your AI apps call you?", first_name())
     a.claude = backend.claude_status(a.model, ping=not args.dry_run) if shutil.which("claude") else \
         backend.Status("claude-cli", False, note="not installed")  # a dry run runs nothing, not even the ping
-    # Plan first (Hao, 2026-10-28): the user's Claude plan whenever Claude Code is there, logged in or not; an API key
+    # Plan first (decided 2026-10-28): the user's Claude plan whenever Claude Code is there, logged in or not; an API key
     # only when the user says yes to it, never as a fallback.
     if args.backend:
         a.backend = args.backend
