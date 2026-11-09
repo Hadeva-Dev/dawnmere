@@ -4,8 +4,8 @@ The only network call is GitHub's release API (and the release's own files). Two
 1. this (old) program fetches the release, checks each wheel and constraints.txt against the release's SHA256SUMS and
    installs them with uv, every dependency at the version the release pinned and with the hash it recorded;
 2. the newly installed program finishes (`update --finish FROM`): models whose checksum changed, the engine's schema
-   migration on a stopped service with a snapshot first, the service restarted, the plugin and the connector pins
-   updated. A failed migration puts the snapshot back and reinstalls the old release.
+   migration on a stopped service with a snapshot first, the service restarted, the plugin moved to the new release's
+   tag and the connector pins updated. A failed migration puts the snapshot back and reinstalls the old release.
 """
 import hashlib
 import json
@@ -20,8 +20,8 @@ from pathlib import Path
 
 from . import apps, edits, launchd, models, prompt
 from .brand import COMMAND, PRODUCT, REPO
-from .layout import (CLI_DIST, CONNECTOR, CONNECTOR_VERSION, ENGINE_DIST, LABEL, SERVER, data_dir, engine_bin,
-                     home, short, uv_bin)
+from .layout import (CLI_DIST, CONNECTOR, CONNECTOR_VERSION, ENGINE_DIST, LABEL, MARKETPLACE, SERVER, data_dir,
+                     engine_bin, engine_record, home, short, uv_bin)
 from .run import Result, run
 
 API = f"https://api.github.com/repos/{REPO}/releases"
@@ -200,6 +200,19 @@ def bump_pins(say):
             say(f"{short(path)}: {e}")
 
 
+def move_plugin(say):
+    """The marketplace was added at the old release's tag, and a marketplace's ref cannot be changed in place: remove
+    it (that uninstalls the plugin too), add it at this release's tag, install the plugin from it again."""
+    v = installed_version()
+    steps = [["claude", "plugin", "marketplace", "remove", MARKETPLACE],
+             ["claude", "plugin", "marketplace", "add", apps.marketplace_source(v), "--scope", "user"],
+             ["claude", "plugin", "install", f"{SERVER}@{MARKETPLACE}", "--scope", "user", "-y"]]
+    if all(run(argv, timeout=120).ok for argv in steps):
+        say(f"Claude Code's plugin: now v{v} (restart Claude Code to load it)")
+    else:
+        say(f"Claude Code's plugin could not move to v{v}: run {COMMAND} setup again")
+
+
 def finish(old_version, say=print, get=fetch):
     """Run by the newly installed program. 0 when updated; 1 after a rollback."""
     man = models.manifest()
@@ -229,8 +242,10 @@ def finish(old_version, say=print, get=fetch):
         return 1
     run(["launchctl", "bootstrap", launchd.domain(), str(launchd.plist_path())], timeout=30)
     run(["launchctl", "kickstart", "-k", f"{launchd.domain()}/{LABEL}"], timeout=30)
+    if eng and os.path.isabs(eng) and data_dir().is_dir():  # what the plugin's hooks run (plugin/scripts/engine)
+        engine_record().write_text(eng + "\n")
     if apps.installed("claude-code") and SERVER in run(["claude", "plugin", "list"], timeout=30).out:
-        run(["claude", "plugin", "update", SERVER], timeout=120)
+        move_plugin(say)
     bump_pins(say)
     say(f"{PRODUCT} is updated ({old_version} to {installed_version()}).")
     return 0

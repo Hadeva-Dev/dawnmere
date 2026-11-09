@@ -322,6 +322,30 @@ def test_update_rolls_back_on_failed_migration(mac, monkeypatch):
     assert list((data / "backup").glob("memory-*-before-update.db"))
 
 
+def test_update_moves_the_plugin_to_the_new_tag(mac, monkeypatch, tmp_path):
+    """The marketplace was added at the old release's tag: it is added again at the new one, the plugin reinstalled
+    from it. And the plugin's hooks get the engine's path again."""
+    data = layout.data_dir()
+    data.mkdir(parents=True)
+    mac.add("lflabs-memory")
+    (mac.home / ".claude").mkdir()
+    mac.on("claude", ["plugin", "list"], 0, "  lflabs-memory@lflabs  0.1.5  enabled\n")
+    monkeypatch.setattr(models, "manifest", lambda: None)
+    monkeypatch.setattr(update, "installed_version", lambda: "0.2.0")
+    out = []
+    assert update.finish("0.1.0", say=out.append, get=fake_github({"0.2.0": wheelset("0.2.0")})) == 0
+    claude = mac.calls("claude")
+    want = [["plugin", "marketplace", "remove", "lflabs"],
+            ["plugin", "marketplace", "add", "Hadeva-Dev/dawnmere#v0.2.0", "--scope", "user"],
+            ["plugin", "install", "lflabs-memory@lflabs", "--scope", "user", "-y"]]
+    assert [c for c in claude if c[:2] != ["plugin", "list"]] == want
+    assert "Claude Code's plugin: now v0.2.0 (restart Claude Code to load it)" in out
+    assert layout.engine_record().read_text() == f"{mac.bin}/lflabs-memory\n"
+    mac.on("claude", ["plugin", "marketplace", "add"], 1, "")
+    update.finish("0.1.0", say=out.append, get=fake_github({"0.2.0": wheelset("0.2.0")}))
+    assert "Claude Code's plugin could not move to v0.2.0: run dawnmere setup again" in out
+
+
 def test_models_download_checks_checksums(tmp_path):
     import io
 

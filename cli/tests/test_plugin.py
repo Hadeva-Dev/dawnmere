@@ -19,6 +19,14 @@ def test_connector_version_matches():
     assert load("plugin/.mcp.json")["mcpServers"][layout.SERVER]["args"] == apps.connector_args()
 
 
+def test_versions_agree():
+    """The plugin moves with the release: its version and the marketplace entry's are the CLI's (RELEASING.md)."""
+    import tomllib
+    cli = tomllib.loads((ROOT / "cli/pyproject.toml").read_text())["project"]["version"]
+    market = load(".claude-plugin/marketplace.json")
+    assert load("plugin/.claude-plugin/plugin.json")["version"] == market["plugins"][0]["version"] == cli
+
+
 def test_marketplace_names():
     market = load(".claude-plugin/marketplace.json")
     assert market["name"] == layout.MARKETPLACE

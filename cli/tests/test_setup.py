@@ -1,5 +1,6 @@
 """dawnmere setup (spec 9.2, Task 9): a temp HOME, fake claude, launchctl, security, zsh and engine."""
 import hashlib
+import importlib.metadata
 import json
 import os
 import shutil
@@ -108,6 +109,9 @@ def test_setup_end_to_end(box, capsys):
     assert "[ok] Self-check: recall in" in shown and "Dawnmere is on." in shown
     assert "Background reading: your Claude plan (Haiku), up to 200 calls a day" in out
     assert ["plugin", "install", "lflabs-memory@lflabs", "--scope", "user", "-y"] in box.calls("claude")
+    version = importlib.metadata.version("lflabs-memory-cli")
+    assert ["plugin", "marketplace", "add", f"Hadeva-Dev/dawnmere#v{version}", "--scope", "user"] in \
+        box.calls("claude"), "the plugin at the release tag the wheels come from, never main's head"
     assert "dawnmere-connector@0.1.0" in (box.home / ".codex/config.toml").read_text()
     assert "hook-cursor-start" in (box.home / ".cursor/hooks.json").read_text()
     assert (layout.data_dir() / "config.toml").read_text().startswith('version = 1\nprofile = "generic"')
@@ -414,3 +418,14 @@ def test_path_advice_and_check_agree(tmp_path, monkeypatch):
     assert advice.startswith("To run dawnmere later, add this line to ~/.zshrc:\n  ")
     (home / ".zshrc").write_text(advice.splitlines()[1].strip() + "\n")
     assert layout.on_shell_path()
+
+
+def test_marketplace_override_for_testing(box, monkeypatch, tmp_path):
+    monkeypatch.setenv("LFLABS_MEMORY_MARKETPLACE", str(tmp_path / "checkout"))
+    assert run_setup()[0] == 0
+    assert ["plugin", "marketplace", "add", str(tmp_path / "checkout"), "--scope", "user"] in box.calls("claude")
+
+
+def test_dry_run_names_the_tag(box):
+    version = importlib.metadata.version("lflabs-memory-cli")
+    assert f"claude plugin marketplace add Hadeva-Dev/dawnmere#v{version} --scope user" in run_setup("--dry-run")[1]

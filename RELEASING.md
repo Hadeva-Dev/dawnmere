@@ -3,8 +3,13 @@
 This repo has no CI: releases are cut by hand on a Mac with Apple silicon, from a clean `main`.
 The engine checkout sits next to this repo as `../lflabs-memory-engine`.
 
-1. **Versions.** Set `version` in `cli/pyproject.toml` to the new `X.Y.Z`, and put the engine tag to ship in `ENGINE_TAG`.
-   Merge that to `main`, then tag it `vX.Y.Z`.
+1. **Versions.** Set `version` in `cli/pyproject.toml` to the new `X.Y.Z`, the same `X.Y.Z` as `version` in
+   `plugin/.claude-plugin/plugin.json` and in the plugin's entry in `.claude-plugin/marketplace.json` (a test checks
+   they agree), and put the engine tag to ship in `ENGINE_TAG`. Merge that to `main`, then tag it `vX.Y.Z` and push
+   the tag (`git push origin vX.Y.Z`) before anything is published: setup adds the Claude Code marketplace at
+   `Hadeva-Dev/dawnmere#vX.Y.Z`, the tag of the CLI it runs from, so the plugin and its hooks change only with a
+   release, never with a push to `main`, and an install fails over to the settings.json hooks if the tag is missing.
+   `dawnmere update` moves the plugin to the new tag (marketplace remove, add at the tag, install).
 2. **Wheels and the installer.**
    ```bash
    VERSION=X.Y.Z
