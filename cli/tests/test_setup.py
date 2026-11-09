@@ -913,3 +913,41 @@ def test_access_says_a_keyless_app_gets_work_only(box, monkeypatch):
     assert out[-1].startswith("Windsurf sees everything (work only until it has a key). To change it:")
     assert access.main("claude-desktop", None, layout.engine_bin(), say=out.append) == 0
     assert out[-1].startswith("Claude Desktop sees everything. To change it:")
+
+
+def answering_late(monkeypatch, *answers):
+    """launchd.wait_ready answers these in turn (the service's sockets appear late, or only after a reload)."""
+    seq = iter(answers)
+    waits = []
+    monkeypatch.setattr(launchd, "wait_ready", lambda timeout=20.0: (waits.append(timeout), next(seq, True))[1])
+    return waits
+
+
+def test_a_slow_first_start_is_waited_for(box, monkeypatch, capsys):
+    """A fresh Mac's first start can outlast 20 s (3 of 9 first installs in the VMs): up to 60 s, said on screen."""
+    waits = answering_late(monkeypatch, False, True)
+    assert run_setup()[0] == 0
+    assert waits[:2] == [setup.READY_WAIT, setup.READY_LONGER] and setup.READY_LONGER == 40, "20 + 40 s outside tests"
+    assert [c[:1] for c in box.calls("launchctl") if c[:1] in (["bootstrap"], ["bootout"])] == [["bootstrap"]]
+
+
+def test_a_service_that_never_answers_is_reloaded_once(box, monkeypatch, capsys):
+    answering_late(monkeypatch, False, False, True)
+    assert run_setup()[0] == 0
+    boots = [c[0] for c in box.calls("launchctl") if c[:1] in (["bootstrap"], ["bootout"])]
+    assert boots == ["bootstrap", "bootout", "bootstrap"]
+
+
+def test_a_service_that_never_starts_says_why_in_the_log(box, monkeypatch, capsys):
+    """memory.log was empty when it failed: now it says what launchd and the engine said."""
+    answering_late(monkeypatch, False, False, False)
+    box.rules["launchctl"] = [[["print"], 113, "Could not find service \"com.lflabs.memory\" in domain\n"]]
+    box.save()
+    code, out = run_setup()
+    shown = capsys.readouterr().out
+    assert code == 1 and "[fail] Memory service: did not start: see ~/Library/Logs/LF Labs/memory.log" in shown
+    log = (layout.logs_dir() / "memory.log").read_text()
+    total = setup.READY_WAIT + setup.READY_LONGER + setup.READY_RETRY
+    assert f"setup: the memory service did not answer within {total:.0f} s (one reload included)." in log
+    assert "launchctl print (exit 113):" in log and 'Could not find service "com.lflabs.memory"' in log
+    assert f"{box.bin}/lflabs-memory --version (exit 0)" in log

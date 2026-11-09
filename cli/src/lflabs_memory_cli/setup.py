@@ -19,8 +19,8 @@ import time
 from importlib import metadata
 from pathlib import Path
 
-from . import (access, apps, backend, claude_settings, edits, install_record, keychain, launchd, models, prompt,
-               screen, settings, sockets)
+from . import (access, apps, backend, claude_settings, edits, install_record, keychain, launchd, layout, models,
+               prompt, screen, settings, sockets)
 from .brand import COMMAND, PRODUCT, REPO
 from .layout import (CLI_DIST, CONNECTOR_VERSION, ENGINE, ENGINE_DIST, MARKETPLACE, SERVER, data_dir,
                      engine_bin, engine_record, find_claude, git_available, home, lf_labs_dir, on_shell_path, path_advice, short, uv_bin)
@@ -256,17 +256,11 @@ class RealSetup:
 
     def step_service(self, ui):
         ui.step("Memory service", "running")
-        ran = launchd.install(self.engine)
-        for argv, ok, _ in ran:
-            install_record.add_command(self.record, argv, ok)
-        self.record["plist"] = str(launchd.plist_path())
+        ok, why = start_service(self.engine, self.record,
+                                lambda s: ui.step("Memory service", "running", s))
         self.save()
-        _, ok, note = ran[-1]  # the bootstrap
         if not ok:
-            ui.step("Memory service", "failed", f"did not start: {note}")
-            return False
-        if not launchd.wait_ready(READY_WAIT):
-            ui.step("Memory service", "failed", "did not start: see ~/Library/Logs/LF Labs/memory.log")
+            ui.step("Memory service", "failed", why)
             return False
         ui.step("Memory service", "ok", "running")
         return True
@@ -512,6 +506,48 @@ def dry_run(a, say):
     return 0
 
 
+READY_LONGER, READY_RETRY = 40.0, 30.0  # with READY_WAIT: up to 60 s for a first start, then 30 s after one retry
+
+
+def start_service(engine, record, note=lambda s: None):
+    """(started, why not). A fresh Mac's first start can take long (the models load for the first time, a cold
+    disk): wait up to READY_WAIT + READY_LONGER seconds, saying it is still starting; then reload the agent once
+    and wait again. When it never answers, memory.log gets why: launchctl's view of it and whether the engine runs."""
+    ran = launchd.install(engine)
+    for argv, ok, _ in ran:
+        install_record.add_command(record, argv, ok)
+    record["plist"] = str(launchd.plist_path())
+    _, ok, why = ran[-1]  # the bootstrap
+    if not ok:
+        return False, f"did not start: {why}"
+    if launchd.wait_ready(READY_WAIT):
+        return True, ""
+    note("still starting: a first start loads the models")
+    if launchd.wait_ready(READY_LONGER):
+        return True, ""
+    for argv, ok, _ in launchd.restart():
+        install_record.add_command(record, argv, ok)
+    if launchd.wait_ready(READY_RETRY):
+        return True, ""
+    _log_no_start(engine)
+    return False, "did not start: see ~/Library/Logs/LF Labs/memory.log"
+
+
+def _log_no_start(engine):
+    """What setup knows when the service never answered, appended to memory.log (it was empty in the VMs)."""
+    shown = run(["launchctl", "print", f"{launchd.domain()}/{launchd.LABEL}"], timeout=30)
+    ver = run([engine, "--version"], timeout=60)
+    lines = [f"{time.strftime('%Y-%m-%d %H:%M:%S')} setup: the memory service did not answer within "
+             f"{READY_WAIT + READY_LONGER + READY_RETRY:.0f} s (one reload included).",
+             f"  launchctl print (exit {shown.code}):"] + \
+        [f"    {x}" for x in (shown.out or shown.err).strip().splitlines()[:40]] + \
+        [f"  {engine} --version (exit {ver.code}): {(ver.out or ver.err).strip()[:300]}"]
+    log = layout.logs_dir() / "memory.log"
+    log.parent.mkdir(parents=True, exist_ok=True)
+    with open(log, "a") as f:
+        f.write("\n".join(lines) + "\n")
+
+
 def finish_models(say):
     """`setup --models`: the search models a setup could not download (resumed where it stopped), then the memory
     service it could not start without them, and the self-check."""
@@ -533,13 +569,10 @@ def finish_models(say):
             return 1
     record = install_record.load()
     engine = engine_bin() or ENGINE
-    ran = launchd.install(engine)
-    for argv, ok, _ in ran:
-        install_record.add_command(record, argv, ok)
-    record["plist"] = str(launchd.plist_path())
+    ok, why = start_service(engine, record)
     install_record.save(record)
-    if not ran[-1][1] or not launchd.wait_ready(READY_WAIT):
-        say("The memory service did not start: see ~/Library/Logs/LF Labs/memory.log")
+    if not ok:
+        say(f"The memory service {why}")
         return 1
     ok, _, why = checked(engine)
     if not ok:
