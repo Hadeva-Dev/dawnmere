@@ -491,7 +491,7 @@ WORDS = ("amber", "basil", "cedar", "delta", "copper", "fjord", "garnet", "harbo
 def check_phrase():
     """What the self-check saves: five random words and a random number, nothing like any real memory (an older
     "<command> self-check <hex>" was taken as a restatement and merged, then purged with it). Every word is a common
-    English one: memory holds back a save it cannot read as English (rare words: "oxbow umber vellum")."""
+    one, so the save is never held back for review and the check sees it at once."""
     return " ".join(secrets.choice(WORDS) for _ in range(5)) + f" {secrets.randbelow(10 ** 6):06d}"
 
 
