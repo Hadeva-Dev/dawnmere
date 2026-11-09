@@ -1,6 +1,7 @@
 """install.sh (spec 10.1, Task 13): POSIX, checksums before anything is installed, then setup."""
 import hashlib
 import importlib.util
+import json
 import os
 import shutil
 import subprocess
@@ -31,7 +32,8 @@ def release(tmp_path):
     script.write_text(render_install.render("0.2.0", rel / CLI, rel / ENGINE, rel / "constraints.txt"))
     home = tmp_path / "home"
     home.mkdir()
-    fakes = Fakes(tmp_path, progs=("uv", "sysctl"))
+    fakes = Fakes(tmp_path, progs=("uv", "sysctl", "python3.12"))
+    fakes.on("uv", ["python", "find", "--managed-python", "3.12"], 0, str(fakes.bin / "python3.12"))
     fakes.on("sysctl", ["-n", "hw.optional.arm64"], 0, "1\n")
     tools = tmp_path / "tools-bin"
     tools.mkdir()
@@ -75,21 +77,30 @@ def test_install_sh_checksum_mismatch_aborts(release):
 
 
 def installs(fakes):
-    return [c for c in fakes.calls("uv") if c[:2] in (["tool", "install"], ["pip", "install"]) and "--help" not in c]
+    return [c for c in fakes.calls("uv") if c[:2] == ["tool", "install"] and "--help" not in c]
 
 
 def test_install_sh_installs_then_runs_setup(release, tmp_path):
     r = sh(release.script, release.env_vars)
     assert r.returncode == 0, r.stderr
     assert "Dawnmere installer" in r.stdout and "Checksums ok" in r.stdout and "Downloading  " in r.stdout
-    install, verify = installs(release)
-    assert install[2:8] == ["--force", "--managed-python", "--python", "3.12", "--no-build", "-c"]
-    assert install[8].endswith("constraints.txt"), "every dependency at the version the release was tested with"
-    assert install[9].endswith(CLI) and install[11].endswith(ENGINE)
-    assert install[12:] == ["--with-executables-from", "lflabs-memory-engine"], "the hooks' lflabs-memory is linked too"
-    assert verify[:4] == ["pip", "install", "--python", str(tmp_path / "uv tools/lflabs-memory-cli/bin/python")]
-    assert verify[4:-1] == ["--reinstall", "--no-deps", "--no-build", "--require-hashes", "-r"]
-    assert verify[-1] == install[8], "then each of them again, its hash checked"
+    rows = [json.loads(line) for line in release.log.read_text().splitlines()]
+    order = [(x["prog"], x["argv"][:2]) for x in rows if x["prog"] == "python3.12" or x["argv"][:2] == ["tool", "install"]
+             and "--help" not in x["argv"]]
+    assert order == [("python3.12", ["-I", "-m"]), ("uv", ["tool", "install"])], "every hash checked before installing"
+    assert ["python", "install", "--managed-python", "--no-bin", "3.12"] in release.calls("uv")
+    download = release.calls("python3.12")[0]
+    assert download[:4] == ["-I", "-m", "pip", "download"]
+    assert download[4:13] == ["--require-hashes", "--only-binary", ":all:", "--no-deps", "--no-cache-dir",
+                              "--disable-pip-version-check", "-q", "-r", download[12]]
+    lock, deps = download[12], download[14]
+    assert lock.endswith("constraints.txt") and download[13] == "-d"
+    install, = installs(release)
+    assert install[2:6] == ["--force", "--managed-python", "--python", "3.12"]
+    assert install[6:13] == ["--no-index", "--find-links", deps, "--no-build", "--no-cache", "-c", lock], \
+        "only the checked files, at the versions the release was tested with"
+    assert install[13].endswith(CLI) and install[15].endswith(ENGINE)
+    assert install[16:] == ["--with-executables-from", "lflabs-memory-engine"], "the hooks' lflabs-memory is linked too"
     assert release.calls("dawnmere") == [["setup"]]
 
 
@@ -97,17 +108,17 @@ def test_constraints_checksum_mismatch_aborts(release):
     (release.rel / "constraints.txt").write_text("idna==9.9\n")
     r = sh(release.script, release.env_vars)
     assert r.returncode != 0 and "constraints.txt did not match its checksum, so nothing was installed" in r.stderr
-    assert not installs(release)
+    assert not installs(release) and not release.calls("python3.12")
 
 
-def test_a_dependency_with_the_wrong_hash_is_taken_out(release):
-    """uv tool install does not check the hashes in a constraints file (uv 0.12.5); the reinstall does, and a
-    mismatch takes the install out again before anything runs it."""
-    release.on("uv", ["pip", "install"], 1, "")
+def test_a_dependency_with_the_wrong_hash_installs_nothing(release):
+    """pip refuses a file whose hash is not the one in constraints.txt: uv tool install never runs, no environment
+    is made."""
+    release.on("python3.12", ["-I", "-m", "pip", "download"], 1, "")
     r = sh(release.script, release.env_vars)
-    assert r.returncode != 0 and "did not match the hashes this release was tested with" in r.stderr
-    assert ["tool", "uninstall", "lflabs-memory-cli"] in release.calls("uv")
-    assert release.calls("dawnmere") == []
+    assert r.returncode != 0
+    assert "A dependency could not be downloaded or did not match its hash, so nothing was installed." in r.stderr
+    assert not installs(release) and release.calls("dawnmere") == []
 
 
 def test_uv_download_is_checked(release, tmp_path):

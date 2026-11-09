@@ -109,21 +109,24 @@ fi
 # uv wants the wheels under their own names
 cp "$TMP/dl.$CLI_WHEEL" "$TMP/$CLI_WHEEL"
 cp "$TMP/dl.$ENGINE_WHEEL" "$TMP/$ENGINE_WHEEL"
-# --managed-python: uv's own arm64 Python, never an x86_64 one on PATH (onnxruntime has no Intel Mac wheels);
-# -c: every dependency at the version this release was tested with (uv tool install ignores the hashes there);
-# --with-executables-from: the engine's lflabs-memory command too, which the Claude Code plugin's hooks run
+# The dependencies first, each file downloaded by pip and checked against its hash in constraints.txt (uv tool
+# install does not check those hashes), with uv's own Python 3.12 (its download checked by uv); nothing of theirs
+# runs. A mismatch stops here, before anything is installed.
 LOCK="$TMP/dl.constraints.txt"
-if ! "$UV" tool install --force --managed-python --python 3.12 --no-build -c "$LOCK" "$TMP/$CLI_WHEEL" \
-  --with "$TMP/$ENGINE_WHEEL" --with-executables-from lflabs-memory-engine >"$TMP/uv.log" 2>&1; then
+if ! { "$UV" python install --managed-python --no-bin 3.12 && PY=$("$UV" python find --managed-python 3.12) &&
+  "$PY" -I -m pip download --require-hashes --only-binary :all: --no-deps --no-cache-dir \
+    --disable-pip-version-check -q -r "$LOCK" -d "$TMP/deps"; } >"$TMP/uv.log" 2>&1; then
+  tail -n 5 "$TMP/uv.log" >&2
+  fail "A dependency could not be downloaded or did not match its hash, so nothing was installed."
+fi
+# Then the install takes only those files (--no-index) and the two wheels checked above.
+# --managed-python: uv's own arm64 Python, never an x86_64 one on PATH (onnxruntime has no Intel Mac wheels);
+# --with-executables-from: the engine's lflabs-memory command too, which the Claude Code plugin's hooks run
+if ! "$UV" tool install --force --managed-python --python 3.12 --no-index --find-links "$TMP/deps" --no-build \
+  --no-cache -c "$LOCK" "$TMP/$CLI_WHEEL" --with "$TMP/$ENGINE_WHEEL" --with-executables-from lflabs-memory-engine \
+  >"$TMP/uv.log" 2>&1; then
   tail -n 5 "$TMP/uv.log" >&2
   fail "Could not install Dawnmere (uv stopped; its last lines are above)."
-fi
-# Each dependency again, its hash checked this time; a mismatch takes the install out before anything runs it.
-if ! "$UV" pip install --python "$("$UV" tool dir)/lflabs-memory-cli/bin/python" --reinstall --no-deps --no-build \
-  --require-hashes -r "$LOCK" >"$TMP/uv.log" 2>&1; then
-  tail -n 5 "$TMP/uv.log" >&2
-  "$UV" tool uninstall lflabs-memory-cli >/dev/null 2>&1 || true
-  fail "A dependency did not match the hashes this release was tested with, so Dawnmere was taken out again."
 fi
 
 TOOLS=$("$UV" tool dir --bin 2>/dev/null || printf '%s' "$BIN")

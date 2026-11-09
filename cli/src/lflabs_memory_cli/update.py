@@ -2,7 +2,8 @@
 
 The only network call is GitHub's release API (and the release's own files). Two halves:
 1. this (old) program fetches the release, checks each wheel and constraints.txt against the release's SHA256SUMS and
-   installs them with uv, every dependency at the version the release pinned and with the hash it recorded;
+   installs them with uv: every dependency first downloaded and checked against the hash the release recorded, then
+   installed from those files only;
 2. the newly installed program finishes (`update --finish FROM`): models whose checksum changed, the engine's schema
    migration on a stopped service with a snapshot first, the service restarted, the plugin moved to the new release's
    tag and the connector pins updated. A failed migration puts the snapshot back and reinstalls the old release.
@@ -26,7 +27,8 @@ from .run import Result, run
 
 API = f"https://api.github.com/repos/{REPO}/releases"
 LOCK = "constraints.txt"   # every dependency of the two wheels, pinned with its hashes (RELEASING.md step 2)
-HASH_MISMATCH = "a dependency did not match the hashes this release was tested with"
+NOT_VERIFIED = "a dependency could not be downloaded or did not match its hash"
+INSTALL_LINE = f"curl -fsSL https://github.com/{REPO}/releases/latest/download/install.sh | sh"
 
 
 def vtuple(v):
@@ -84,31 +86,74 @@ def wheels(rel, get=fetch, where=None, need_lock=True):
     return out
 
 
-def install_wheels(cli_whl, engine_whl, lock=None):
-    """uv tool install, every dependency at lock's version; then, since uv tool install does not check the hashes in
-    a constraints file (uv 0.12.5), each dependency again by a hash-checked reinstall. A Result; a hash that differs
-    is a failed one, its text saying so."""
+def verified_deps(lock, where):
+    """Every dependency in lock downloaded into `where` by pip, each file checked against its hash there (uv tool
+    install does not check the hashes in a constraints file, uv 0.12.5), with uv's own Python 3.12. Nothing of
+    theirs runs and nothing is installed. A Result."""
     uv = uv_bin() or "uv"
-    pins = ["--no-build", "-c", str(lock)] if lock else []
-    r = run([uv, "tool", "install", "--force", "--managed-python", "--python", "3.12", *pins, str(cli_whl), "--with",
-             str(engine_whl), "--with-executables-from", ENGINE_DIST], timeout=600)
-    if not r.ok or not lock:
-        return r
+    r = run([uv, "python", "install", "--managed-python", "--no-bin", "3.12"], timeout=600)
+    if r.ok:
+        r = run([uv, "python", "find", "--managed-python", "3.12"], timeout=60)
+    if not r.ok or not r.out.strip():
+        return Result(r.code or 1, "", f"uv has no Python 3.12 ({(r.err or r.out).strip()[-200:]})")
+    return run([r.out.strip(), "-I", "-m", "pip", "download", "--require-hashes", "--only-binary", ":all:", "--no-deps",
+                "--no-cache-dir", "--disable-pip-version-check", "-q", "-r", str(lock), "-d", str(where)], timeout=900)
+
+
+def install_wheels(cli_whl, engine_whl, lock=None):
+    """(Result, landed): with a lock, the dependencies are downloaded and hash-checked first, and uv tool install then
+    takes only those files (--no-index) and the two wheels, so only checked files can land. landed is False when it
+    stopped before uv tool install ran (nothing was installed)."""
+    pins = []
+    if lock:
+        deps = Path(lock).parent / "deps"
+        d = verified_deps(lock, deps)
+        if not d.ok:
+            return Result(d.code, "", f"{NOT_VERIFIED}: nothing was installed ({(d.err or d.out).strip()[-300:]})"), \
+                False
+        pins = ["--no-index", "--find-links", str(deps), "--no-build", "--no-cache", "-c", str(lock)]
+    r = run([uv_bin() or "uv", "tool", "install", "--force", "--managed-python", "--python", "3.12", *pins,
+             str(cli_whl), "--with", str(engine_whl), "--with-executables-from", ENGINE_DIST], timeout=600)
+    return r, True
+
+
+def quarantine():
+    """Take the installed programs out so nothing can load them: uv tool uninstall, else move the environment aside."""
+    uv = uv_bin() or "uv"
+    if run([uv, "tool", "uninstall", CLI_DIST], timeout=120).ok:
+        return
     tools = run([uv, "tool", "dir"], timeout=30).out.strip()
-    v = run([uv, "pip", "install", "--python", str(Path(tools) / CLI_DIST / "bin/python"), "--reinstall", "--no-deps",
-             "--no-build", "--require-hashes", "-r", str(lock)], timeout=600)
-    return v if v.ok else Result(v.code, "", f"{HASH_MISMATCH} ({(v.err or v.out).strip()[-200:]})")
+    env = Path(tools) / CLI_DIST if tools else None
+    if env and env.exists():
+        env.rename(env.with_name(f"{CLI_DIST}.quarantined-{int(time.time())}"))
 
 
-def reinstall(version, get, say):
-    """Put a release back (after a failed update): pinned when it has a constraints.txt. Raises on failure."""
+def reinstall(version, get, say, unpinned=False):
+    """Put a release back, its dependencies checked as above. A release from before 0.1.6 has no constraints.txt: put
+    back as it was installed when unpinned, else refused. Raises on failure."""
     with tempfile.TemporaryDirectory() as tmp:
         cli_whl, engine_whl, lock = wheels(release(f"v{version}", get), get, tmp, need_lock=False)
+        if lock is None and not unpinned:
+            raise RuntimeError(f"{version} has no {LOCK} to check it against")
         if lock is None:
             say(f"{version} has no {LOCK}, so it goes back without pinned dependencies, as it was installed.")
-        r = install_wheels(cli_whl, engine_whl, lock)
+        r, _ = install_wheels(cli_whl, engine_whl, lock)
         if not r.ok:
             raise RuntimeError((r.err or r.out).strip()[:200])
+
+
+def fail_closed(version, get, say):
+    """After an install that went wrong once something had landed: never leave that environment in place. Take it out,
+    then put `version` back the checked way; failing that, leave nothing installed and say how to install again."""
+    quarantine()
+    try:
+        reinstall(version, get, say)
+        say(f"Back on {version}.")
+    except Exception as e:
+        quarantine()
+        say(f"Could not reinstall {version} ({e}), so {PRODUCT} is uninstalled. Install it again with:")
+        say(f"  {INSTALL_LINE}")
+    return 1
 
 
 def main(check_only=False, yes=False, say=print, get=fetch):
@@ -134,18 +179,13 @@ def main(check_only=False, yes=False, say=print, get=fetch):
         except Exception as e:
             say(f"Update stopped: {e}")
             return 1
-        r = install_wheels(cli_whl, engine_whl, lock)
-        if not r.ok and HASH_MISMATCH in r.err:
-            say(f"Update stopped: {r.err}")
-            try:
-                reinstall(have, get, say)
-                say(f"Back on {have}.")
-            except Exception as e:
-                say(f"Could not reinstall {have} ({e}): run the install line again.")
+        r, landed = install_wheels(cli_whl, engine_whl, lock)
+        if not r.ok and not landed:
+            say(f"Update stopped: {r.err}")  # you are still on `have`, untouched
             return 1
         if not r.ok:
-            say(f"Update stopped: uv could not install it ({(r.err or r.out).strip()[:200]}). Nothing changed.")
-            return 1
+            say(f"Update stopped: uv could not install it ({(r.err or r.out).strip()[:200]}). Putting {have} back.")
+            return fail_closed(have, get, say)
     # the new program finishes: its models list, its migrations, its connector version
     new = Path(engine_bin() or "").with_name(COMMAND) if engine_bin() else None
     argv = [str(new) if new and new.exists() else COMMAND, "update", "--finish", have]
@@ -234,9 +274,9 @@ def finish(old_version, say=print, get=fetch):
         if snap:
             put_back(snap)
         try:
-            reinstall(old_version, get, say)
+            reinstall(old_version, get, say, unpinned=True)
         except Exception as e:
-            say(f"Could not reinstall {old_version} ({e}): run the install line again.")
+            say(f"Could not reinstall {old_version} ({e}): install it again with: {INSTALL_LINE}")
         run(["launchctl", "bootstrap", launchd.domain(), str(launchd.plist_path())], timeout=30)
         say(f"Back on {old_version}; your memory is as it was" + (f" (snapshot: {short(snap)})." if snap else "."))
         return 1
