@@ -10,7 +10,7 @@ from importlib import metadata
 
 from . import apps, backend, launchd, layout, models, settings, sockets
 from .brand import COMMAND
-from .layout import CONNECTOR, CONNECTOR_VERSION, ENGINE_DIST, SERVER, data_dir, engine_bin, home, short
+from .layout import CONNECTOR, CONNECTOR_VERSION, ENGINE, ENGINE_DIST, SERVER, data_dir, engine_bin, home, short
 from .run import run
 
 SLOW = 1.5
@@ -149,20 +149,26 @@ def check_connector():
                  "Codex and Cursor cannot reach memory: is the background service running?")
 
 
-def check_node(node):
+def check_node(node, on_npm=True):
     version, problem = node
     if problem:
         return Check("Node.js", "warn", problem, apps.NODE_FIX)
+    if on_npm is None:  # offline, or no npm: said, never a failure
+        return Check("Node.js", "ok", f"{version}; could not check {CONNECTOR}@{CONNECTOR_VERSION} on npm")
     return Check("Node.js", "ok", version)
 
 
-def _no_tools(check, node):
-    """An app row while Node.js is missing: its MCP entry (npx) cannot start, so the row warns (the fix is the
-    Node.js row's)."""
-    if not node[1] or check.note == "not installed":
+def _no_tools(check, node, on_npm=True):
+    """An app row while Node.js is missing, or the pinned connector is not on npm: its MCP entry (npx) cannot start,
+    so the row warns (the fix is the Node.js row's)."""
+    if check.note == "not installed":
         return check
-    return Check(check.name, "warn", f"{check.note}; {check.name} cannot use memory's tools until Node.js 18 or "
-                 "later is installed", check.fix)
+    if node[1]:
+        return Check(check.name, "warn", f"{check.note}; {check.name} cannot use memory's tools until Node.js 18 or "
+                     "later is installed", check.fix)
+    if on_npm is False:
+        return Check(check.name, "warn", f"{check.note}; {apps.NOT_ON_NPM}", check.fix)
+    return check
 
 
 def check_model(cfg, ping=True):
@@ -289,6 +295,18 @@ def check_command():
                  f"add this line to ~/.zprofile, then open a new Terminal window: {layout.path_line()}")
 
 
+def check_held():
+    """[a row] when the engine holds app saves back from prompts (`lflabs-memory held --count`), else []: they wait
+    for the user's confirm code, which `lflabs-memory held` shows."""
+    eng = engine_bin()
+    r = run([eng, "held", "--count"], timeout=15) if eng else None
+    n = int(r.out.strip()) if r and r.ok and r.out.strip().isdigit() else 0
+    if not n:
+        return []
+    return [Check("held back", "ok", f"{n} app save{'s' if n != 1 else ''} held back from prompts: {ENGINE} held "
+                  "shows them and their confirm codes")]
+
+
 def check_privacy(cfg):
     """What stays and what goes: the memory is on this Mac; background reading sends conversations to the user's own
     model (their Claude plan or API key)."""
@@ -312,11 +330,12 @@ def checks(ping=True):
     cfg = settings.load()
     db = _db()
     node = apps.node_status()
+    on_npm = apps.connector_on_npm() if not node[1] else True
     try:
-        return [check_engine(), check_data(db), check_models(), check_hook(), check_connector(), check_node(node),
-                check_model(cfg, ping), check_budget(db, cfg), check_backlog(db),
-                *(_no_tools(c, node) for c in (check_claude(), check_codex(), check_cursor())), check_command(),
-                check_privacy(cfg), check_backups()]
+        return [check_engine(), check_data(db), check_models(), check_hook(), check_connector(),
+                check_node(node, on_npm), check_model(cfg, ping), check_budget(db, cfg), check_backlog(db),
+                *(_no_tools(c, node, on_npm) for c in (check_claude(), check_codex(), check_cursor())),
+                check_command(), check_privacy(cfg), check_backups(), *check_held()]
     finally:
         if db is not None:
             db.close()

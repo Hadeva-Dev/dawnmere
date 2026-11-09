@@ -44,8 +44,9 @@ def healthy(mac, monkeypatch, tmp_path, backend_name="claude-cli"):
     mac.on("ps", [], 0, " 2-03:04:05\n")
     mac.add("ps")
     mac.add("lflabs-memory")
-    for prog in ("node", "npx", "zsh"):
+    for prog in ("node", "npx", "zsh", "npm"):
         mac.add(prog)
+    mac.on("npm", ["view"], 0, f"{layout.CONNECTOR_VERSION}\n")
     layout.engine_record().write_text(f"{mac.bin}/lflabs-memory\n")
     mac.on("node", ["--version"], 0, "v20.11.0\n")
     mac.on("claude", ["--version"], 0, "2.1.301 (Claude Code)\n")
@@ -157,6 +158,45 @@ def test_privacy_row_says_what_leaves_the_mac(mac, monkeypatch, tmp_path, connec
     assert ("privacy       ok    memory stored on this Mac; background reading off; Codex sessions off; chat index "
             "off; no telemetry") in text
     assert "local only" not in text
+
+
+def test_doctor_says_when_the_connector_is_not_on_npm(mac, monkeypatch, tmp_path, connector):
+    """Every app's MCP entry runs npx dawnmere-connector@X: if X is not published, none of them can start it."""
+    healthy(mac, monkeypatch, tmp_path)
+    mac.rules["npm"] = [[["view"], 1, "npm error code E404\nnpm error 404 No match found for version 9.9.9\n"]]
+    mac.save()
+    code, text = run_doctor()
+    want = f"the connector dawnmere-connector@{layout.CONNECTOR_VERSION} is not on npm yet: apps cannot start memory's tools"
+    for app in ("Claude Code", "Codex", "Cursor"):
+        assert next(x for x in text.splitlines() if x.startswith(app)).endswith(want) and f"{app:<14}warn" in text
+    assert ["view", f"dawnmere-connector@{layout.CONNECTOR_VERSION}", "version"] in mac.calls("npm")
+
+
+def test_doctor_offline_could_not_check_npm(mac, monkeypatch, tmp_path, connector):
+    healthy(mac, monkeypatch, tmp_path)
+    mac.rules["npm"] = [[["view"], 1, "npm error code ENOTFOUND\n"]]
+    mac.save()
+    code, text = run_doctor()
+    assert f"Node.js       ok    v20.11.0; could not check dawnmere-connector@{layout.CONNECTOR_VERSION} on npm" in text
+    assert "Codex         ok" in text and code == 0
+
+
+def test_doctor_remembers_the_connector_is_published(mac, monkeypatch, tmp_path, connector):
+    healthy(mac, monkeypatch, tmp_path)
+    run_doctor()
+    run_doctor()
+    assert len([c for c in mac.calls("npm") if c[:1] == ["view"]]) == 1, "asked once, then remembered"
+
+
+def test_doctor_counts_saves_held_back(mac, monkeypatch, tmp_path, connector):
+    healthy(mac, monkeypatch, tmp_path)
+    mac.on("lflabs-memory", ["held", "--count"], 0, "3\n")
+    code, text = run_doctor()
+    assert "held back     ok    3 app saves held back from prompts: lflabs-memory held shows them and their confirm " \
+           "codes" in text
+    mac.rules["lflabs-memory"] = [[["held", "--count"], 0, "0\n"]]
+    mac.save()
+    assert "held back" not in run_doctor()[1]
 
 
 def test_doctor_none_mode_line(mac, monkeypatch, tmp_path, connector):

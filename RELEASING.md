@@ -28,18 +28,26 @@ The engine checkout sits next to this repo as `../lflabs-memory-engine`.
    `pip download --require-hashes --only-binary :all: --no-deps -r constraints.txt` (uv tool install does not
    check the hashes in a constraints file), then `uv tool install --no-index --find-links` those files only; a
    release without constraints.txt is refused.
-3. **Tests before publishing.**
+3. **The connector on npm, before step 1's merge.** If `connector/package.json`'s version changed:
+   ```bash
+   (cd connector && npm ci && npm test && npm publish)   # dawnmere-connector X.Y.Z
+   npm view "dawnmere-connector@$(node -p "require('./connector/package.json').version")" version   # prints it
+   ```
+   Do this BEFORE merging the release PR to `main` (step 1): `plugin/.mcp.json` on `main` pins that version, and the
+   marketplace of a 0.1.5 install follows `main`, so a merged pin that is not published yet leaves those apps
+   unable to start memory's tools (doctor and setup say so).
+4. **Tests before publishing.**
    ```bash
    (cd cli && uv run pytest -q)
    (cd connector && npm ci && npm test && npm run test:bundle)
    ```
-4. **Claude Desktop extension.**
+5. **Claude Desktop extension.**
    ```bash
    (cd connector && npm run pack:mcpb) && cp connector/dawnmere-connector.mcpb dist/
    (cd dist && shasum -a 256 dawnmere-connector.mcpb >> SHA256SUMS)
    ```
-5. **Publish.** `gh release create "v$VERSION" dist/* --title "v$VERSION" --generate-notes`
-6. **Check the install line** in a throwaway home, with a UTF-8 locale like a real Terminal:
+6. **Publish.** `gh release create "v$VERSION" dist/* --title "v$VERSION" --generate-notes`
+7. **Check the install line** in a throwaway home, with a UTF-8 locale like a real Terminal:
    ```bash
    H=$(mktemp -d)
    env -i HOME="$H" PATH=/usr/bin:/bin:/usr/sbin LC_ALL=en_US.UTF-8 LFLABS_MEMORY_NO_SETUP=1 \

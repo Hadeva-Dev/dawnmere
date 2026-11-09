@@ -273,6 +273,9 @@ class RealSetup:
 
     def step_apps(self, ui):
         ui.step("Your apps", "running")
+        from .update import bump_pins  # an earlier setup's Codex and Cursor entries move to this connector version
+        bump_pins(lambda s: None, self.record)
+        self.save()
         order = [x for x in self.a.apps if x in apps.LABELS and apps.installed(x)]
         shown = [AppResult(apps.LABELS[x]) for x in order]
         for app, row in zip(order, shown):
@@ -313,6 +316,7 @@ class RealSetup:
         listed = run(["claude", "plugin", "list"], timeout=30)
         if listed.ok and SERVER in listed.out:
             if apps.marketplace_pinned():
+                self._drop_fallback()
                 return "plugin", None, True
             # an older install's marketplace (main's head, or another tag): its ref cannot be changed in place, so
             # remove it (that uninstalls the plugin too) and add it at this release's tag, as update does
@@ -321,6 +325,7 @@ class RealSetup:
             engine_record().write_text(self.engine + "\n")
         if self._cmd(["claude", "plugin", "marketplace", "add", apps.marketplace_source(), "--scope", "user"]).ok and \
                 self._cmd(["claude", "plugin", "install", f"{SERVER}@{MARKETPLACE}", "--scope", "user", "-y"]).ok:
+            self._drop_fallback()
             return "plugin", None, True
         # fallback: the MCP entry by claude mcp add, the hooks in settings.json
         if run(["claude", "mcp", "get", SERVER], timeout=30).ok:
@@ -330,6 +335,19 @@ class RealSetup:
                                 *apps.connector_args()]).ok
         _, fine = self._apply(apps.file_plans("claude-code", self.engine))
         return "MCP + hooks", None, mcp_ok and fine
+
+    def _drop_fallback(self):
+        """With the plugin installed, an earlier setup's fallback (its hooks in ~/.claude/settings.json, its MCP entry
+        by `claude mcp add`) would run every hook twice and list memory's tools twice: take out what install.json
+        says setup added, as uninstall does."""
+        from . import uninstall
+        for entry in [f for f in self.record["files"] if f.get("kind") == "claude-settings"]:
+            uninstall._file(entry, uninstall.Report(lambda s: None))
+            self.record["files"].remove(entry)
+        added = any(c.get("ok") and c["argv"][1:3] == ["mcp", "add"] for c in self.record["commands"])
+        if added and run(["claude", "mcp", "get", SERVER], timeout=30).ok:
+            self._cmd(["claude", "mcp", "remove", "--scope", "user", SERVER])
+        self.save()
 
     def wire_codex(self):
         changed, fine = self._apply(apps.file_plans("codex", self.engine))
@@ -354,6 +372,8 @@ class RealSetup:
 
     def step_check(self, ui):
         ui.step("Self-check", "running")
+        if apps.connector_on_npm() is False and hasattr(ui, "state"):
+            ui.state.problem = f"Setup is done, but {apps.NOT_ON_NPM}. Run {COMMAND} doctor once it is published."
         ok, seconds, why = checked(self.engine)
         if not ok:
             ui.step("Self-check", "failed", why)
