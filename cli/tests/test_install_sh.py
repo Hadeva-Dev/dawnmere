@@ -119,3 +119,21 @@ def test_render_fills_every_release_line(release):
     sha = hashlib.sha256((release.rel / CLI).read_bytes()).hexdigest()
     assert 'VERSION="0.2.0"' in text and f'CLI_SHA256="{sha}"' in text and f'CLI_WHEEL="{CLI}"' in text
     assert os.access(ROOT / "install.sh", os.X_OK) or True
+
+
+def test_path_advice_is_setups(release, tmp_path):
+    """Without setup to follow, install.sh gives setup's own PATH advice, checked the way setup and doctor check it
+    (zsh as a new Terminal window starts it). With setup to follow, setup says it at its end."""
+    from lflabs_memory_cli import layout
+    release.add("zsh")
+    release.on("zsh", ["-lic", "command -v dawnmere"], 1, "")
+    r = sh(release.script, {**release.env_vars, "LFLABS_MEMORY_NO_SETUP": "1"})
+    assert r.returncode == 0, r.stderr
+    tools = tmp_path / "tools-bin"
+    assert f'To run dawnmere later, add this line to ~/.zshrc:\n  export PATH="{tools}:$PATH"\n' in r.stdout
+    assert ["-lic", "command -v dawnmere"] in release.calls("zsh")
+    assert "add this line to ~/.zshrc:\n  " in layout.path_advice()
+    release.rules["zsh"] = []
+    release.save()
+    assert "~/.zshrc" not in sh(release.script, {**release.env_vars, "LFLABS_MEMORY_NO_SETUP": "1"}).stdout
+    assert "~/.zshrc" not in sh(release.script, release.env_vars).stdout

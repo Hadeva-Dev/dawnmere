@@ -115,6 +115,8 @@ def test_setup_end_to_end(box, capsys):
     assert models.check(models.manifest()) == {"embed": "ok", "rerank": "ok"}
     assert any(c[:1] == ["bootstrap"] for c in box.calls("launchctl"))
     assert ["purge", "7"] in box.calls("lflabs-memory"), "the self-check's memory is deleted for good"
+    assert layout.engine_record().read_text() == layout.engine_bin() + "\n", "the plugin's hooks run this path"
+    assert os.path.isabs(layout.engine_bin()) and "PATH" not in out
 
 
 def test_setup_dry_run_lists_changes(box):
@@ -159,7 +161,8 @@ def test_plugin_fallback_when_plugin_cli_fails(box, capsys):
             "dawnmere-connector@0.1.0"] in calls
     hooks = json.loads((box.home / ".claude/settings.json").read_text())["hooks"]
     assert set(hooks) == {"UserPromptSubmit", "SessionStart", "Stop", "SessionEnd"}
-    assert hooks["UserPromptSubmit"][0]["hooks"][0]["command"] == "lflabs-memory hook-prompt"
+    assert hooks["UserPromptSubmit"][0]["hooks"][0]["command"] == f"{box.bin}/lflabs-memory hook-prompt", \
+        "the absolute path, never one PATH has to find"
 
 
 def test_setup_writes_through_symlink(box, capsys):
@@ -380,3 +383,34 @@ def test_setup_reports_a_bootstrap_launchd_refused(box, capsys):
     assert code != 0, out + shown
     assert "did not start: launchctl exited 5" in shown + out
     assert "see ~/Library/Logs" not in shown + out
+
+
+def test_path_advice_when_a_new_terminal_would_not_find_dawnmere(box, capsys):
+    """Checked the way a new Terminal window starts zsh (login and interactive), so the advice is ~/.zshrc."""
+    box.on("zsh", ["-lic"], 1, "")
+    code, out = run_setup()
+    assert code == 0
+    assert ["-lic", "command -v dawnmere"] in box.calls("zsh")
+    assert 'To run dawnmere later, add this line to ~/.zshrc:\n  export PATH="' in out
+    box.rules["zsh"] = []
+    box.save()
+    assert "~/.zshrc" not in run_setup()[1]
+
+
+@pytest.mark.skipif(not os.path.exists("/bin/zsh"), reason="no zsh")
+def test_path_advice_and_check_agree(tmp_path, monkeypatch):
+    """The real zsh: the line the advice gives, put in ~/.zshrc, is what makes the check pass."""
+    home = tmp_path / "home"
+    tools = tmp_path / "tools bin"
+    tools.mkdir(parents=True)
+    home.mkdir()
+    (tools / "dawnmere").write_text("#!/bin/sh\n")
+    (tools / "dawnmere").chmod(0o755)
+    monkeypatch.setenv("HOME", str(home))
+    monkeypatch.setenv("PATH", "/usr/bin:/bin")
+    monkeypatch.setattr(layout, "tool_bin", lambda: str(tools))
+    assert not layout.on_shell_path()
+    advice = layout.path_advice()
+    assert advice.startswith("To run dawnmere later, add this line to ~/.zshrc:\n  ")
+    (home / ".zshrc").write_text(advice.splitlines()[1].strip() + "\n")
+    assert layout.on_shell_path()

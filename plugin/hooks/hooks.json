@@ -5,7 +5,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "lflabs-memory hook-prompt",
+            "command": "/bin/sh \"${CLAUDE_PLUGIN_ROOT}/scripts/engine\" hook-prompt",
             "timeout": 10
           }
         ]
@@ -16,7 +16,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "lflabs-memory hook-session-start",
+            "command": "/bin/sh \"${CLAUDE_PLUGIN_ROOT}/scripts/engine\" hook-session-start",
             "timeout": 120
           }
         ]
@@ -27,7 +27,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "lflabs-memory hook-activity",
+            "command": "/bin/sh \"${CLAUDE_PLUGIN_ROOT}/scripts/engine\" hook-activity",
             "timeout": 10
           }
         ]
@@ -38,7 +38,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "lflabs-memory hook-session-end",
+            "command": "/bin/sh \"${CLAUDE_PLUGIN_ROOT}/scripts/engine\" hook-session-end",
             "timeout": 10
           }
         ]

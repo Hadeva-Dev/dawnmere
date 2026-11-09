@@ -114,13 +114,13 @@ if ! "$UV" tool install --force --managed-python --python 3.12 "$TMP/$CLI_WHEEL"
 fi
 
 TOOLS=$("$UV" tool dir --bin 2>/dev/null || printf '%s' "$BIN")
-# shellcheck disable=SC2016  # the line to paste keeps a literal $PATH
-case ":$PATH:" in
-  *":$TOOLS:"*) ;;
-  *) printf 'To run dawnmere later, add this line to ~/.zshrc:\n  export PATH="%s:$PATH"\n' "$TOOLS" ;;
-esac
-
-[ -z "${LFLABS_MEMORY_NO_SETUP:-}" ] || exit 0
+if [ -n "${LFLABS_MEMORY_NO_SETUP:-}" ]; then
+  # setup's PATH advice, checked as setup and doctor check it: zsh as a new Terminal window starts it
+  # shellcheck disable=SC2016  # the line to paste keeps a literal $PATH
+  zsh -lic 'command -v dawnmere' </dev/null >/dev/null 2>&1 ||
+    printf 'To run dawnmere later, add this line to ~/.zshrc:\n  export PATH="%s:$PATH"\n' "$TOOLS"
+  exit 0
+fi
 rm -rf "$TMP"
 trap - EXIT INT TERM
 # Under `curl | sh` our stdin is the script itself: setup asks its questions on the terminal.

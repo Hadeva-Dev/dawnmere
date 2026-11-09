@@ -21,7 +21,7 @@ from pathlib import Path
 from . import apps, backend, edits, install_record, keychain, launchd, models, prompt, settings, sockets
 from .brand import COMMAND, PRODUCT, REPO
 from .layout import (CLI_DIST, CONNECTOR_VERSION, ENGINE, ENGINE_DIST, MARKETPLACE, SERVER, data_dir,
-                     engine_bin, home, short, uv_bin)
+                     engine_bin, engine_record, home, on_shell_path, path_advice, short, uv_bin)
 from .run import run
 from .screen import AppResult, Memory, Step, pick_memory, self_check_row
 
@@ -299,12 +299,11 @@ class RealSetup:
         listed = run(["claude", "plugin", "list"], timeout=30)
         if listed.ok and SERVER in listed.out:
             return "plugin", None, True
+        if os.path.isabs(self.engine):  # the plugin's hooks run this path (plugin/scripts/engine), never PATH's
+            engine_record().write_text(self.engine + "\n")
         source = os.environ.get("LFLABS_MEMORY_MARKETPLACE") or REPO  # a local checkout, for testing
         if self._cmd(["claude", "plugin", "marketplace", "add", source, "--scope", "user"]).ok and \
                 self._cmd(["claude", "plugin", "install", f"{SERVER}@{MARKETPLACE}", "--scope", "user", "-y"]).ok:
-            if not on_login_path():
-                self.left_alone.append(("claude-code", None, f"{ENGINE} is not on the PATH Claude Code's hooks see",
-                                        'export PATH="$HOME/.local/bin:$PATH"   (add to ~/.zshrc)'))
             return "plugin", None, True
         # fallback: the MCP entry by claude mcp add, the hooks in settings.json
         if run(["claude", "mcp", "get", SERVER], timeout=30).ok:
@@ -312,8 +311,7 @@ class RealSetup:
         else:
             mcp_ok = self._cmd(["claude", "mcp", "add", "--scope", "user", "--transport", "stdio", SERVER, "--", "npx",
                                 *apps.connector_args()]).ok
-        engine = ENGINE if on_login_path() else self.engine
-        _, fine = self._apply(apps.file_plans("claude-code", engine))
+        _, fine = self._apply(apps.file_plans("claude-code", self.engine))
         return "MCP + hooks", None, mcp_ok and fine
 
     def wire_codex(self):
@@ -352,11 +350,6 @@ class RealSetup:
             return False
         ui.step("Self-check", *self_check_row(seconds))
         return True
-
-
-def on_login_path():
-    """Whether a login shell finds the engine command (what Claude Code's hooks run)."""
-    return run(["zsh", "-lc", f"command -v {ENGINE}"], timeout=15).ok
 
 
 def _hook(engine, sub, payload, client=None):
@@ -487,6 +480,8 @@ def main(args, say=print):
                               f"{settings.DEFAULTS['llm']['daily_calls']} calls a day",
              "none": f"Background reading: off ({backend.NONE_LOSES})"}[a.backend])
         say(f"`{COMMAND} doctor` checks everything. `{COMMAND} uninstall` removes it all.")
+    if not on_shell_path():
+        say("\n" + path_advice())
     return code
 
 
