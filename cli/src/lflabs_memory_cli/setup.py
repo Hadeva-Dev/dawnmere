@@ -19,10 +19,11 @@ import time
 from importlib import metadata
 from pathlib import Path
 
-from . import access, apps, backend, claude_settings, edits, install_record, keychain, launchd, models, prompt, settings, sockets
-from .brand import COMMAND, PRODUCT
+from . import (access, apps, backend, claude_settings, edits, install_record, keychain, launchd, models, prompt,
+               screen, settings, sockets)
+from .brand import COMMAND, PRODUCT, REPO
 from .layout import (CLI_DIST, CONNECTOR_VERSION, ENGINE, ENGINE_DIST, MARKETPLACE, SERVER, data_dir,
-                     engine_bin, engine_record, home, lf_labs_dir, on_shell_path, path_advice, short, uv_bin)
+                     engine_bin, engine_record, find_claude, home, lf_labs_dir, on_shell_path, path_advice, short, uv_bin)
 from .run import run
 from .screen import AppResult, Memory, Step, pick_memory, self_check_row
 
@@ -485,7 +486,7 @@ def main(args, say=print):
     intro = full_show(args.show)
     if a.api_key and keychain.store(a.api_key):
         record["keychain"] = True
-    settings.save(settings.render(a.name, a.backend, a.model, a.codex_sessions))
+    settings.save(settings.render(a.name, a.backend, a.model, a.codex_sessions, claude_path=find_claude()))
     record["versions"] = {"cli": _version(CLI_DIST), "engine": _version(ENGINE_DIST), "connector": CONNECTOR_VERSION}
     install_record.save(record)
     work = RealSetup(a, record, say)
@@ -506,7 +507,23 @@ def main(args, say=print):
         say(f"`{COMMAND} doctor` checks everything. `{COMMAND} uninstall` removes it all.")
     if not on_shell_path():
         say("\n" + path_advice())
+    if code == 0 and not (args.plain or args.yes) and sys.stdin.isatty() and sys.stdout.isatty():
+        star_once(say)
     return code
+
+
+STAR = f"If {PRODUCT} helps, a star helps others find it: github.com/{REPO}"
+
+
+def star_once(say):
+    """One quiet line, once per Mac: a flag file in the data folder says it was shown (setup run again, or uninstall
+    with --keep-data, never shows it again; it goes with the data folder)."""
+    flag = data_dir() / ".star-shown"
+    if flag.exists():
+        return
+    grey = screen.detect()["color"]
+    say("\n" + screen.IND + (f"\x1b[38;5;{screen.GREY}m{STAR}\x1b[0m" if grey else STAR))
+    os.close(os.open(flag, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600))
 
 
 def _version(dist):

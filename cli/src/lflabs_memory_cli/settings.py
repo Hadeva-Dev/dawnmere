@@ -31,9 +31,9 @@ def _value(v):
     return ("true" if v else "false") if isinstance(v, bool) else str(v) if isinstance(v, int) else json.dumps(v)
 
 
-def render(owner_name, backend, main_model="haiku", codex_sessions=False):
+def render(owner_name, backend, main_model="haiku", codex_sessions=False, claude_path=None):
     cfg = json.loads(json.dumps(DEFAULTS))
-    cfg["llm"].update(backend=backend, main_model=main_model)
+    cfg["llm"].update(backend=backend, main_model=main_model, **({"claude_path": claude_path} if claude_path else {}))
     cfg["privacy"]["codex_sessions"] = codex_sessions
     lines = ["version = 1", 'profile = "generic"'] + ([f"owner_name = {_value(owner_name)}"] if owner_name else [])
     for section, values in cfg.items():

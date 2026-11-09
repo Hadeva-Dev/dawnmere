@@ -95,6 +95,22 @@ def on_shell_path():
     return run(["zsh", "-lic", f"command -v {COMMAND}"], timeout=15).ok
 
 
+def find_claude():
+    """Claude Code's absolute path as a new Terminal window finds it (login and interactive zsh: its PATH, or the
+    alias the old local installer made), else the claude on this PATH. The background service has launchd's fixed
+    PATH, so setup stores this in config.toml ([llm] claude_path). None when there is none."""
+    r = run(["zsh", "-lic", "whence -p claude || alias claude"], timeout=15)
+    for line in reversed((r.out or "").splitlines() if r.ok else []):
+        line = line.strip()
+        if line.split("=", 1)[0] in ("claude", "alias claude"):
+            line = line.split("=", 1)[1].strip().strip("'\"")
+        p = os.path.expanduser(line)
+        if os.path.isabs(p) and os.access(p, os.X_OK):
+            return p
+    found = shutil.which("claude")
+    return str(Path(found).absolute()) if found else None
+
+
 def path_line():
     return f'export PATH="{tool_bin()}:$PATH"'
 
