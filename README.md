@@ -83,13 +83,13 @@ Every app also gets four tools through MCP: `recall`, `remember`, `forget` and `
   Anthropic API key. You can also run with no model at all.
 - **Each app sees what you allow.** Cursor starts with work notes only, and a new app sees work notes only.
   Claude Code's and Claude Desktop's memory tools, and any app that only names itself, see work notes only for now.
-  Claude Code's automatic recall in your prompts still sees everything. Widening an app's access needs you: in
-  Claude Code or Codex you type it and click Allow in a macOS dialog; in Terminal you type the app's name back and
-  click Allow.
+  Claude Code's automatic recall in your prompts still sees everything. Widening an app's access needs you at a
+  Terminal: run `dawnmere access cursor everything`, type the app's name back and click Allow in a macOS dialog.
+  Asking for it in a chat only gets you that command.
   <!-- checked against v0.1.6 (406ee39/c3ed5b1): MCP tools of Claude Code, Claude Desktop and self-named apps see
        work only; the prompt hook sees everything; Terminal widening asks for the app's name and an Allow dialog
-       (access.py engine_widens). Not yet in 406ee39/c3ed5b1: the Allow dialog on a widening typed in Claude Code or
-       Codex, being added for v0.1.6; check it in the released code. -->
+       (access.py engine_widens). A widening typed in Claude Code or Codex is never applied;
+       the reply gives the Terminal command (engine 50ffd0b, typed widening refused). -->
 - **Saved text is screened.** Text that looks like an API key or token is refused. An app's save that would run
   downloaded code, delete files, keep something from you or speak to your assistant's instructions is refused. A
   rule, an instruction, or anything with a command or a link saved by an app is kept for search only, labelled, and
@@ -249,7 +249,7 @@ time, for example to add a model later.
 | `dawnmere setup` | connect your apps to one memory on this Mac |
 | `dawnmere doctor` | check that everything works, Node.js included, one line per check, with what to do about each problem |
 | `dawnmere export` | save your memory to `~/Downloads/dawnmere-export-<date>.json` (`--format md` for Markdown) |
-| `dawnmere import FILE` | add the memories from an export file, skipping any already there |
+| `dawnmere import FILE` | add the memories from an export file, skipping any already there; they count as app saves until you confirm them in one macOS dialog |
 | `dawnmere access APP [LEVEL]` | show what an app may see, or change it: `everything`, `nothing-personal`, `work` or `nothing` (only Cursor can be widened from here) |
 | `dawnmere update` | install the newest release, checked against its checksums |
 | `dawnmere uninstall` | remove everything setup added |

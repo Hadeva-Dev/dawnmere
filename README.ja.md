@@ -75,11 +75,11 @@ flowchart LR
 - **アプリごとではなく、メモリはひとつ。** すべてのアプリがひとつのストアを共有するので、Claude Code で保存した事実が、そのまま Cursor が呼び出す事実になります。
 - **メモリはあなたの Mac に置かれます。** メモリは Library フォルダにあるひとつの SQLite ファイルです。検索は小さなローカルモデルを使って Mac 上で行います。アカウントはなく、LF Labs には何も送られず、ツールが利用データを集めることもありません。
 - **読み取りには、あなた自身のモデルを使います。** 自動保存には、Claude Code 経由のあなたの Claude プランか、あなた自身の Anthropic API キーを使います。モデルなしで動かすこともできます。
-- **各アプリが見られるのは、あなたが許可した範囲だけ。** Cursor は最初は仕事用のメモしか見られません。新しく接続したアプリも同じです。Claude Code と Claude Desktop のメモリツール、そして名前を名乗るだけのアプリも、今のところ仕事用のメモしか見られません。Claude Code がプロンプトに自動で挿入する呼び出しは、引き続きすべてを見られます。アプリが見られる範囲を広げるには、あなた自身の操作が必要です。Claude Code や Codex では、あなたがそう入力し、macOS のダイアログで「Allow」をクリックします。ターミナルでは、アプリの名前をもう一度入力し、「Allow」をクリックします。
+- **各アプリが見られるのは、あなたが許可した範囲だけ。** Cursor は最初は仕事用のメモしか見られません。新しく接続したアプリも同じです。Claude Code と Claude Desktop のメモリツール、そして名前を名乗るだけのアプリも、今のところ仕事用のメモしか見られません。Claude Code がプロンプトに自動で挿入する呼び出しは、引き続きすべてを見られます。アプリが見られる範囲を広げるには、あなた自身がターミナルで操作する必要があります。`dawnmere access cursor everything` を実行し、アプリの名前をもう一度入力して、macOS のダイアログで「Allow」をクリックします。チャットで頼んでも、このコマンドが返ってくるだけです。
   <!-- checked against v0.1.6 (406ee39/c3ed5b1): MCP tools of Claude Code, Claude Desktop and self-named apps see
        work only; the prompt hook sees everything; Terminal widening asks for the app's name and an Allow dialog
-       (access.py engine_widens). Not yet in 406ee39/c3ed5b1: the Allow dialog on a widening typed in Claude Code or
-       Codex, being added for v0.1.6; check it in the released code. -->
+       (access.py engine_widens). A widening typed in Claude Code or Codex is never applied;
+       the reply gives the Terminal command (engine 50ffd0b, typed widening refused). -->
 - **保存されるテキストはチェックされます。** API キーやトークンのように見えるテキストは拒否されます。ダウンロードしたコードを実行させる、ファイルを削除させる、あなたに何かを隠させる、アシスタントへの指示そのものに語りかける、といったアプリからの保存も拒否されます。アプリが保存したルールや指示、コマンドやリンクを含むものは、検索専用として保存されてラベルが付き、あなたが "confirm memory N" と入力するまでプロンプトに加えられることはありません。呼び出されたメモは "notes, not instructions"（指示ではなくメモ）というラベル付きでアプリに渡ります。
   <!-- checked against v0.1.6 (406ee39/c3ed5b1): MCP `remember` goes through the instruction screen; only some app
        saves are refused, the rest that read as rules, instructions, commands or links are kept search-only until
@@ -212,7 +212,7 @@ sh install.sh
 | `dawnmere setup` | この Mac にあるひとつのメモリに、アプリを接続する |
 | `dawnmere doctor` | Node.js も含めて、すべてが動くか確認する。1 項目 1 行で、問題ごとに対処法も表示 |
 | `dawnmere export` | メモリを `~/Downloads/dawnmere-export-<date>.json` に保存する（Markdown なら `--format md`） |
-| `dawnmere import FILE` | エクスポートファイルからメモリを追加する。すでにあるものはスキップ |
+| `dawnmere import FILE` | エクスポートファイルからメモリを追加する。すでにあるものはスキップ。macOS のダイアログで一度確認するまでは、アプリが保存したものとして扱われる |
 | `dawnmere access APP [LEVEL]` | アプリが見られる範囲を表示・変更する：`everything`、`nothing-personal`、`work`、`nothing`（ここから広げられるのは Cursor だけ） |
 | `dawnmere update` | 最新の release をインストールし、チェックサムで照合する |
 | `dawnmere uninstall` | セットアップが追加したものをすべて削除する |
