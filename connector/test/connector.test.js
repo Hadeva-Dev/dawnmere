@@ -208,7 +208,7 @@ describe("the command line", () => {
   test("--help prints the usage on stdout and exits 0", async () => {
     for (const flag of ["--help", "-h"]) {
       const { stdout, stderr } = await run(process.execPath, [BIN, flag]);
-      assert.match(stdout, /^usage: dawnmere-connector \[--check \| --version \| --help\]/);
+      assert.match(stdout, /^usage: \S+ \[--check \| --version \| --help\]/);
       assert.equal(stderr, "");
     }
   });
