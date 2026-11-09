@@ -59,7 +59,7 @@ def sh(script, env):
 def test_install_sh_posix():
     r = subprocess.run(["shellcheck", "-s", "sh", str(ROOT / "install.sh")], capture_output=True, text=True)
     assert r.returncode == 0, r.stdout
-    assert len((ROOT / "install.sh").read_text().splitlines()) <= 150
+    assert len((ROOT / "install.sh").read_text().splitlines()) <= 180  # 150 until retries and the API fallback
 
 
 def test_source_copy_refuses(release):
@@ -203,3 +203,108 @@ def test_progress_bar_follows_the_locale(release, locale, cell):
     bars = [line for line in r.stdout.replace("\r", "\n").splitlines() if line.startswith("Downloading  ")]
     assert bars and f"Downloading  {cell * 12}" in r.stdout.replace("\r", "\n")
     assert ("─" in r.stdout) == (cell == "─")
+
+
+
+class GitHub:
+    """A local stand-in for github.com's release downloads and api.github.com: each path answers 504 as many times
+    as told, then the file. Asset ids as the API gives them."""
+
+    def __init__(self, rel, fail=None, accept=True):
+        import http.server
+        import threading
+        self.rel, self.fail, self.hits = rel, dict(fail or {}), []
+        names = sorted(p.name for p in rel.iterdir())
+        self.ids = {n: 100 + i for i, n in enumerate(names)}
+        outer = self
+
+        class H(http.server.BaseHTTPRequestHandler):
+            def log_message(self, *a):
+                pass
+
+            def do_GET(self):
+                outer.hits.append((self.path, self.headers.get("Accept")))
+                left = next((k for k in outer.fail if self.path.startswith(k) and outer.fail[k] != 0), None)
+                if left:
+                    outer.fail[left] -= 1
+                    return self.send_error(504)
+                if self.path.startswith("/dl/"):
+                    return self.reply((outer.rel / self.path[4:]).read_bytes())
+                if self.path == "/api/repos/Hadeva-Dev/dawnmere/releases/tags/v0.2.0":
+                    return self.reply(json.dumps({"assets": [{"name": n, "id": i} for n, i in outer.ids.items()]})
+                                      .encode())
+                if self.path.startswith("/api/repos/Hadeva-Dev/dawnmere/releases/assets/"):
+                    if self.headers.get("Accept") != "application/octet-stream":
+                        return self.reply(b'{"json": "metadata, not the file"}')
+                    i = int(self.path.rsplit("/", 1)[1])
+                    return self.reply((outer.rel / next(n for n, x in outer.ids.items() if x == i)).read_bytes())
+                self.send_error(404)
+
+            def reply(self, body):
+                self.send_response(200)
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+        self.server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), H)
+        threading.Thread(target=self.server.serve_forever, daemon=True).start()
+        self.url = f"http://127.0.0.1:{self.server.server_port}"
+
+    def env(self, base):
+        return {**base, "LFLABS_MEMORY_RELEASE_BASE": f"{self.url}/dl", "LFLABS_MEMORY_API_BASE": f"{self.url}/api"}
+
+    def close(self):
+        self.server.shutdown()
+        self.server.server_close()
+
+
+def test_downloads_are_retried(release):
+    gh = GitHub(release.rel, {f"/dl/{CLI}": 2})
+    try:
+        r = sh(release.script, gh.env(release.env_vars))
+        assert r.returncode == 0, r.stderr
+        assert [p for p, _ in gh.hits].count(f"/dl/{CLI}") == 3, "two 504s, then the file"
+    finally:
+        gh.close()
+
+
+def test_downloads_fall_back_to_the_api(release):
+    """The release URL keeps failing: the same files through api.github.com, by asset id, as octet-stream; the
+    checksums are checked as ever."""
+    gh = GitHub(release.rel, {"/dl/": -1})
+    try:
+        r = sh(release.script, {**gh.env(release.env_vars), "LFLABS_MEMORY_RETRIES": "1"})
+        assert r.returncode == 0, r.stderr
+        assert "Checksums ok" in r.stdout
+        got = [(p, a) for p, a in gh.hits if "/releases/assets/" in p]
+        assert len(got) == 3 and all(a == "application/octet-stream" for _, a in got)
+    finally:
+        gh.close()
+
+
+def test_a_download_that_never_comes_says_so_once(release):
+    gh = GitHub(release.rel, {"/dl/": -1, "/api/": -1})
+    try:
+        r = sh(release.script, {**gh.env(release.env_vars), "LFLABS_MEMORY_RETRIES": "1"})
+        assert r.returncode != 0
+        assert r.stderr.strip().splitlines()[-1] == (f"Could not download {CLI}: GitHub did not answer. Check the "
+                                                     "connection and run the install line again.")
+        assert not installs(release)
+    finally:
+        gh.close()
+
+
+def test_an_old_curl_is_retried_by_a_loop(release, tmp_path):
+    """A curl without --retry-all-errors (older than 7.71): the loop retries instead."""
+    old = tmp_path / "oldcurl"
+    old.mkdir()
+    (old / "curl").write_text('#!/bin/sh\n[ "$1" = --help ] && { echo "--retry <num>"; exit 0; }\n'
+                              'exec /usr/bin/curl "$@"\n')
+    (old / "curl").chmod(0o755)
+    gh = GitHub(release.rel, {f"/dl/{CLI}": 1})
+    try:
+        env = gh.env(release.env_vars)
+        r = sh(release.script, {**env, "PATH": f"{old}:{env['PATH']}", "LFLABS_MEMORY_RETRIES": "2"})
+        assert r.returncode == 0, r.stderr
+        assert [p for p, _ in gh.hits].count(f"/dl/{CLI}") == 2
+    finally:
+        gh.close()

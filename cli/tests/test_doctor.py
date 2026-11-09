@@ -442,10 +442,10 @@ def test_models_download_checks_checksums(tmp_path):
     (src / "embed/model.onnx").write_bytes(b"weights" * 100)
     man = engine_models.build(src, "models-2026-10-28", files={"embed": ("model.onnx",)})
     assert man["models"]["embed"][0]["url"].endswith("/models-2026-10-28/embed-model.onnx")
-    served = {"good": b"weights" * 100, "bad": b"evil" * 100}
+    served = {"good": b"weights" * 100, "bad": b"evil" * 175}
     for which in ("good", "bad"):
         dest = tmp_path / which
-        opener = lambda url, timeout: io.BytesIO(served[which])  # noqa: E731
+        opener = lambda req, timeout: io.BytesIO(served[which])  # noqa: E731
         if which == "good":
             models.download(man, ["embed"], where=dest, opener=opener)
             assert models.check(man, dest) == {"embed": "ok"}
@@ -488,3 +488,129 @@ def test_first_day_wording(mac, monkeypatch, tmp_path):
     out = []
     export.export(str(tmp_path / "x.json"), say=out.append)
     assert out[0].startswith("Exported 1 memory to ")
+
+
+# ---------- model downloads: retried, resumed ----------
+
+class Flaky:
+    """A model server: serves body, honours Range with 206, and fails as told: a list of "reset" (half the bytes, then
+    the connection drops), "down" (refused) or "full" (ignores Range: the whole file with 200)."""
+
+    def __init__(self, body, script):
+        self.body, self.script, self.ranges = body, list(script), []
+
+    def __call__(self, req, timeout=60):
+        import io
+        rng = req.get_header("Range")
+        self.ranges.append(rng)
+        how = self.script.pop(0) if self.script else "ok"
+        if how == "down":
+            raise OSError("connection refused")
+        start = int(rng[6:-1]) if rng and how != "full" else 0
+        data = self.body[start:]
+        status = 206 if start else 200
+        outer = self
+
+        class R(io.BytesIO):
+            def __init__(self):
+                super().__init__(data)
+                self.status, self.sent = status, 0
+
+            def read(self, n=-1):
+                chunk = super().read(n)
+                if how == "reset" and self.tell() > len(data) // 2:
+                    raise ConnectionResetError("reset by peer")
+                return chunk
+        outer.last = R
+        return R()
+
+
+def a_model(tmp_path, body=b"weights" * 30000):
+    return {"release": "m", "models": {"embed": [{"file": "model.onnx", "url": "https://x/embed", "size": len(body),
+                                                  "sha256": hashlib.sha256(body).hexdigest()}]}}, body
+
+
+def test_model_download_retries_and_resumes(tmp_path):
+    man, body = a_model(tmp_path)
+    server, waits = Flaky(body, ["down", "reset"]), []
+    models.download(man, ["embed"], where=tmp_path, opener=server, sleep=waits.append)
+    assert (tmp_path / "embed/model.onnx").read_bytes() == body
+    assert server.ranges[:2] == [None, None] and server.ranges[2].startswith("bytes=") and server.ranges[2] != "bytes=0-"
+    assert waits == [1, 2], "backing off"
+    assert not list(tmp_path.rglob("*.part"))
+
+
+def test_model_download_restarts_when_range_is_ignored(tmp_path):
+    man, body = a_model(tmp_path)
+    models.download(man, ["embed"], where=tmp_path, opener=Flaky(body, ["reset", "full"]), sleep=lambda s: None)
+    assert (tmp_path / "embed/model.onnx").read_bytes() == body
+
+
+def test_a_failed_download_keeps_its_part_for_next_time(tmp_path):
+    man, body = a_model(tmp_path)
+    with pytest.raises(models.DownloadError) as e:
+        models.download(man, ["embed"], where=tmp_path, opener=Flaky(body, ["reset"] + ["down"] * 9),
+                        sleep=lambda s: None)
+    assert list(e.value.missing) == ["embed"]
+    have = (tmp_path / "embed/model.onnx.part").stat().st_size
+    assert 0 < have < len(body)
+    server = Flaky(body, [])
+    models.download(man, ["embed"], where=tmp_path, opener=server, sleep=lambda s: None)
+    assert server.ranges == [f"bytes={have}-"], "the next run goes on from where this one stopped"
+    assert (tmp_path / "embed/model.onnx").read_bytes() == body
+
+
+def test_update_fetch_retries(monkeypatch):
+    """GitHub's 504s: each request is tried again, 2 s apart, up to 6 times."""
+    import io
+    import urllib.error
+    tries, waits = [], []
+
+    def urlopen(req, timeout):
+        tries.append(req.full_url)
+        if len(tries) < 3:
+            raise urllib.error.HTTPError(req.full_url, 504, "Gateway Timeout", {}, None)
+        return io.BytesIO(b"ok")
+    monkeypatch.setattr(update.urllib.request, "urlopen", urlopen)
+    assert update.fetch("https://x/y", sleep=waits.append) == b"ok"
+    assert len(tries) == 3 and waits == [2, 2]
+    tries.clear()
+    monkeypatch.setattr(update.urllib.request, "urlopen", lambda req, timeout: (_ for _ in ()).throw(OSError("down")))
+    with pytest.raises(OSError):
+        update.fetch("https://x/y", sleep=waits.append)
+
+
+def test_update_falls_back_to_the_api_asset(mac, monkeypatch, tmp_path):
+    """A release file the download URL will not give: the same file by its API URL (octet-stream), checked as ever."""
+    monkeypatch.setattr(update, "installed_version", lambda: "0.1.0")
+    gh = fake_github({"0.2.0": wheelset("0.2.0")})
+    asked = []
+
+    def get(url):
+        asked.append(url)
+        if url.startswith("https://dl/"):
+            raise OSError("504")
+        if url.startswith("https://api.github.com/repos/Hadeva-Dev/dawnmere/releases/assets/"):
+            return gh("https://dl/0.2.0/" + url.rsplit("/", 1)[1])
+        doc = json.loads(gh(url))
+        for a in doc["assets"]:
+            a["url"] = "https://api.github.com/repos/Hadeva-Dev/dawnmere/releases/assets/" + a["name"]
+        return json.dumps(doc).encode()
+    rel = update.release(get=get)
+    paths = update.wheels(rel, get, tmp_path)
+    assert [p.name for p in paths] == ["lflabs_memory_cli-0.2.0-py3-none-any.whl",
+                                       "lflabs_memory_engine-0.2.0-py3-none-any.whl", "constraints.txt"]
+    assert any("/releases/assets/SHA256SUMS" in u for u in asked)
+
+
+def test_update_asks_the_api_for_the_file_itself(monkeypatch):
+    seen = []
+
+    def urlopen(req, timeout):
+        import io
+        seen.append(req.get_header("Accept"))
+        return io.BytesIO(b"x")
+    monkeypatch.setattr(update.urllib.request, "urlopen", urlopen)
+    update.fetch("https://api.github.com/repos/o/r/releases/assets/7")
+    update.fetch("https://api.github.com/repos/o/r/releases/latest")
+    assert seen == ["application/octet-stream", "application/vnd.github+json"]
