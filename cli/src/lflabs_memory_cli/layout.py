@@ -10,7 +10,7 @@ from .run import run
 SERVER = "lflabs-memory"                 # our MCP entry in every app's config, and the Claude Code plugin's name
 ENGINE = "lflabs-memory"                 # the engine's console script
 CONNECTOR = f"{COMMAND}-connector"       # the npm package apps run to reach the engine: the one branded identifier
-CONNECTOR_VERSION = "0.1.0"
+CONNECTOR_VERSION = "0.1.1"
 CLIENT_ENV = "LFLABS_MEMORY_CLIENT"
 MARKETPLACE = "lflabs"                   # .claude-plugin/marketplace.json's name
 LABEL = "com.lflabs.memory"              # the LaunchAgent

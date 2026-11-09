@@ -17,8 +17,10 @@ const pluginMcp = json("../plugin/.mcp.json");
 const market = json("../.claude-plugin/marketplace.json");
 
 test("one version everywhere", () => {
-  for (const v of [pkg.version, server.version, server.packages[0].version, manifest.version, plugin.version,
-    market.plugins[0].version]) assert.equal(v, VERSION);
+  for (const v of [pkg.version, server.version, server.packages[0].version, manifest.version]) assert.equal(v, VERSION);
+  // the Claude Code plugin ships with each CLI release (its marketplace is pinned to that tag, cli/tests
+  // test_versions_agree): its own version is the CLI's, and it runs this connector's version
+  assert.equal(plugin.version, market.plugins[0].version);
   assert.deepEqual(pluginMcp.mcpServers["lflabs-memory"].args, ["-y", `${pkg.name}@${VERSION}`]);
 });
 

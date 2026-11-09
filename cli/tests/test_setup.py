@@ -112,7 +112,7 @@ def test_setup_end_to_end(box, capsys):
     version = importlib.metadata.version("lflabs-memory-cli")
     assert ["plugin", "marketplace", "add", f"Hadeva-Dev/dawnmere#v{version}", "--scope", "user"] in \
         box.calls("claude"), "the plugin at the release tag the wheels come from, never main's head"
-    assert "dawnmere-connector@0.1.0" in (box.home / ".codex/config.toml").read_text()
+    assert "dawnmere-connector@0.1.1" in (box.home / ".codex/config.toml").read_text()
     assert "hook-cursor-start" in (box.home / ".cursor/hooks.json").read_text()
     assert (layout.data_dir() / "config.toml").read_text().startswith('version = 1\nprofile = "generic"')
     assert oct(os.stat(layout.data_dir() / "config.toml").st_mode & 0o777) == "0o600"
@@ -131,7 +131,7 @@ def test_setup_dry_run_lists_changes(box):
     assert code == 0
     assert tree(box.home) == before and not (layout.data_dir() / "config.toml").exists()
     assert box.calls("launchctl") == [] and not [c for c in box.calls("claude") if c[:1] == ["plugin"]]
-    for line in ("~/.codex/config.toml: add [mcp_servers.lflabs-memory]", 'args = ["-y", "dawnmere-connector@0.1.0"]',
+    for line in ("~/.codex/config.toml: add [mcp_servers.lflabs-memory]", 'args = ["-y", "dawnmere-connector@0.1.1"]',
                  "~/.cursor/mcp.json: add mcpServers.\"lflabs-memory\"", "claude plugin install lflabs-memory@lflabs",
                  'LFLABS_MEMORY_CLIENT = "codex"', "hook-cursor-start"):
         assert line in out, line
@@ -154,7 +154,7 @@ def test_setup_leaves_jsonc_alone(box, capsys):
     assert code == 0
     assert (box.home / ".cursor/mcp.json").read_text() == jsonc
     assert "~/.cursor/mcp.json: is not plain JSON (comments?): left alone; add this by hand" in out
-    assert '"dawnmere-connector@0.1.0"' in out, "the lines to add are printed"
+    assert '"dawnmere-connector@0.1.1"' in out, "the lines to add are printed"
 
 
 def test_plugin_fallback_when_plugin_cli_fails(box, capsys):
@@ -162,7 +162,7 @@ def test_plugin_fallback_when_plugin_cli_fails(box, capsys):
     assert run_setup()[0] == 0
     calls = box.calls("claude")
     assert ["mcp", "add", "--scope", "user", "--transport", "stdio", "lflabs-memory", "--", "npx", "-y",
-            "dawnmere-connector@0.1.0"] in calls
+            "dawnmere-connector@0.1.1"] in calls
     hooks = json.loads((box.home / ".claude/settings.json").read_text())["hooks"]
     assert set(hooks) == {"UserPromptSubmit", "SessionStart", "Stop", "SessionEnd"}
     assert hooks["UserPromptSubmit"][0]["hooks"][0]["command"] == f"{box.bin}/lflabs-memory hook-prompt", \
