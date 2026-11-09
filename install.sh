@@ -45,6 +45,8 @@ TMP=$(mktemp -d)
 trap 'rm -rf "$TMP"' EXIT INT TERM
 
 # One progress line for everything downloaded, redrawn in place: "Downloading  ──────      12.4 / 31.0 MB".
+# Box drawing under a UTF-8 locale only, decided as setup's screen decides (the first of LC_ALL, LC_CTYPE, LANG).
+case ${LC_ALL:-${LC_CTYPE:-${LANG:-}}} in *[Uu][Tt][Ff]-8* | *[Uu][Tt][Ff]8*) CELL="─" ;; *) CELL="-" ;; esac
 TOTAL=0
 progress() {
   got=$(cat "$TMP"/dl.* 2>/dev/null | wc -c | tr -d ' ')
@@ -53,7 +55,7 @@ progress() {
   [ "$cells" -le 12 ] || cells=12
   bar="" i=0
   while [ "$i" -lt 12 ]; do
-    if [ "$i" -lt "$cells" ]; then bar="${bar}─"; else bar="$bar "; fi
+    if [ "$i" -lt "$cells" ]; then bar="${bar}${CELL}"; else bar="$bar "; fi
     i=$((i + 1))
   done
   printf '\rDownloading  %s  %s / %s MB ' "$bar" \

@@ -191,3 +191,15 @@ def test_no_terminal_means_no_setup(release):
     assert release.calls("dawnmere") == []
     assert ("There is no terminal for setup's questions, so no app was changed. Run \"dawnmere setup\" in a "
             "Terminal window, or \"dawnmere setup --yes\" to take the defaults.") in " ".join(r.stdout.split())
+
+
+@pytest.mark.parametrize("locale,cell", [({"LC_ALL": "C"}, "-"), ({"LANG": "en_US.UTF-8"}, "─"),
+                                         ({"LC_ALL": "en_US.ISO8859-1", "LANG": "en_US.UTF-8"}, "-"),
+                                         ({"LC_CTYPE": "UTF-8"}, "─"), ({}, "-")])
+def test_progress_bar_follows_the_locale(release, locale, cell):
+    """Box drawing only under a UTF-8 locale, decided as setup's screen decides (LC_ALL, LC_CTYPE, LANG)."""
+    r = sh(release.script, {**release.env_vars, **locale})
+    assert r.returncode == 0, r.stderr
+    bars = [line for line in r.stdout.replace("\r", "\n").splitlines() if line.startswith("Downloading  ")]
+    assert bars and f"Downloading  {cell * 12}" in r.stdout.replace("\r", "\n")
+    assert ("─" in r.stdout) == (cell == "─")
