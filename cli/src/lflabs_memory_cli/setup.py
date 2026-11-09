@@ -19,7 +19,7 @@ import time
 from importlib import metadata
 from pathlib import Path
 
-from . import apps, backend, edits, install_record, keychain, launchd, models, prompt, settings, sockets
+from . import access, apps, backend, edits, install_record, keychain, launchd, models, prompt, settings, sockets
 from .brand import COMMAND, PRODUCT
 from .layout import (CLI_DIST, CONNECTOR_VERSION, ENGINE, ENGINE_DIST, MARKETPLACE, SERVER, data_dir,
                      engine_bin, engine_record, home, lf_labs_dir, on_shell_path, path_advice, short, uv_bin)
@@ -137,7 +137,7 @@ def ask(args, say):
         say(f"Memory will run without a model: {backend.NONE_LOSES}. `{COMMAND} setup` again to add one later.")
     if args.only:
         a.apps = [x.strip() for x in args.only.split(",") if x.strip()]
-    if "cursor" in a.apps and apps.installed("cursor"):
+    if "cursor" in a.apps and apps.installed("cursor") and not access.agent_shell():  # never offered to an agent
         a.cursor_personal = prompt.yes_no(f"Let Cursor see your personal notes too? (Change it any time: {COMMAND} "
                                           "access cursor work)", False, assume=False if args.yes else None)
     if args.no_import or not list(claude_notes()):
@@ -318,16 +318,9 @@ class RealSetup:
         changed, fine = self._apply(apps.file_plans("codex", self.engine))
         return "MCP + hook", apps.HINTS["codex"] if changed else None, fine
 
-    def wire_cursor(self):
+    def wire_cursor(self):  # work only: a yes to personal notes is confirmed after the screen (access.main)
         changed, fine = self._apply(apps.file_plans("cursor", self.engine))
-        if not (fine and self.a.cursor_personal):
-            return "MCP", apps.HINTS["cursor"] if changed else None, fine
-        from . import access  # the key goes into Cursor's own files and the engine keeps its hash; never shown
-        widened = access.widen_cursor(self.engine, self.record,
-                                      say=lambda s: self.left_alone.append(("cursor", None, s, ""))) and \
-            access.set_level(self.engine, "cursor", "everything")
-        self.save()
-        return ("MCP (all)" if widened else "MCP"), apps.HINTS["cursor"], True
+        return "MCP", apps.HINTS["cursor"] if changed else None, fine
 
     def step_notes(self, ui):
         ui.step("Your notes", "running")
@@ -475,6 +468,8 @@ def main(args, say=print):
     work = RealSetup(a, record, say)
     work.problem = node
     code = play(work, intro=intro, plain=args.plain, animate=not args.no_animation)
+    if code == 0 and a.cursor_personal:  # widening needs the person to confirm it, here as in `access` itself
+        access.main("cursor", "everything", work.engine, say=say)
     for app, path, note, snippet in work.left_alone:
         say(f"\n{apps.LABELS.get(app, app)}: {short(path) + ': ' if path else ''}{note}")
         if snippet:
