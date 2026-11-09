@@ -210,9 +210,59 @@ def fake_github(versions):
     return get
 
 
-def wheelset(v):
+def wheelset(v, constraints=True):
     return {f"lflabs_memory_cli-{v}-py3-none-any.whl": f"cli {v}".encode(),
-            f"lflabs_memory_engine-{v}-py3-none-any.whl": f"engine {v}".encode()}
+            f"lflabs_memory_engine-{v}-py3-none-any.whl": f"engine {v}".encode(),
+            **({"constraints.txt": f"idna==3.{v[-1]}\n".encode()} if constraints else {})}
+
+
+def uv_installs(mac):
+    return [c for c in mac.calls("uv") if c[:2] in (["tool", "install"], ["pip", "install"])]
+
+
+def test_update_pins_and_checks_every_dependency(mac, monkeypatch, tmp_path):
+    """The release's constraints.txt, checked against SHA256SUMS: the versions for uv tool install, then the hashes
+    by a reinstall (uv tool install does not check hashes). Then the new program finishes."""
+    monkeypatch.setattr(update, "installed_version", lambda: "0.1.0")
+    mac.on("uv", ["tool", "dir"], 0, str(tmp_path / "tools"))
+    finished = []
+    monkeypatch.setattr(update.os, "execvp", lambda prog, argv: finished.append(argv))
+    seen = {}
+    real = update.run
+
+    def run(argv, **kw):
+        if argv[1:3] == ["tool", "install"]:
+            seen["lock"] = open(argv[argv.index("-c") + 1]).read()
+        return real(argv, **kw)
+    monkeypatch.setattr(update, "run", run)
+    update.main(yes=True, say=lambda s: None, get=fake_github({"0.2.0": wheelset("0.2.0")}))
+    install, verify = uv_installs(mac)
+    assert "--no-build" in install and seen["lock"] == "idna==3.0\n"
+    assert verify[2:4] == ["--python", str(tmp_path / "tools/lflabs-memory-cli/bin/python")]
+    assert verify[4:-1] == ["--reinstall", "--no-deps", "--no-build", "--require-hashes", "-r"]
+    assert finished and finished[0][1:] == ["update", "--finish", "0.1.0"]
+
+
+def test_update_refuses_a_release_without_constraints(mac, monkeypatch):
+    monkeypatch.setattr(update, "installed_version", lambda: "0.1.0")
+    out = []
+    assert update.main(yes=True, say=out.append, get=fake_github({"0.2.0": wheelset("0.2.0", False)})) == 1
+    assert out[-1] == "Update stopped: the release has no checked constraints.txt: nothing was installed"
+    assert uv_installs(mac) == []
+
+
+def test_update_puts_the_old_release_back_when_a_hash_differs(mac, monkeypatch, tmp_path):
+    monkeypatch.setattr(update, "installed_version", lambda: "0.1.0")
+    mac.on("uv", ["tool", "dir"], 0, str(tmp_path / "tools"))
+    mac.on("uv", ["pip", "install"], 1, "")
+    out = []
+    get = fake_github({"0.1.0": wheelset("0.1.0", False), "0.2.0": wheelset("0.2.0")})
+    assert update.main(yes=True, say=out.append, get=get) == 1
+    assert any(x.startswith("Update stopped: a dependency did not match the hashes this release was tested with")
+               for x in out)
+    assert out[-1] == "Back on 0.1.0."
+    last = uv_installs(mac)[-1]
+    assert last[:2] == ["tool", "install"] and "lflabs_memory_cli-0.1.0-py3-none-any.whl" in last[6]
 
 
 def test_update_check_only(mac, monkeypatch):
@@ -257,7 +307,7 @@ def test_update_rolls_back_on_failed_migration(mac, monkeypatch):
         return real_run(argv, **kw)
     monkeypatch.setattr(update, "run", run)
     monkeypatch.setattr(models, "manifest", lambda: None)
-    get = fake_github({"0.1.0": wheelset("0.1.0"), "0.2.0": wheelset("0.2.0")})
+    get = fake_github({"0.1.0": wheelset("0.1.0", False), "0.2.0": wheelset("0.2.0")})
     out = []
     assert update.finish("0.1.0", say=out.append, get=get) == 1
     rows = sqlite3.connect(data / "memory.db").execute("select content from memories").fetchall()
@@ -265,6 +315,8 @@ def test_update_rolls_back_on_failed_migration(mac, monkeypatch):
     installs = [c for c in mac.calls("uv") if c[:2] == ["tool", "install"]]
     assert installs and "lflabs_memory_cli-0.1.0-py3-none-any.whl" in installs[-1][6] and "--managed-python" in installs[-1]
     assert installs[-1][-2:] == ["--with-executables-from", "lflabs-memory-engine"]
+    assert "-c" not in installs[-1], "0.1.0 has no constraints.txt: back on it as it was installed"
+    assert "0.1.0 has no constraints.txt, so it goes back without pinned dependencies, as it was installed." in out
     assert any("bootstrap" in c for c in mac.calls("launchctl")), "the service is started again"
     assert out[-1].startswith("Back on 0.1.0; your memory is as it was")
     assert list((data / "backup").glob("memory-*-before-update.db"))
