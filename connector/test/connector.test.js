@@ -204,4 +204,19 @@ describe("the command line", () => {
   test("--version", async () => {
     assert.equal((await run(process.execPath, [BIN, "--version"])).stdout.trim(), "0.1.0");
   });
+
+  test("--help prints the usage on stdout and exits 0", async () => {
+    for (const flag of ["--help", "-h"]) {
+      const { stdout, stderr } = await run(process.execPath, [BIN, flag]);
+      assert.match(stdout, /^usage: \S+ \[--check \| --version \| --help\]/);
+      assert.equal(stderr, "");
+    }
+  });
+
+  test("an unknown flag still prints the usage on stderr and exits 2", async () => {
+    await assert.rejects(
+      run(process.execPath, [BIN, "--nope"]),
+      (e) => e.code === 2 && /^usage: /.test(e.stderr) && e.stdout === "",
+    );
+  });
 });
