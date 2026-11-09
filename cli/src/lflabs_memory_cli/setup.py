@@ -483,14 +483,15 @@ def self_check(engine):
 
 
 KEPT = "kept #"  # self_check's why when the save landed in a memory that was there before: not purged
-WORDS = ("amber", "basil", "cedar", "delta", "ember", "fjord", "garnet", "harbor", "indigo", "juniper", "kelp",
-         "lantern", "maple", "nectar", "oxbow", "pebble", "quartz", "ridge", "saffron", "thistle", "umber", "vellum",
-         "willow", "yarrow", "zephyr", "anvil", "birch", "cobalt", "dune", "estuary", "fennel", "gravel")
+WORDS = ("amber", "basil", "cedar", "delta", "copper", "fjord", "garnet", "harbor", "indigo", "juniper", "kelp",
+         "lantern", "maple", "nectar", "meadow", "pebble", "quartz", "ridge", "saffron", "thistle", "orchard", "falcon",
+         "willow", "canyon", "zephyr", "anvil", "birch", "cobalt", "dune", "estuary", "fennel", "gravel")
 
 
 def check_phrase():
     """What the self-check saves: five random words and a random number, nothing like any real memory (an older
-    "<command> self-check <hex>" was taken as a restatement and merged, then purged with it)."""
+    "<command> self-check <hex>" was taken as a restatement and merged, then purged with it). Every word is a common
+    English one: memory holds back a save it cannot read as English (rare words: "oxbow umber vellum")."""
     return " ".join(secrets.choice(WORDS) for _ in range(5)) + f" {secrets.randbelow(10 ** 6):06d}"
 
 
