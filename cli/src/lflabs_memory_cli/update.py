@@ -21,7 +21,7 @@ import urllib.request
 from importlib import metadata
 from pathlib import Path
 
-from . import apps, edits, launchd, models, prompt
+from . import apps, edits, install_record, launchd, models, prompt
 from .brand import COMMAND, PRODUCT, REPO
 from .layout import (CLI_DIST, CONNECTOR, CONNECTOR_VERSION, ENGINE_DIST, LABEL, MARKETPLACE, SERVER, data_dir,
                      engine_bin, engine_record, home, short, uv_bin)
@@ -242,23 +242,32 @@ def put_back(snap):
         b.close()
 
 
-def bump_pins(say):
-    """Point Codex's and Cursor's entries at this version of the connector."""
+def bump_pins(say, record=None):
+    """Point Codex's and Cursor's entries at this version of the connector, each change recorded in install.json (so
+    uninstall still puts the user's file back). record: the one setup holds; else install.json is loaded and saved."""
     pin = f"{CONNECTOR}@{CONNECTOR_VERSION}"
-    for path in (home() / ".codex/config.toml", home() / ".cursor/mcp.json"):
+    rec = record if record is not None else install_record.load()
+    old_pin = re.compile(re.escape(CONNECTOR) + r"@[0-9][\w.\-]*")
+    for app, kind, path in (("codex", "codex-toml", home() / ".codex/config.toml"),
+                            ("cursor", "mcp-json", home() / ".cursor/mcp.json")):
         try:
             old = edits.read(path)
         except edits.Skip:
             continue
         if not old or pin in old or f"{CONNECTOR}@" not in old:
             continue
-        new = re.sub(re.escape(CONNECTOR) + r"@[0-9][\w.\-]*", pin, old)
+        new = old_pin.sub(pin, old)
+        plan = apps.Plan(app, kind, path, "add", f"connector now {CONNECTOR_VERSION}", new=new, old=old)
+        prev = install_record.file_entry(rec, plan) if rec else None
+        plan.added = old_pin.sub(pin, prev["added"]) if prev and prev.get("added") else ""
         try:
             (edits.load_toml if path.suffix == ".toml" else edits.load_json)(new)
-            edits.write(path, new, old)
+            apps.apply(plan, rec if rec is not None else install_record.empty())
             say(f"{short(path)}: connector now {CONNECTOR_VERSION}")
         except edits.Skip as e:
             say(f"{short(path)}: {e}")
+    if rec is not None and record is None:
+        install_record.save(rec)
 
 
 def move_plugin(say):

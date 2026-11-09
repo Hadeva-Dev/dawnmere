@@ -101,6 +101,32 @@ def hook_engine():
     return None
 
 
+def connector_on_npm():
+    """Whether the connector version every app's entry pins (npx dawnmere-connector@X) is on npm: True, False, or None
+    when it cannot be told (no npm, offline). A yes is remembered in the data folder; a no or a don't-know is asked
+    again next time."""
+    from .layout import data_dir
+    mark = data_dir() / "connector-on-npm"
+    try:
+        if mark.read_text().strip() == CONNECTOR_VERSION:
+            return True
+    except OSError:
+        pass
+    if not shutil.which("npm"):
+        return None
+    r = run(["npm", "view", f"{CONNECTOR}@{CONNECTOR_VERSION}", "version"], timeout=20)
+    if r.ok and r.out.strip() == CONNECTOR_VERSION:
+        if data_dir().is_dir():
+            mark.write_text(CONNECTOR_VERSION + "\n")
+        return True
+    if "E404" in r.err + r.out or (r.ok and not r.out.strip()):
+        return False
+    return None
+
+
+NOT_ON_NPM = f"the connector {CONNECTOR}@{CONNECTOR_VERSION} is not on npm yet: apps cannot start memory's tools"
+
+
 def connector_args():
     return ["-y", f"{CONNECTOR}@{CONNECTOR_VERSION}"]
 

@@ -852,3 +852,50 @@ def test_rerun_keeps_the_name_given_before(box, monkeypatch):
     monkeypatch.setattr(prompt, "text", lambda q, default="": asked.append(default) or default)  # Enter
     assert setup.ask(args, lambda s: None).name == "Sam" and asked == ["Sam"]
     assert setup.ask(cli.parser().parse_args(["setup", "--yes", "--plain"]), lambda s: None).name == "Sam"
+
+
+def test_rerun_moves_codex_and_cursor_to_this_connector(box):
+    """An earlier setup's entries pin an older connector: a re-run moves them (recorded, so uninstall still puts the
+    user's files back)."""
+    from lflabs_memory_cli import uninstall
+    mine = 'model = "o5"\n'
+    (box.home / ".codex/config.toml").write_text(mine)
+    assert run_setup()[0] == 0
+    toml = box.home / ".codex/config.toml"
+    toml.write_text(toml.read_text().replace(f"@{layout.CONNECTOR_VERSION}", "@0.0.9"))
+    record = json.loads(layout.install_json().read_text())
+    for f in record["files"]:
+        if f["path"] == str(toml):
+            f["sha256"] = hashlib.sha256(toml.read_bytes()).hexdigest()
+            f["added"] = f["added"].replace(f"@{layout.CONNECTOR_VERSION}", "@0.0.9")
+    layout.install_json().write_text(json.dumps(record))
+    assert run_setup()[0] == 0
+    assert f"dawnmere-connector@{layout.CONNECTOR_VERSION}" in toml.read_text() and "@0.0.9" not in toml.read_text()
+    assert uninstall.main(keep_data=True, out=lambda s: None) == 0
+    assert toml.read_text() == mine
+
+
+def test_plugin_takes_over_from_the_fallback(box):
+    """A 0.1.5 install on the fallback (hooks in settings.json, `claude mcp add`) that gets the plugin on a re-run
+    would run each hook twice: setup's fallback hooks and MCP entry come out."""
+    (box.home / ".claude/settings.json").write_text('{"theme": "dark"}\n')
+    box.on("claude", ["plugin", "marketplace", "add"], 1, "")
+    assert run_setup()[0] == 0
+    assert "hook-prompt" in (box.home / ".claude/settings.json").read_text()
+    box.rules["claude"] = [r for r in box.rules["claude"] if r[0][:3] != ["plugin", "marketplace", "add"]
+                           and r[0][:2] != ["mcp", "get"]]
+    box.on("claude", ["mcp", "get"], 0, "lflabs-memory: npx -y dawnmere-connector")
+    box.save()
+    assert run_setup()[0] == 0
+    assert (box.home / ".claude/settings.json").read_text() == '{"theme": "dark"}\n'
+    assert ["mcp", "remove", "--scope", "user", "lflabs-memory"] in box.calls("claude")
+    assert not [f for f in json.loads(layout.install_json().read_text())["files"] if f["kind"] == "claude-settings"]
+
+
+def test_setup_says_when_the_connector_is_not_on_npm(box, capsys):
+    box.add("npm")
+    box.on("npm", ["view"], 1, "npm error code E404\n")
+    code, out = run_setup()
+    shown = capsys.readouterr().out
+    assert code == 0 and "Dawnmere is on." not in shown
+    assert f"dawnmere-connector@{layout.CONNECTOR_VERSION} is not on npm yet: apps cannot start memory's tools" in shown
