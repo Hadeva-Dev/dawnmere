@@ -95,6 +95,34 @@ def on_shell_path():
     return run(["zsh", "-lic", f"command -v {COMMAND}"], timeout=15).ok
 
 
+_GIT = []
+
+
+def git_available(which=None, link="/var/db/xcode_select_link"):
+    """Whether git really runs, decided without running git or xcrun: on a Mac without the Command Line Tools,
+    /usr/bin/git is Apple's stub, and running it puts up a dialog offering to install them. Another git (Homebrew's)
+    is real; /usr/bin/git is when the active developer folder (DEVELOPER_DIR, else xcode-select's link, else
+    /Library/Developer/CommandLineTools) has usr/bin/git. Asked once per process (the engine's mem.git_available is
+    the same test)."""
+    if _GIT:
+        return _GIT[0]
+    found = (which or shutil.which)("git")
+    if not found:
+        ok = False
+    elif os.path.realpath(found) != "/usr/bin/git":
+        ok = True
+    else:
+        dev = os.environ.get("DEVELOPER_DIR")
+        if not dev:
+            try:
+                dev = os.readlink(link)
+            except OSError:
+                dev = "/Library/Developer/CommandLineTools"
+        ok = os.path.isfile(os.path.join(dev, "usr", "bin", "git"))
+    _GIT.append(ok)
+    return ok
+
+
 def find_claude():
     """Claude Code's absolute path as a new Terminal window finds it (login and interactive zsh: its PATH, or the
     alias the old local installer made), else the claude on this PATH. The background service has launchd's fixed
