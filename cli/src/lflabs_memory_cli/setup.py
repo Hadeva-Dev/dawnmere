@@ -341,6 +341,10 @@ class RealSetup:
         if not ok:
             ui.step("Self-check", "failed", why)
             return False
+        if why == NO_GIT:
+            ui.step("Self-check", "warn", f"{self_check_row(seconds)[1]}; git missing (see below)")
+            self.left_alone.append(("Self-check", None, NO_GIT_NOTE, ""))
+            return True
         ui.step("Self-check", *self_check_row(seconds))
         return True
 
@@ -366,12 +370,30 @@ def _context(out):
     return str(spec.get("additionalContext") or out.get("additional_context") or out.get("text") or "")
 
 
+NO_GIT = "git does not work"
+NO_GIT_NOTE = ("git does not work on this Mac: install Apple's Command Line Tools (xcode-select --install). Until "
+               "then memory tells your projects apart by folder rather than by repo, and only inside your home "
+               "folder.")
+
+
+def git_works():
+    try:
+        return subprocess.run(["git", "--version"], capture_output=True, timeout=15).returncode == 0
+    except (OSError, subprocess.SubprocessError):
+        return False
+
+
 def self_check(engine):
-    """(passed, recall seconds, why it failed): the try-it path end to end (spec 9.2 step 9)."""
-    with tempfile.TemporaryDirectory(prefix="lflabs-check-") as d:
-        project = Path(d) / "check-project"
+    """(passed, recall seconds, why it failed): the try-it path end to end (spec 9.2 step 9), in a new git repo.
+    Without a working git (macOS's /usr/bin/git only offers to install the Command Line Tools) the engine tells
+    projects apart by folder, inside the home folder only: the check folder is then made there for the few seconds it
+    takes, and why is NO_GIT with passed True."""
+    git = git_works()
+    with tempfile.TemporaryDirectory(prefix="lflabs-check-", dir=None if git else home()) as d:
+        project = Path(d).resolve() / "check-project"
         project.mkdir()
-        subprocess.run(["git", "init", "-q", str(project)], capture_output=True, timeout=15)
+        if git:
+            subprocess.run(["git", "init", "-q", str(project)], capture_output=True, timeout=15)
         sid = f"self-check-{secrets.token_hex(4)}"
         base = {"session_id": sid, "transcript_path": str(project / "t.jsonl"), "cwd": str(project),
                 "hook_event_name": "UserPromptSubmit"}
@@ -396,7 +418,7 @@ def self_check(engine):
                     "Codex and Cursor could not recall it"
         finally:
             run([engine, "purge", mid], timeout=30)  # gone for good, not just retired
-    return True, took, ""
+    return True, took, "" if git else NO_GIT
 
 
 # ---------- the command ----------
