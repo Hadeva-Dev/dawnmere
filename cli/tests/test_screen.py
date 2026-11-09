@@ -46,7 +46,7 @@ def test_frames_golden():
 def test_final_frame_matches_the_design():
     """The last frame at 100 x 46 is the prototype's (research/dawnmere-kip/term/final_frame.txt), line for line.
     Two rows differ on purpose: the tree's "how" lines up with the results (spec 9.1, One result column), and the
-    self-check shows hundredths (Hao, 2026-10-28)."""
+    self-check shows hundredths (decided 2026-10-28)."""
     design = (GOLDEN / "design-final.txt").read_text().splitlines()
     state = scripted(width=100, height=46)
     real = [visible(x) for x in frame(done_at(state), state)]
