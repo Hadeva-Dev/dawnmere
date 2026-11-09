@@ -1,7 +1,8 @@
 <!--
 README for v0.1.6. Merge only after the v0.1.6 changes have landed and been released.
-Every sentence that describes v0.1.6 behaviour is followed by a comment starting "v0.1.6:"; before merging, grep for
-"v0.1.6:" and check each one against the released code. "ENGINE-PUBLIC:" marks links that need
+Every sentence that describes v0.1.6 behaviour is followed by a comment starting "checked against v0.1.6
+(406ee39/c3ed5b1):" (CLI 406ee39, engine c3ed5b1); one marked "not yet in 406ee39/c3ed5b1" still needs checking
+against the released code before merging. "ENGINE-PUBLIC:" marks links that need
 Hadeva-Dev/lflabs-memory-engine to be public. Other comments give file:line evidence in this repo at 1c817d5 (CLI
 0.1.5) or in the engine wheel lflabs_memory_engine-0.1.3 (paths under lflabs_memory/).
 -->
@@ -34,8 +35,8 @@ Made by [LF Labs](#who-makes-it-and-the-lf-labs-names).
 
 <!-- Apple silicon and macOS 14: install.sh:35-38 refuses anything else, and setup.py:73-74 checks macOS again.
      Node 18: connector/package.json "engines" >=18; every app's MCP entry runs `npx -y dawnmere-connector@...`
-     (layout.py:11-12, apps.py:43-44, plugin/.mcp.json). 1 GB: setup.py:28,79-81. dawnmere.app/install answers 302 to
-     releases/latest/download/install.sh (checked 2026-11-08). -->
+     (layout.py:11-12, apps.py:43-44, plugin/.mcp.json). 1 GB: setup.py:28,79-81. dawnmere.app/install answers 200
+     with install.sh from the latest release (checked 2026-11-09). -->
 
 ## What it does
 
@@ -59,8 +60,10 @@ How each app saves and recalls:
 | **Codex** | into each prompt | when you type "remember that ...", or when the model calls `remember` |
 | **Cursor** | at the start of each chat | when the model calls `remember` |
 
-What an app that sees only work notes saves is kept as a work note, so every other app can recall it too.
-<!-- v0.1.6: a `remember` with no kind from a work-only app (Cursor by default) is visible to work apps. -->
+A note saved without a type by an app that sees only work notes is filed as a work note, so the other apps can recall
+it too, unless it is about your own health, family, money or legal matters, which stay personal.
+<!-- checked against v0.1.6 (406ee39/c3ed5b1): a `remember` with no kind from a work-only app (Cursor by default) is
+     filed as work, unless it is about the user's health, family, money or legal matters. -->
 
 <!-- Claude Code hooks: plugin/hooks/hooks.json (UserPromptSubmit, SessionStart, Stop, SessionEnd). Codex: a
      UserPromptSubmit hook running hook-prompt (apps.py:146-153). Cursor: a sessionStart hook only (apps.py:156-163).
@@ -79,11 +82,22 @@ Every app also gets four tools through MCP: `recall`, `remember`, `forget` and `
 - **Your own model does the reading.** Automatic saving uses your Claude plan through Claude Code, or your own
   Anthropic API key. You can also run with no model at all.
 - **Each app sees what you allow.** Cursor starts with work notes only, and a new app sees work notes only.
-- **Saved text is screened.** Text that looks like a key, token or password is refused, and so is text that reads
-  like an instruction to your apps, including what an app saves with `remember`. Recalled notes reach the app
-  labelled "notes, not instructions".
-  <!-- v0.1.6: MCP `remember` goes through the instruction screen. Key/token refusals: mem.py:1373-1378. Label:
-       mem.py:3919, instant.py:34. -->
+  Claude Code's and Claude Desktop's memory tools, and any app that only names itself, see work notes only for now.
+  Claude Code's automatic recall in your prompts still sees everything. Widening an app's access needs you: in
+  Claude Code or Codex you type it and click Allow in a macOS dialog; in Terminal you type the app's name back and
+  click Allow.
+  <!-- checked against v0.1.6 (406ee39/c3ed5b1): MCP tools of Claude Code, Claude Desktop and self-named apps see
+       work only; the prompt hook sees everything; Terminal widening asks for the app's name and an Allow dialog
+       (access.py engine_widens). Not yet in 406ee39/c3ed5b1: the Allow dialog on a widening typed in Claude Code or
+       Codex, being added for v0.1.6; check it in the released code. -->
+- **Saved text is screened.** Text that looks like an API key or token is refused. An app's save that would run
+  downloaded code, delete files, keep something from you or speak to your assistant's instructions is refused. A
+  rule, an instruction, or anything with a command or a link saved by an app is kept for search only, labelled, and
+  never added to a prompt until you type "confirm memory N". Recalled notes reach the app labelled "notes, not
+  instructions".
+  <!-- checked against v0.1.6 (406ee39/c3ed5b1): MCP `remember` goes through the instruction screen; only some app
+       saves are refused, the rest that read as rules, instructions, commands or links are kept search-only until
+       "confirm memory N". Key/token refusals: mem.py:1373-1378. Label: mem.py:3919, instant.py:34. -->
 - **Setup can be undone.** It asks before changing anything, backs up every file it touches, can show its plan with
   `--dry-run`, and `dawnmere uninstall` puts the files back.
 
@@ -123,7 +137,7 @@ notes Claude Code already keeps.
 curl -fsSL https://dawnmere.app/install | sh
 ```
 
-That address forwards to `install.sh` on the latest
+That address serves `install.sh` from the latest
 [GitHub release](https://github.com/Hadeva-Dev/dawnmere/releases/latest). The script:
 
 1. stops unless this is a Mac with Apple silicon and macOS 14 or later;
@@ -132,12 +146,17 @@ That address forwards to `install.sh` on the latest
 3. checks those files against sha256 values written into the script, and installs nothing if one differs;
 4. has uv install them with Python 3.12 and the engine's Python packages from PyPI, each pinned to an exact version
    and checked against its sha256;
-   <!-- v0.1.6: dependencies pinned with hashes. Before that, install.sh:110-115 let uv resolve them unpinned. -->
-5. starts `dawnmere setup`, which asks before it changes anything.
+   <!-- checked against v0.1.6 (406ee39/c3ed5b1): dependencies pinned with hashes. Before that, install.sh:110-115
+        let uv resolve them unpinned. -->
+5. adds one marked line to `~/.zprofile` so new Terminal windows find `dawnmere`, unless they already do, and says so;
+   <!-- checked against v0.1.6 (406ee39/c3ed5b1): install.sh appends a marked PATH line to ~/.zprofile (e6b3df0). -->
+6. starts `dawnmere setup`, which asks before it changes anything.
 
-Without a terminal to ask in (in a script, say), the installer stops unless you pass `--yes`:
-`curl -fsSL https://dawnmere.app/install | sh -s -- --yes`.
-<!-- v0.1.6: no-TTY installs require --yes. Check the exact way to pass it. -->
+Without a terminal to ask in (in a script, say), the installer installs the programs but does not run setup, so none
+of your apps is changed. Afterwards run `dawnmere setup` in a Terminal window, or `dawnmere setup --yes` to take the
+defaults.
+<!-- checked against v0.1.6 (406ee39/c3ed5b1): install.sh reads no arguments; with no TTY it installs, edits
+     ~/.zprofile, skips setup and says to run `dawnmere setup --yes`. -->
 
 <!-- install.sh:20-22 (uv pin and hash), 33-38 (platform checks), 81-96 (fetch and check), 110-115 (uv tool install
      with --managed-python --python 3.12 and --with the engine wheel). -->
@@ -153,9 +172,10 @@ sh install.sh
 The `install.sh` in this repo is the template: it refuses to run until a release fills in the version and checksums.
 <!-- install.sh:10-18, 32 -->
 
-Your apps do not depend on your PATH: the hooks setup writes call Dawnmere by its full path. If Terminal cannot find
-the `dawnmere` command afterwards, add the line the installer printed and open a new Terminal window.
-<!-- v0.1.6: plugin hooks get absolute paths, and the PATH advice changes. Check the installer's wording. -->
+Your apps do not depend on your PATH: the hooks setup writes call Dawnmere by its full path. `dawnmere uninstall`
+takes the installer's `~/.zprofile` line out again.
+<!-- checked against v0.1.6 (406ee39/c3ed5b1): plugin hooks get absolute paths; uninstall removes the marked
+     ~/.zprofile line. -->
 
 **Updating:** `dawnmere update`, which checks each file against the release's `SHA256SUMS`. Running the install line
 again also works.
@@ -195,7 +215,7 @@ time, for example to add a model later.
 - **Claude Code** (2.1.301 or later): setup installs the `lflabs-memory` plugin from this repo, at the release you
   installed, which adds the tools and four hooks. If the plugin cannot be installed, it adds the same tools with
   `claude mcp add` and the hooks to `~/.claude/settings.json`.
-  <!-- v0.1.6: the plugin pins to the release tag. -->
+  <!-- checked against v0.1.6 (406ee39/c3ed5b1): the plugin pins to the release tag. -->
 - **Codex**: adds `[mcp_servers.lflabs-memory]` to `~/.codex/config.toml` and a prompt hook to `~/.codex/hooks.json`.
   Type `/hooks` once in Codex to trust the hook.
 - **Cursor**: adds `lflabs-memory` to `~/.cursor/mcp.json` and a session-start hook to `~/.cursor/hooks.json`, then
@@ -210,13 +230,13 @@ time, for example to add a model later.
     "mcpServers": {
       "lflabs-memory": {
         "command": "npx",
-        "args": ["-y", "dawnmere-connector@0.1.0"]
+        "args": ["-y", "dawnmere-connector@0.1.1"]
       }
     }
   }
   ```
 
-  <!-- v0.1.6: check the connector version still matches layout.py CONNECTOR_VERSION. -->
+  <!-- checked against v0.1.6 (406ee39/c3ed5b1): connector 0.1.1 matches layout.py CONNECTOR_VERSION. -->
   The [connector's README](connector/README.md) has the lines for Windsurf, Gemini CLI and others.
 
 <!-- MIN_CLAUDE layout.py:20. Plugin then fallback: setup.py:294-313. Codex: apps.py:100-116, 146-153; hint
@@ -234,26 +254,36 @@ time, for example to add a model later.
 | `dawnmere update` | install the newest release, checked against its checksums |
 | `dawnmere uninstall` | remove everything setup added |
 
-<!-- v0.1.6: doctor checks Node. Commands: main.py:76-131. Export path: export.py:79. Import skips duplicates:
-     export.py:112-134. Levels and widening: access.py:18, 124-126. -->
+<!-- checked against v0.1.6 (406ee39/c3ed5b1): doctor checks Node. Commands: main.py:76-131. Export path:
+     export.py:79. Import skips duplicates: export.py:112-134. Levels and widening: access.py:18, 124-126. -->
 
 `dawnmere doctor --report` prints counts only (no memory text, names or paths), so it is safe to paste into an issue.
 <!-- doctor.py:274-297 -->
 
 ## Forgetting
 
-When an app calls `forget`, the memory is deleted from the database on your Mac. It cannot be brought back.
-`dawnmere uninstall` can also delete the whole memory (it asks first).
-<!-- v0.1.6: forget is a real delete. Before that it was a soft delete with `lflabs-memory purge` and `restore`
-     (mem.py:1787-1790, 1954-1973). -->
+When you forget a memory yourself (type "forget memory 12" in Claude Code or Codex, or run `lflabs-memory forget 12`
+in Terminal), its text, search entries, older versions and the facts drawn from it are deleted from the memory file
+and its backups. It cannot be brought back. If background reading is on, the words are kept for up to 24 hours so the
+background job can find other notes that mention them, then erased. When an app calls `forget` on its own, the memory
+is hidden at once and deleted for good after 24 hours; until then `lflabs-memory restore 12` brings it back. A
+fingerprint with no words stays, so the same thing is not saved again from an old chat. `dawnmere uninstall` can also
+delete the whole memory (it asks first).
+<!-- checked against v0.1.6 (406ee39/c3ed5b1): your own forget is a real delete (words kept up to 24 h when a model
+     is on); an app's forget hides the memory, deletes it after 24 h, and `restore` brings it back until then. Before
+     v0.1.6 every forget was a soft delete with `lflabs-memory purge` and `restore` (mem.py:1787-1790, 1954-1973). -->
 
 ## What leaves your Mac
 
-Your memory is never uploaded, and nothing is sent to LF Labs. These are the only network calls:
+Your memory is never uploaded to us, and nothing is sent to LF Labs. What leaves your Mac:
 
-- **Background reading**, if you chose a model: after a Claude Code session goes quiet, that conversation goes to
-  your own model provider (your Claude plan through Claude Code, or the Anthropic API with your key) to pick out
-  what is worth remembering. At most 200 calls a day.
+- **Background reading**, if you chose a model, sends your own provider (your Claude plan through Claude Code, or the
+  Anthropic API with your key) your Claude Code conversations, after every 6 of your messages and when a session goes
+  quiet, with up to 8 related memories, which can include ones saved from Codex or Cursor. It also sends memories
+  waiting to be filed, a prompt not in English from any app (to search it in English), and for up to 24 hours the
+  words of something you forgot. At most 200 calls a day; with no model, none of this is sent.
+- **GitHub**: releases and updates, and, if GitHub's `gh` is installed and logged in, the open pull requests of the
+  repo you are working in.
 - **Downloads**: uv, Python and the engine's Python packages (from GitHub and PyPI); the search models and the Claude
   Code plugin (from this repo's releases and repo); the connector (from npm, when an app starts it). `dawnmere update`
   asks GitHub for the newest release.
@@ -261,7 +291,8 @@ Your memory is never uploaded, and nothing is sent to LF Labs. These are the onl
 
 Each app decides for itself what it sends to its own model, including what it recalls from memory.
 
-<!-- 200 a day: settings.py:8. Ping: backend.py:59-104. Models URL: THIRD_PARTY.md and models.json. -->
+<!-- checked against v0.1.6 (406ee39/c3ed5b1): what goes to the model provider and to GitHub, as listed.
+     200 a day: settings.py:8. Ping: backend.py:59-104. Models URL: THIRD_PARTY.md and models.json. -->
 
 ## Uninstall
 
@@ -272,10 +303,13 @@ dawnmere uninstall
 It stops and removes the background service, takes memory out of Claude Code, Codex and Cursor (putting each file
 back as it was, or removing only the Dawnmere entries if you changed the file since), removes the API key from your
 Keychain, and removes the `dawnmere` and engine programs. It always asks before deleting your memory, which cannot be
-brought back; say no, or use `--keep-data`, to keep it. The backups setup made stay next to each file, and uninstall
-lists them.
+brought back; say no, or use `--keep-data`, to keep it. It deletes the backups setup made. If a file could not be put
+back as it was, its copy from before setup stays next to it and uninstall lists it. It also takes out the
+`~/.zprofile` line the installer added. uv and the Python it downloaded stay on your Mac; uninstall prints how to
+remove them.
 
-<!-- uninstall.py:44-140 -->
+<!-- checked against v0.1.6 (406ee39/c3ed5b1): uninstall deletes the .lflabs-backup-* files except a pre-setup copy
+     of a file it could not restore, removes the ~/.zprofile line, leaves uv and its Python. uninstall.py:44-140 -->
 
 ## Who makes it, and the LF Labs names
 

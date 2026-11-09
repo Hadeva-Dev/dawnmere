@@ -1,7 +1,8 @@
 <!--
 README for v0.1.6. Merge only after the v0.1.6 changes have landed and been released.
-Every sentence that describes v0.1.6 behaviour is followed by a comment starting "v0.1.6:"; before merging, grep for
-"v0.1.6:" and check each one against the released code. "ENGINE-PUBLIC:" marks links that need
+Every sentence that describes v0.1.6 behaviour is followed by a comment starting "checked against v0.1.6
+(406ee39/c3ed5b1):" (CLI 406ee39, engine c3ed5b1); one marked "not yet in 406ee39/c3ed5b1" still needs checking
+against the released code before merging. "ENGINE-PUBLIC:" marks links that need
 Hadeva-Dev/lflabs-memory-engine to be public. Other comments give file:line evidence in this repo at 1c817d5 (CLI
 0.1.5) or in the engine wheel lflabs_memory_engine-0.1.3 (paths under lflabs_memory/).
 -->
@@ -34,8 +35,8 @@ curl -fsSL https://dawnmere.app/install | sh
 
 <!-- Apple silicon and macOS 14: install.sh:35-38 refuses anything else, and setup.py:73-74 checks macOS again.
      Node 18: connector/package.json "engines" >=18; every app's MCP entry runs `npx -y dawnmere-connector@...`
-     (layout.py:11-12, apps.py:43-44, plugin/.mcp.json). 1 GB: setup.py:28,79-81. dawnmere.app/install answers 302 to
-     releases/latest/download/install.sh (checked 2026-11-08). -->
+     (layout.py:11-12, apps.py:43-44, plugin/.mcp.json). 1 GB: setup.py:28,79-81. dawnmere.app/install answers 200
+     with install.sh from the latest release (checked 2026-11-09). -->
 
 ## できること
 
@@ -57,8 +58,9 @@ flowchart LR
 | **Codex** | 毎回のプロンプトに挿入 | "remember that ..." と入力したとき、またはモデルが `remember` を呼んだとき |
 | **Cursor** | 各チャットの開始時 | モデルが `remember` を呼んだとき |
 
-仕事用のメモしか見られないアプリが保存したものは、仕事用のメモとして保存されます。そのため、ほかのどのアプリからも呼び出せます。
-<!-- v0.1.6: a `remember` with no kind from a work-only app (Cursor by default) is visible to work apps. -->
+仕事用のメモしか見られないアプリが種類を指定せずに保存したメモは、仕事用のメモとして保存されるので、ほかのアプリからも呼び出せます。ただし、あなた自身の健康、家族、お金、法律に関わる内容は、個人的なメモのままになります。
+<!-- checked against v0.1.6 (406ee39/c3ed5b1): a `remember` with no kind from a work-only app (Cursor by default) is
+     filed as work, unless it is about the user's health, family, money or legal matters. -->
 
 <!-- Claude Code hooks: plugin/hooks/hooks.json (UserPromptSubmit, SessionStart, Stop, SessionEnd). Codex: a
      UserPromptSubmit hook running hook-prompt (apps.py:146-153). Cursor: a sessionStart hook only (apps.py:156-163).
@@ -73,10 +75,15 @@ flowchart LR
 - **アプリごとではなく、メモリはひとつ。** すべてのアプリがひとつのストアを共有するので、Claude Code で保存した事実が、そのまま Cursor が呼び出す事実になります。
 - **メモリはあなたの Mac に置かれます。** メモリは Library フォルダにあるひとつの SQLite ファイルです。検索は小さなローカルモデルを使って Mac 上で行います。アカウントはなく、LF Labs には何も送られず、ツールが利用データを集めることもありません。
 - **読み取りには、あなた自身のモデルを使います。** 自動保存には、Claude Code 経由のあなたの Claude プランか、あなた自身の Anthropic API キーを使います。モデルなしで動かすこともできます。
-- **各アプリが見られるのは、あなたが許可した範囲だけ。** Cursor は最初は仕事用のメモしか見られません。新しく接続したアプリも同じです。
-- **保存されるテキストはチェックされます。** キー、トークン、パスワードのように見えるテキストは拒否されます。アプリへの指示のように読めるテキストも拒否され、アプリが `remember` で保存する内容も対象です。呼び出されたメモは "notes, not instructions"（指示ではなくメモ）というラベル付きでアプリに渡ります。
-  <!-- v0.1.6: MCP `remember` goes through the instruction screen. Key/token refusals: mem.py:1373-1378. Label:
-       mem.py:3919, instant.py:34. -->
+- **各アプリが見られるのは、あなたが許可した範囲だけ。** Cursor は最初は仕事用のメモしか見られません。新しく接続したアプリも同じです。Claude Code と Claude Desktop のメモリツール、そして名前を名乗るだけのアプリも、今のところ仕事用のメモしか見られません。Claude Code がプロンプトに自動で挿入する呼び出しは、引き続きすべてを見られます。アプリが見られる範囲を広げるには、あなた自身の操作が必要です。Claude Code や Codex では、あなたがそう入力し、macOS のダイアログで「Allow」をクリックします。ターミナルでは、アプリの名前をもう一度入力し、「Allow」をクリックします。
+  <!-- checked against v0.1.6 (406ee39/c3ed5b1): MCP tools of Claude Code, Claude Desktop and self-named apps see
+       work only; the prompt hook sees everything; Terminal widening asks for the app's name and an Allow dialog
+       (access.py engine_widens). Not yet in 406ee39/c3ed5b1: the Allow dialog on a widening typed in Claude Code or
+       Codex, being added for v0.1.6; check it in the released code. -->
+- **保存されるテキストはチェックされます。** API キーやトークンのように見えるテキストは拒否されます。ダウンロードしたコードを実行させる、ファイルを削除させる、あなたに何かを隠させる、アシスタントへの指示そのものに語りかける、といったアプリからの保存も拒否されます。アプリが保存したルールや指示、コマンドやリンクを含むものは、検索専用として保存されてラベルが付き、あなたが "confirm memory N" と入力するまでプロンプトに加えられることはありません。呼び出されたメモは "notes, not instructions"（指示ではなくメモ）というラベル付きでアプリに渡ります。
+  <!-- checked against v0.1.6 (406ee39/c3ed5b1): MCP `remember` goes through the instruction screen; only some app
+       saves are refused, the rest that read as rules, instructions, commands or links are kept search-only until
+       "confirm memory N". Key/token refusals: mem.py:1373-1378. Label: mem.py:3919, instant.py:34. -->
 - **セットアップは元に戻せます。** 何かを変える前に必ず確認し、触れるファイルはすべてバックアップします。`--dry-run` で計画だけを表示でき、`dawnmere uninstall` でファイルを元に戻せます。
 
 <!-- Local store and models: engine METADATA "SQLite + vectors + keyword search", models.json (bge-small, MiniLM
@@ -112,17 +119,21 @@ flowchart LR
 curl -fsSL https://dawnmere.app/install | sh
 ```
 
-このアドレスは、最新の [GitHub release](https://github.com/Hadeva-Dev/dawnmere/releases/latest) にある `install.sh` に転送されます。スクリプトは次のことを行います。
+このアドレスは、最新の [GitHub release](https://github.com/Hadeva-Dev/dawnmere/releases/latest) にある `install.sh` をそのまま返します。スクリプトは次のことを行います。
 
 1. Apple シリコン搭載で macOS 14 以降の Mac でなければ、そこで止まります。
 2. 新しめの [uv](https://github.com/astral-sh/uv) がなければ uv 0.12.5 をダウンロードし、release から `dawnmere` とエンジンのパッケージをダウンロードします。
 3. それらのファイルを、スクリプトに書き込まれた sha256 値と照合します。ひとつでも違えば何もインストールしません。
 4. uv に Python 3.12 でインストールさせます。エンジンが使う Python パッケージは PyPI から取得し、どれも正確なバージョンに固定したうえで sha256 を照合します。
-   <!-- v0.1.6: dependencies pinned with hashes. Before that, install.sh:110-115 let uv resolve them unpinned. -->
-5. `dawnmere setup` を起動します。setup は何かを変える前に必ず確認します。
+   <!-- checked against v0.1.6 (406ee39/c3ed5b1): dependencies pinned with hashes. Before that, install.sh:110-115
+        let uv resolve them unpinned. -->
+5. 新しいターミナルウィンドウが `dawnmere` を見つけられるよう、`~/.zprofile` に目印付きの行を 1 行追加し、そのことを知らせます（すでに見つけられる場合は追加しません）。
+   <!-- checked against v0.1.6 (406ee39/c3ed5b1): install.sh appends a marked PATH line to ~/.zprofile (e6b3df0). -->
+6. `dawnmere setup` を起動します。setup は何かを変える前に必ず確認します。
 
-確認を取れるターミナルがない場合（スクリプトから実行する場合など）、`--yes` を渡さない限りインストーラーは止まります：`curl -fsSL https://dawnmere.app/install | sh -s -- --yes`
-<!-- v0.1.6: no-TTY installs require --yes. Check the exact way to pass it. -->
+確認を取れるターミナルがない場合（スクリプトから実行する場合など）、インストーラーはプログラムをインストールしますが、セットアップは実行しません。そのため、アプリは何も変更されません。あとでターミナルウィンドウで `dawnmere setup` を実行するか、`dawnmere setup --yes` でデフォルトのまま進めてください。
+<!-- checked against v0.1.6 (406ee39/c3ed5b1): install.sh reads no arguments; with no TTY it installs, edits
+     ~/.zprofile, skips setup and says to run `dawnmere setup --yes`. -->
 
 <!-- install.sh:20-22 (uv pin and hash), 33-38 (platform checks), 81-96 (fetch and check), 110-115 (uv tool install
      with --managed-python --python 3.12 and --with the engine wheel). -->
@@ -138,8 +149,9 @@ sh install.sh
 このリポジトリの `install.sh` はテンプレートです。release がバージョンとチェックサムを書き込むまでは、実行を拒否します。
 <!-- install.sh:10-18, 32 -->
 
-アプリは PATH に依存しません。セットアップが書き込むフックは、Dawnmere をフルパスで呼び出します。あとでターミナルが `dawnmere` コマンドを見つけられないときは、インストーラーが表示した行を追加してから、新しいターミナルウィンドウを開いてください。
-<!-- v0.1.6: plugin hooks get absolute paths, and the PATH advice changes. Check the installer's wording. -->
+アプリは PATH に依存しません。セットアップが書き込むフックは、Dawnmere をフルパスで呼び出します。インストーラーが `~/.zprofile` に追加した行は、`dawnmere uninstall` で取り除かれます。
+<!-- checked against v0.1.6 (406ee39/c3ed5b1): plugin hooks get absolute paths; uninstall removes the marked
+     ~/.zprofile line. -->
 
 **アップデート：** `dawnmere update` を実行します。release の `SHA256SUMS` で各ファイルを照合します。インストール用のコマンドをもう一度実行しても構いません。
 <!-- update.py:55-70 -->
@@ -171,7 +183,7 @@ sh install.sh
 ## 対応アプリ
 
 - **Claude Code**（2.1.301 以降）：インストールした release と同じバージョンの `lflabs-memory` プラグインを、このリポジトリからインストールします。プラグインがツールと 4 つのフックを追加します。プラグインをインストールできない場合は、`claude mcp add` で同じツールを追加し、フックを `~/.claude/settings.json` に書き込みます。
-  <!-- v0.1.6: the plugin pins to the release tag. -->
+  <!-- checked against v0.1.6 (406ee39/c3ed5b1): the plugin pins to the release tag. -->
 - **Codex**：`~/.codex/config.toml` に `[mcp_servers.lflabs-memory]` を、`~/.codex/hooks.json` にプロンプトフックを追加します。Codex で一度 `/hooks` と入力し、フックを信頼してください。
 - **Cursor**：`~/.cursor/mcp.json` に `lflabs-memory` を、`~/.cursor/hooks.json` にセッション開始フックを追加します。そのあと Cursor を再起動してください。`dawnmere access cursor everything` を実行するまで、Cursor は仕事用のメモしか見られません。`dawnmere access cursor work` で元に戻せます。
 - **Claude Desktop とそのほかの MCP アプリ**：セットアップでは接続しません。Claude Desktop の場合は、[最新の release](https://github.com/Hadeva-Dev/dawnmere/releases/latest) から `dawnmere-connector.mcpb` を開くか、次の内容を `~/Library/Application Support/Claude/claude_desktop_config.json` に追加してください。
@@ -181,13 +193,13 @@ sh install.sh
     "mcpServers": {
       "lflabs-memory": {
         "command": "npx",
-        "args": ["-y", "dawnmere-connector@0.1.0"]
+        "args": ["-y", "dawnmere-connector@0.1.1"]
       }
     }
   }
   ```
 
-  <!-- v0.1.6: check the connector version still matches layout.py CONNECTOR_VERSION. -->
+  <!-- checked against v0.1.6 (406ee39/c3ed5b1): connector 0.1.1 matches layout.py CONNECTOR_VERSION. -->
   Windsurf や Gemini CLI などの設定は、[コネクタの README](connector/README.md) にあります。
 
 <!-- MIN_CLAUDE layout.py:20. Plugin then fallback: setup.py:294-313. Codex: apps.py:100-116, 146-153; hint
@@ -205,29 +217,32 @@ sh install.sh
 | `dawnmere update` | 最新の release をインストールし、チェックサムで照合する |
 | `dawnmere uninstall` | セットアップが追加したものをすべて削除する |
 
-<!-- v0.1.6: doctor checks Node. Commands: main.py:76-131. Export path: export.py:79. Import skips duplicates:
-     export.py:112-134. Levels and widening: access.py:18, 124-126. -->
+<!-- checked against v0.1.6 (406ee39/c3ed5b1): doctor checks Node. Commands: main.py:76-131. Export path:
+     export.py:79. Import skips duplicates: export.py:112-134. Levels and widening: access.py:18, 124-126. -->
 
 `dawnmere doctor --report` は件数だけを出力します（メモリの本文、名前、パスは含みません）。そのまま issue に貼っても安全です。
 <!-- doctor.py:274-297 -->
 
 ## 忘れさせる（forget）
 
-アプリが `forget` を呼ぶと、そのメモリはあなたの Mac 上のデータベースから削除され、元には戻せません。`dawnmere uninstall` でメモリ全体を削除することもできます（先に確認します）。
-<!-- v0.1.6: forget is a real delete. Before that it was a soft delete with `lflabs-memory purge` and `restore`
-     (mem.py:1787-1790, 1954-1973). -->
+自分でメモリを忘れさせた場合（Claude Code や Codex で "forget memory 12" と入力するか、ターミナルで `lflabs-memory forget 12` を実行）、その本文、検索用のエントリ、古いバージョン、そこから取り出された事実が、メモリファイルとそのバックアップから削除されます。元には戻せません。バックグラウンドでの読み取りがオンの場合は、その言葉に触れているほかのメモをバックグラウンドの処理が見つけられるよう、言葉だけが最大 24 時間残り、そのあと消去されます。アプリが自分で `forget` を呼んだ場合、そのメモリはすぐに非表示になり、24 時間後に完全に削除されます。それまでは `lflabs-memory restore 12` で元に戻せます。言葉を含まない指紋だけは残るので、古いチャットから同じことがもう一度保存されることはありません。`dawnmere uninstall` でメモリ全体を削除することもできます（先に確認します）。
+<!-- checked against v0.1.6 (406ee39/c3ed5b1): your own forget is a real delete (words kept up to 24 h when a model
+     is on); an app's forget hides the memory, deletes it after 24 h, and `restore` brings it back until then. Before
+     v0.1.6 every forget was a soft delete with `lflabs-memory purge` and `restore` (mem.py:1787-1790, 1954-1973). -->
 
 ## Mac の外に出るもの
 
-あなたのメモリがアップロードされることはなく、LF Labs には何も送られません。ネットワーク通信は次のものだけです。
+あなたのメモリが私たちのもとへアップロードされることはなく、LF Labs には何も送られません。Mac の外に出るものは次のとおりです。
 
-- **バックグラウンドでの読み取り**（モデルを選んだ場合）：Claude Code のセッションが落ち着いたあと、その会話をあなた自身のモデルプロバイダー（Claude Code 経由のあなたの Claude プラン、またはあなたのキーでの Anthropic API）に送り、覚えておく価値のある内容を選び出します。1 日あたり最大 200 回です。
+- **バックグラウンドでの読み取り**（モデルを選んだ場合）：あなたの Claude Code の会話を、あなた自身のプロバイダー（Claude Code 経由のあなたの Claude プラン、またはあなたのキーでの Anthropic API）に送ります。送るのは、あなたのメッセージ 6 件ごとと、セッションが落ち着いたときで、関連するメモリを最大 8 件添えます。その中には Codex や Cursor から保存されたものが含まれることもあります。ほかに、整理待ちのメモリ、どのアプリからでも英語以外のプロンプト（英語で検索するため）、忘れさせたものの言葉（最大 24 時間）も送ります。1 日あたり最大 200 回です。モデルがなければ、これらは何も送られません。
+- **GitHub**：release とアップデート。GitHub の `gh` がインストール済みでログインしていれば、作業中のリポジトリのオープンな pull request も取得します。
 - **ダウンロード**：uv、Python、エンジンが使う Python パッケージ（GitHub と PyPI から）、検索モデルと Claude Code プラグイン（このリポジトリとその release から）、コネクタ（アプリが起動するときに npm から）。`dawnmere update` は GitHub に最新の release を問い合わせます。
 - **セットアップでのモデルの確認**：Claude Code か Anthropic API に、短いテスト呼び出しを 1 回送ります。
 
 各アプリが自分のモデルに何を送るかは、それぞれのアプリが決めます。メモリから呼び出した内容も同じです。
 
-<!-- 200 a day: settings.py:8. Ping: backend.py:59-104. Models URL: THIRD_PARTY.md and models.json. -->
+<!-- checked against v0.1.6 (406ee39/c3ed5b1): what goes to the model provider and to GitHub, as listed.
+     200 a day: settings.py:8. Ping: backend.py:59-104. Models URL: THIRD_PARTY.md and models.json. -->
 
 ## アンインストール
 
@@ -235,9 +250,10 @@ sh install.sh
 dawnmere uninstall
 ```
 
-バックグラウンドサービスを止めて削除し、Claude Code、Codex、Cursor からメモリを外します（各ファイルを元どおりに戻します。そのあとファイルを変更していた場合は、Dawnmere の項目だけを削除します）。さらにキーチェーンから API キーを削除し、`dawnmere` とエンジンのプログラムを削除します。メモリを削除する前には必ず確認します。削除したメモリは元に戻せません。残したいときは「いいえ」と答えるか、`--keep-data` を付けてください。セットアップが作ったバックアップは各ファイルの隣に残り、アンインストール時に一覧で表示されます。
+バックグラウンドサービスを止めて削除し、Claude Code、Codex、Cursor からメモリを外します（各ファイルを元どおりに戻します。そのあとファイルを変更していた場合は、Dawnmere の項目だけを削除します）。さらにキーチェーンから API キーを削除し、`dawnmere` とエンジンのプログラムを削除します。メモリを削除する前には必ず確認します。削除したメモリは元に戻せません。残したいときは「いいえ」と答えるか、`--keep-data` を付けてください。セットアップが作ったバックアップは削除します。元どおりに戻せなかったファイルがあれば、セットアップ前のコピーがその隣に残り、アンインストール時に一覧で表示されます。インストーラーが `~/.zprofile` に追加した行も取り除きます。uv とそれがダウンロードした Python は Mac に残ります。削除のしかたはアンインストール時に表示されます。
 
-<!-- uninstall.py:44-140 -->
+<!-- checked against v0.1.6 (406ee39/c3ed5b1): uninstall deletes the .lflabs-backup-* files except a pre-setup copy
+     of a file it could not restore, removes the ~/.zprofile line, leaves uv and its Python. uninstall.py:44-140 -->
 
 <a id="who-makes-it-and-the-lf-labs-names"></a>
 ## 開発元と「LF Labs」という名前
