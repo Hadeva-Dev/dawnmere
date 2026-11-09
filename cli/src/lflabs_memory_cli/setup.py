@@ -311,7 +311,11 @@ class RealSetup:
     def wire_claude_code(self):
         listed = run(["claude", "plugin", "list"], timeout=30)
         if listed.ok and SERVER in listed.out:
-            return "plugin", None, True
+            if apps.marketplace_pinned():
+                return "plugin", None, True
+            # an older install's marketplace (main's head, or another tag): its ref cannot be changed in place, so
+            # remove it (that uninstalls the plugin too) and add it at this release's tag, as update does
+            self._cmd(["claude", "plugin", "marketplace", "remove", MARKETPLACE])
         if os.path.isabs(self.engine):  # the plugin's hooks run this path (plugin/scripts/engine), never PATH's
             engine_record().write_text(self.engine + "\n")
         if self._cmd(["claude", "plugin", "marketplace", "add", apps.marketplace_source(), "--scope", "user"]).ok and \
