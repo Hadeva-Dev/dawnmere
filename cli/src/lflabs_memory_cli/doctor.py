@@ -80,9 +80,10 @@ def check_data(db):
     size = sum(f.stat().st_size for f in data_dir().glob("memory.db*")) / 1e6
     parts = [f"{mem:,} memor{'y' if mem == 1 else 'ies'}"] + \
         ([f"{claims:,} claim{'' if claims == 1 else 's'}"] if claims is not None else []) + [f"{size:.0f} MB"]
-    mode = os.stat(data_dir()).st_mode & 0o777
-    if mode & 0o077:
-        return Check("data", "warn", f"{d}  ({', '.join(parts)})", f"the folder is readable by others: chmod 700 '{data_dir()}'")
+    open_ = [str(p) for p in (data_dir(), layout.lf_labs_dir()) if p.is_dir() and os.stat(p).st_mode & 0o077]
+    if open_:
+        return Check("data", "warn", f"{d}  ({', '.join(parts)})",
+                     "the folder is readable by others: chmod 700 " + " ".join(f"'{p}'" for p in open_))
     return Check("data", "ok", f"{d}  ({', '.join(parts)})")
 
 

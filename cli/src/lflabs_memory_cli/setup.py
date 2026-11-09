@@ -22,7 +22,7 @@ from pathlib import Path
 from . import apps, backend, edits, install_record, keychain, launchd, models, prompt, settings, sockets
 from .brand import COMMAND, PRODUCT
 from .layout import (CLI_DIST, CONNECTOR_VERSION, ENGINE, ENGINE_DIST, MARKETPLACE, SERVER, data_dir,
-                     engine_bin, engine_record, home, on_shell_path, path_advice, short, uv_bin)
+                     engine_bin, engine_record, home, lf_labs_dir, on_shell_path, path_advice, short, uv_bin)
 from .run import run
 from .screen import AppResult, Memory, Step, pick_memory, self_check_row
 
@@ -464,7 +464,9 @@ def main(args, say=print):
     record = install_record.load() or install_record.empty()
     intro = full_show(args.show)
     data_dir().mkdir(parents=True, exist_ok=True, mode=0o700)
-    os.chmod(data_dir(), 0o700)
+    for d in (data_dir(), lf_labs_dir()):  # mkdir's mode is the last folder's only: LF Labs would be 0755
+        if d.is_dir():
+            os.chmod(d, 0o700)
     if a.api_key and keychain.store(a.api_key):
         record["keychain"] = True
     settings.save(settings.render(a.name, a.backend, a.model, a.codex_sessions))

@@ -441,3 +441,13 @@ def test_no_terminal_needs_yes(box, monkeypatch, capsys):
     assert out[-1] == ("There is no terminal to ask on, so nothing was changed. Run dawnmere setup in a Terminal "
                        "window, or dawnmere setup --yes to take the defaults.")
     assert run_setup("--backend", "none")[0] == 0
+
+
+def test_setup_closes_the_lf_labs_folder(box):
+    """The folder above the data folder holds the connector's socket: owner only too (a real one was 0755)."""
+    parent = box.home / "Library/Application Support/LF Labs"
+    parent.mkdir(parents=True)
+    parent.chmod(0o755)
+    assert run_setup()[0] == 0
+    assert oct(parent.stat().st_mode & 0o777) == "0o700"
+    assert oct(layout.data_dir().stat().st_mode & 0o777) == "0o700"
