@@ -401,3 +401,26 @@ def test_a_problem_replaces_the_success_line():
         assert "Dawnmere is on." not in text and TRY_PREFIX not in text and "reaches the others" not in text
         assert problem in text.replace("! ", ""), display
         assert state.plain or all(len(line) <= state.width for line in lines), display  # plain lines never wrap
+
+
+@pytest.mark.parametrize("backend_name,logged_in,version", [("claude-cli", False, "2.1.301"),
+                                                           ("claude-cli", True, "2.1.301"),
+                                                           ("anthropic-api", None, "2.1.301"),
+                                                           ("none", None, "2.1.301"), ("none", None, None)])
+def test_claude_code_row_fits_80_columns(final, backend_name, logged_in, version):
+    """Setup's own Claude Code notes are never cut at 80 columns ("log in to start reading (claude, then…" was)."""
+    from lflabs_memory_cli import backend, setup
+    a = setup.Answers()
+    a.backend = backend_name
+    a.claude = backend.Status("claude-cli", True, version, logged_in, usable=True)
+    got = []
+
+    class UI:
+        def step(self, label, status, note=None, **kw):
+            got.append((status, note))
+    setup.RealSetup.step_claude(type("S", (), {"a": a})(), UI())
+    status, note = got[-1]
+    state, end = final(width=80)
+    state.steps[0].status, state.steps[0].note = status, note
+    row = next(visible(x) for x in frame(end, state) if "Claude Code" in x and note in x)
+    assert len(row) <= 80 and not row.endswith("…")

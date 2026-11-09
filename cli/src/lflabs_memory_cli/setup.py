@@ -210,7 +210,7 @@ class RealSetup:
         ui.step("Claude Code", "running")
         c = self.a.claude
         if self.a.backend == "claude-cli" and c.logged_in is False:
-            ui.step("Claude Code", "warn", "found; log in to start reading (claude, then /login)")
+            ui.step("Claude Code", "warn", "found; log in to start: claude, then /login")
             return
         if self.a.backend == "claude-cli":
             note = "found, logged in"
