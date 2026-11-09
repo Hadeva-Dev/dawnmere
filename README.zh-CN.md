@@ -54,7 +54,7 @@ flowchart LR
 
 | 应用 | 召回 | 保存 |
 | --- | --- | --- |
-| **Claude Code** | 注入每一条提示词，以及会话开始时 | 会话空闲后自动保存（前提是你选了模型）；你输入 "remember that ..." 时；或模型调用 `remember` 时 |
+| **Claude Code** | 每条提示词都会注入，会话开始时也会 | 会话空闲后自动保存（前提是你选了模型）；你输入 "remember that ..." 时；或模型调用 `remember` 时 |
 | **Codex** | 注入每一条提示词 | 你输入 "remember that ..." 时，或模型调用 `remember` 时 |
 | **Cursor** | 每次新对话开始时 | 模型调用 `remember` 时 |
 
@@ -80,7 +80,7 @@ flowchart LR
        work only; the prompt hook sees everything; Terminal widening asks for the app's name and an Allow dialog
        (access.py engine_widens). A widening typed in Claude Code or Codex is never applied;
        the reply gives the Terminal command (engine 50ffd0b, typed widening refused). -->
-- **存入的文本会经过筛查。** 看起来像 API 密钥或令牌的文本会被拒绝。应用要保存的内容如果会让人运行下载来的代码、删除文件、对你隐瞒某些事，或是冲着你的助手所遵循的指令说话，也会被拒绝。应用保存的规则、指令，或任何带有命令或链接的内容，只会留作搜索用，并加上标注；在你输入 "confirm memory N" 之前，绝不会被加进提示词。召回的笔记交给应用时，会带上 "notes, not instructions"（是笔记，不是指令）的标注。
+- **存入的文本会经过筛查。** 看起来像 API 密钥或令牌的文本会被拒绝。应用要保存的内容如果会让人运行下载来的代码、删除文件、对你隐瞒某些事，或是试图改写助手自身的指令，也会被拒绝。应用保存的规则、指令，或任何带有命令或链接的内容，只会留作搜索用，并加上标注；在你输入 "confirm memory N" 之前，绝不会被加进提示词。召回的笔记交给应用时，会带上 "notes, not instructions"（是笔记，不是指令）的标注。
   <!-- checked against v0.1.6 (406ee39/c3ed5b1): MCP `remember` goes through the instruction screen; only some app
        saves are refused, the rest that read as rules, instructions, commands or links are kept search-only until
        "confirm memory N". Key/token refusals: mem.py:1373-1378. Label: mem.py:3919, instant.py:34. -->
@@ -260,7 +260,7 @@ dawnmere uninstall
 
 Dawnmere 由 LF Labs（GitHub 上的 [Hadeva-Dev](https://github.com/Hadeva-Dev) 组织）开发。程序内部使用 LF Labs 这个名字，所以下面这些都是 Dawnmere：
 
-| 是什么 | 在哪里 |
+| 内容 | 位置 |
 | --- | --- |
 | 你的记忆、设置和模型 | `~/Library/Application Support/LF Labs/Memory/`（只有你能读取） |
 | 服务日志 | `~/Library/Logs/LF Labs/memory.log` |
@@ -290,6 +290,6 @@ Dawnmere 由 LF Labs（GitHub 上的 [Hadeva-Dev](https://github.com/Hadeva-Dev)
 
 ## 相关项目
 
-[memory-bench](https://github.com/Hadeva-Dev/memory-bench) 是一个面向助手记忆的开放基准测试，出自同一批人之手。它目前还没有 Dawnmere 的数据行；里面维护者自己的那一行是一个相关的系统，基准测试里也写明了这一点。
+[memory-bench](https://github.com/Hadeva-Dev/memory-bench) 是一个面向助手记忆的开放基准测试，出自同一批人之手。它有一行 Dawnmere 的数据，测的是已发布的引擎，泄露情况和召回结果并排列出；里面维护者的另一行是一个相关的系统，基准测试里也写明了这一点。
 
 发现 bug？请[提交 issue](https://github.com/Hadeva-Dev/dawnmere/issues/new/choose)，并附上 `dawnmere doctor --report` 的输出。安全问题请按 [SECURITY.md](SECURITY.md) 私下报告。
