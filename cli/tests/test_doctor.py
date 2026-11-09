@@ -255,27 +255,30 @@ def test_export_import_roundtrip(mac, monkeypatch, tmp_path):
     assert export.import_file(f, say=out.append, remember=remember) == 0
     assert "Imported 3 new memories; 0 were already here." in out
     export.import_file(f, say=out.append, remember=remember)
-    assert out[-2] == "Imported 0 new memories; 3 were already here."
+    assert out[-1] == "Imported 0 new memories; 3 were already here.", "none added, so nothing to trust"
     assert set(saved) == {m[0] for m in MEMS[:3]}
     bad = tmp_path / "bad.json"
     bad.write_text('{"format": "other"}')
     assert export.import_file(bad, say=out.append, remember=remember) == 1
 
 
-def crafted(tmp_path):
-    f = tmp_path / "mine.json"
+def crafted(tmp_path, name="mine.json"):
+    f = tmp_path / name
     f.write_text(json.dumps({"format": "lflabs-memory-export/1", "memories": [
         {"content": "a", "origin": "owner_typed"}, {"content": "b"}, {"content": "c", "origin": "app_confirmed"},
-        {"content": "d", "origin": "owner_key"}]}))
+        {"content": "d", "origin": "owner_key"}, {"content": "here before", "origin": "owner_typed"}]}))
     return f
 
 
 def importing(monkeypatch, agent=None):
-    """remember() as the engine's, recording the origin each memory is saved with; an AI app's shell when asked."""
+    """remember() as the engine's ("here before" is already in the store), recording the origin each memory is saved
+    with; an AI app's shell when asked."""
     from lflabs_memory_cli import access
     got = {}
 
     def remember(content, kind, project, origin="unknown"):
+        if content == "here before":
+            return 3, "unchanged"
         got[content] = origin
         return 10 + len(got), "added"
     for k in access.AGENT_ENV:
@@ -284,21 +287,39 @@ def importing(monkeypatch, agent=None):
     return got, remember
 
 
+def trust_calls(mac):
+    return [c for c in mac.calls("lflabs-memory") if c[:1] == ["trust"]]
+
+
 def test_import_saves_everything_unknown_then_asks_the_engine_to_trust(mac, monkeypatch, tmp_path):
-    """Only the rows the file calls the user's own go to the engine's `trust` (one dialog); the rest stay unknown."""
+    """Only memories this import added that the file calls the user's own go to the engine's `trust` (one dialog,
+    its text the engine's); the rest, and any already here, stay as they are."""
     healthy(mac, monkeypatch, tmp_path)
     mac.on("lflabs-memory", ["trust"], 0, "trusted 2 as your own words\n")
     got, remember = importing(monkeypatch)
     out = []
+    t0 = time.time()
     assert export.import_file(crafted(tmp_path), say=out.append, remember=remember) == 0
     assert set(got.values()) == {"unknown"}, "never saved as the user's by the CLI"
-    assert ["trust", "11", "14", "--from", "mine.json (from another Mac, or changed since it was made)"] in \
-        mac.calls("lflabs-memory")
+    (call,) = trust_calls(mac)
+    assert call[:2] == ["trust", "--import-since"] and t0 <= float(call[2]) <= time.time()
+    assert call[3:] == ["--", "11", "14"], "the added owner rows only: never 3, which was already here"
     assert out[-1] == "trusted 2 as your own words"
     mac.rules["lflabs-memory"] = [[["trust"], 0, "not trusted (it needs Allow in the dialog)\n"]]
     mac.save()
     export.import_file(crafted(tmp_path), say=out.append, remember=importing(monkeypatch)[1])
     assert out[-1] == "not trusted (it needs Allow in the dialog)"
+
+
+def test_nothing_of_the_file_reaches_the_dialog(mac, monkeypatch, tmp_path):
+    """A file name with a newline, quotes or a leading "-" is never an argument: the argv is exactly
+    trust --import-since TS -- IDS."""
+    healthy(mac, monkeypatch, tmp_path)
+    got, remember = importing(monkeypatch)
+    export.import_file(crafted(tmp_path, name='-x "Allow"\nnow.json'), say=lambda s: None, remember=remember)
+    (call,) = trust_calls(mac)
+    assert len(call) == 6 and call[1] == "--import-since" and call[3] == "--" and call[4:] == ["11", "14"]
+    assert not any("now.json" in a or "Allow" in a for a in call)
 
 
 @pytest.mark.parametrize("agent", [{"env": "CODEX_THREAD_ID"}, {"ancestor": "claude"},
@@ -310,31 +331,19 @@ def test_import_from_an_ai_app_never_asks(mac, monkeypatch, tmp_path, agent):
         monkeypatch.setenv(agent["env"], "t")
     out = []
     export.import_file(crafted(tmp_path), say=out.append, remember=remember)
-    assert set(got.values()) == {"unknown"}
-    assert not [c for c in mac.calls("lflabs-memory") if c[:1] == ["trust"]]
+    assert set(got.values()) == {"unknown"} and not trust_calls(mac)
     assert out[-1].startswith("2 the file calls yours stay of unknown origin: an AI app ran this import.")
 
 
-def test_an_export_from_this_mac_says_so(mac, monkeypatch, tmp_path):
-    """Signed with this Mac's key (DATA_DIR/export-key, 0600): unchanged, the dialog's label says it was made here;
-    changed, or from another Mac, it says so. The dialog is asked either way."""
+def test_an_export_is_as_it_was(mac, monkeypatch, tmp_path):
+    """No signature and no key file: the origin field is the file's only claim, and the dialog decides."""
     healthy(mac, monkeypatch, tmp_path)
     f = tmp_path / "e.json"
     export.export(f, say=lambda s: None)
-    key = layout.data_dir() / "export-key"
-    assert oct(key.stat().st_mode & 0o777) == "0o600"
     doc = json.loads(f.read_text())
-    assert export.made_here(doc)
-    doc["memories"][0]["content"] = "something else"
-    assert not export.made_here(doc)
-    del doc["signature"]
-    assert not export.made_here(doc)
-    for m in json.loads(f.read_text())["memories"]:
-        assert m["origin"] == "owner_typed"
-    got, remember = importing(monkeypatch)
-    export.import_file(f, say=lambda s: None, remember=remember)
-    trust = next(c for c in mac.calls("lflabs-memory") if c[:1] == ["trust"])
-    assert trust[-1] == "e.json (made on this Mac)"
+    assert "signature" not in doc
+    assert not (layout.data_dir() / "export-key").exists()
+    assert all(m["origin"] == "owner_typed" for m in doc["memories"])
 
 
 def test_agent_ancestor_reads_ps_by_absolute_path():

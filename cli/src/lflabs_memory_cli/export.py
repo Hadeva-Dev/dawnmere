@@ -3,16 +3,12 @@
 Secrets (memories the engine marked `secret`) never leave: they are left out and counted. Import goes through the
 engine's own remember(), so a memory already there is not added twice. Every imported memory is saved as of
 "unknown" origin: a file can say anything about where it came from, and a person at a terminal can be imitated by an
-AI app. The rows the file says are the user's own are then handed to the engine's `trust`, which asks the user once,
-in a macOS dialog only they can click, before it makes them their own (owner_vouched); never from an AI app's shell.
-An export is signed (HMAC-SHA256, a key kept in the data folder) only to tell the user, in that dialog, whether the
-file was made on this Mac and is unchanged; the dialog is asked either way.
+AI app. The memories this import added that the file says are the user's own are then handed to the engine's
+`trust`, which asks the user once, in a macOS dialog only they can click and whose text the engine writes itself,
+before it makes them their own (owner_vouched); never from an AI app's shell.
 """
-import hashlib
-import hmac
 import json
 import os
-import secrets as _secrets
 import sqlite3
 import time
 from collections import defaultdict
@@ -91,7 +87,6 @@ def export(out_file=None, fmt="json", include_claims=False, say=print):
         doc = {"format": FORMAT, "exported": time.time(), "memories": mems}
         if include_claims:
             doc["claims"] = claims
-        doc["signature"] = sign(doc)
         _write(path, json.dumps(doc, indent=2, ensure_ascii=False) + "\n")
     say(f"Exported {len(mems)} memor{'y' if len(mems) == 1 else 'ies'}" +
         (f" and {len(claims)} claim{'' if len(claims) == 1 else 's'}" if include_claims else "") +
@@ -104,36 +99,6 @@ def export(out_file=None, fmt="json", include_claims=False, say=print):
 OWN = {"owner_key", "owner_typed", "owner_vouched", "owner_desk"}  # the engine's OWNER_ORIGINS: the user's own words
 
 
-def _export_key(create=False):
-    p = data_dir() / "export-key"
-    try:
-        return bytes.fromhex(p.read_text().strip())
-    except (OSError, ValueError):
-        if not create:
-            return None
-    key = _secrets.token_bytes(32)
-    p.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
-    with os.fdopen(os.open(p, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600), "w") as f:
-        f.write(key.hex() + "\n")
-    return key
-
-
-def _body(doc):
-    return json.dumps({k: v for k, v in doc.items() if k != "signature"}, sort_keys=True, ensure_ascii=False,
-                      separators=(",", ":")).encode()
-
-
-def sign(doc):
-    return hmac.new(_export_key(create=True), _body(doc), hashlib.sha256).hexdigest()
-
-
-def made_here(doc):
-    """Whether the file was exported on this Mac and has not changed since (its HMAC checks with this Mac's key)."""
-    key, got = _export_key(), doc.get("signature")
-    return bool(key and isinstance(got, str) and hmac.compare_digest(hmac.new(key, _body(doc), hashlib.sha256)
-                                                                     .hexdigest(), got))
-
-
 def _engine_remember():
     """remember(content, kind, project, origin) through the engine, on its own store."""
     from lflabs_memory import mem  # noqa: the engine is installed with this CLI
@@ -144,15 +109,16 @@ def _engine_remember():
     return save
 
 
-def ask_trust(ids, label, say):
-    """The engine's `trust`: one macOS dialog asks the user whether these memories are their own words; it says
-    what it did. Never from an AI app's shell (they stay unknown)."""
+def ask_trust(ids, since, say):
+    """The engine's `trust`: one macOS dialog, its text the engine's own, asks the user whether these memories (added
+    by this import, at or after `since`) are their own words; it says what it did. Nothing of the file (its name, its
+    words) is passed as text. Never from an AI app's shell (they stay unknown)."""
     from .access import agent_ancestor, agent_shell
     if agent_shell() or agent_ancestor() is not None:
         say(f"{len(ids)} the file calls yours stay of unknown origin: an AI app ran this import. Run {COMMAND} import "
             "yourself, in a Terminal window, to be asked.")
         return
-    r = run([engine_bin() or ENGINE, "trust", *map(str, ids), "--from", label], timeout=300)
+    r = run([engine_bin() or ENGINE, "trust", "--import-since", repr(since), "--", *map(str, ids)], timeout=300)
     say((r.out or r.err).strip() or "not trusted")
 
 
@@ -172,13 +138,14 @@ def import_file(path, say=print, remember=None):
     save = remember or _engine_remember()
     added = same = refused = 0
     own = []
+    since = time.time()  # the engine trusts only memories made by this import (created at or after it)
     for m in doc["memories"]:
         content = m.get("content") if isinstance(m, dict) else None
         if not isinstance(content, str) or not content.strip():
             refused += 1
             continue
         mid, action = save(content, m.get("kind") or "note", m.get("project"), origin="unknown")
-        if mid is not None and m.get("origin") in OWN:
+        if mid is not None and action == "added" and m.get("origin") in OWN:  # never one that was already here
             own.append(mid)
         if mid is None:
             refused += 1
@@ -189,7 +156,5 @@ def import_file(path, say=print, remember=None):
     say(f"Imported {added} new memor{'y' if added == 1 else 'ies'}; {same} {'was' if same == 1 else 'were'} already "
         "here" + (f"; {refused} refused" if refused else "") + ".")
     if own:
-        name = Path(path).name
-        ask_trust(own, f"{name} (made on this Mac)" if made_here(doc) else
-                  f"{name} (from another Mac, or changed since it was made)", say)
+        ask_trust(own, since, say)
     return 0
