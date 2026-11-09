@@ -22,6 +22,7 @@ def healthy(mac, monkeypatch, tmp_path, backend_name="claude-cli"):
     h = mac.home
     data = layout.data_dir()
     data.mkdir(parents=True, mode=0o700)
+    data.parent.chmod(0o700)
     (data / "config.toml").write_text(f'version = 1\n[llm]\nbackend = "{backend_name}"\n')
     day = time.strftime("%Y-%m-%d")
     store.make(data / "memory.db", MEMS, ["c1", "c2"], [(day, "extract", 41, 6200, 1100, 0.1)])
@@ -123,6 +124,14 @@ def test_doctor_path_row(mac, monkeypatch, tmp_path, connector):
     assert "dawnmere      warn  not on your PATH: a new Terminal window will not find it" in text
     assert '\ndawnmere: add this line to ~/.zshrc, then open a new Terminal window: export PATH="' in text
     assert ["-lic", "command -v dawnmere"] in mac.calls("zsh")
+
+
+def test_doctor_checks_the_lf_labs_folder(mac, monkeypatch, tmp_path, connector):
+    healthy(mac, monkeypatch, tmp_path)
+    layout.data_dir().parent.chmod(0o755)
+    code, text = run_doctor()
+    assert "data          warn  ~/Library/Application Support/LF Labs/Memory" in text
+    assert "\ndata: the folder is readable by others: chmod 700 '" + str(layout.data_dir().parent) + "'" in text
 
 
 def test_doctor_none_mode_line(mac, monkeypatch, tmp_path, connector):

@@ -27,9 +27,13 @@ def home():
     return Path.home()
 
 
+def lf_labs_dir():
+    """The folder above the data folder, which also holds the connector's socket: owner only, like the data folder."""
+    return home() / "Library/Application Support/LF Labs"
+
+
 def data_dir():
-    return Path(os.environ[HOME_ENV]).expanduser() if os.environ.get(HOME_ENV) else \
-        home() / "Library/Application Support/LF Labs/Memory"
+    return Path(os.environ[HOME_ENV]).expanduser() if os.environ.get(HOME_ENV) else lf_labs_dir() / "Memory"
 
 
 def install_json():
@@ -51,7 +55,7 @@ def engine_sock():
 
 def connector_sock():
     return Path(os.environ[SOCKET_ENV]).expanduser() if os.environ.get(SOCKET_ENV) else \
-        home() / "Library/Application Support/LF Labs/memory-connector.sock"
+        lf_labs_dir() / "memory-connector.sock"
 
 
 def plist_path():
