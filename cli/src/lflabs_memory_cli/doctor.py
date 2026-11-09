@@ -290,9 +290,11 @@ def check_command():
 
 
 def check_privacy(cfg):
-    p = cfg["privacy"]
-    return Check("privacy", "ok", "local only; Codex sessions " + ("on" if p["codex_sessions"] else "off") +
-                 "; chat index " + ("on" if p["chat_index"] else "off") + "; no telemetry")
+    """What stays and what goes: the memory is on this Mac; background reading sends conversations to the user's own
+    model (their Claude plan or API key)."""
+    p, on = cfg["privacy"], lambda x: "on" if x else "off"
+    return Check("privacy", "ok", f"memory stored on this Mac; background reading {on(cfg['llm']['backend'] != 'none')}; "
+                 f"Codex sessions {on(p['codex_sessions'])}; chat index {on(p['chat_index'])}; no telemetry")
 
 
 def check_backups():

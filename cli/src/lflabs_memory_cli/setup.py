@@ -37,9 +37,10 @@ def onboarding():
     return f"""\
 {PRODUCT} gives Claude Code, Codex and Cursor one shared memory on this Mac.
 
-Your memory is one file here, never uploaded. After a Claude Code session goes
-quiet, your own model (your Claude plan or API key) reads the conversation and
-keeps what is worth remembering. Nothing goes to LF Labs. No usage data, ever.
+Your memory is one file here, never uploaded to us. After a Claude Code
+session goes quiet, your own model (your Claude plan or API key) reads the
+conversation and keeps what is worth remembering. Nothing goes to LF Labs. No
+usage data, ever.
 
 Setup adds {PRODUCT} to Claude Code, Codex and Cursor, backing up every file it
 touches, and starts a small background service that keeps search fast.
