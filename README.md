@@ -6,6 +6,8 @@ Hadeva-Dev/lflabs-memory-engine to be public. Other comments give file:line evid
 0.1.5) or in the engine wheel lflabs_memory_engine-0.1.3 (paths under lflabs_memory/).
 -->
 
+<p align="center"><b>English</b> | <a href="README.zh-CN.md">简体中文</a> | <a href="README.ja.md">日本語</a></p>
+
 <h1 align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="assets/lockup-dark.svg">
