@@ -10,6 +10,7 @@ import subprocess
 import sys
 import tempfile
 import threading
+import tomllib
 from pathlib import Path
 
 import pytest
@@ -652,3 +653,69 @@ def test_self_check_without_git(box, capsys):
                  if json.loads(r)["argv"] == ["hook-cursor-start"]) if False else None
     assert start is None
     assert not list(box.home.glob("lflabs-check-*")), "the check folder in the home folder is gone again"
+
+
+def test_setup_stores_where_claude_is(box, tmp_path):
+    """The background service finds claude only in fixed folders (launchd's PATH): setup asks a login shell where it
+    is, as a new Terminal window would find it (an alias too), and puts the absolute path in config.toml."""
+    real = tmp_path / "Claude Code" / "claude"
+    real.parent.mkdir()
+    shutil.copy(box.bin / "claude", real)
+    box.on("zsh", ["-lic", "whence -p claude || alias claude"], 0, f"some rc noise\nclaude='{real}'\n")
+    assert run_setup()[0] == 0
+    cfg = tomllib.loads((layout.data_dir() / "config.toml").read_text())
+    assert cfg["llm"]["claude_path"] == str(real)
+    box.rules["zsh"] = []
+    box.save()
+    assert run_setup()[0] == 0
+    assert tomllib.loads((layout.data_dir() / "config.toml").read_text())["llm"]["claude_path"] == f"{box.bin}/claude", \
+        "else the claude on PATH"
+
+
+STAR = "If Dawnmere helps, a star helps others find it: github.com/Hadeva-Dev/dawnmere"
+
+
+def interactive(monkeypatch):
+    """A person at a terminal (setup's own questions still take their defaults)."""
+    import io
+
+    class TTY(io.StringIO):
+        def isatty(self):
+            return True
+    monkeypatch.setattr(setup.sys, "stdin", TTY(""))
+    monkeypatch.setattr(setup.sys, "stdout", TTY())
+    answering(monkeypatch, {})
+    from lflabs_memory_cli import prompt
+    monkeypatch.setattr(prompt, "text", lambda q, default="": default)
+
+
+def test_the_star_line_once_per_mac(box, monkeypatch, capsys):
+    interactive(monkeypatch)
+    say = []
+    args = cli.parser().parse_args(["setup", "--no-animation"])
+    assert setup.main(args, say=say.append) == 0
+    shown = [line for line in say if STAR in line]
+    assert len(shown) == 1 and len(setup.screen.visible(shown[0]).strip("\n")) <= 80
+    flag = layout.data_dir() / ".star-shown"
+    assert flag.exists() and oct(flag.stat().st_mode & 0o777) == "0o600"
+    say = []
+    assert setup.main(args, say=say.append) == 0
+    assert not any(STAR in line for line in say), "never again, setup re-run or not"
+
+
+@pytest.mark.parametrize("flags", [["--plain"], ["--yes"]])
+def test_no_star_line_in_plain_or_yes_runs(box, monkeypatch, flags):
+    interactive(monkeypatch)
+    say = []
+    assert setup.main(cli.parser().parse_args(["setup", "--no-animation", *flags]), say=say.append) == 0
+    assert not any(STAR in line for line in say) and not (layout.data_dir() / ".star-shown").exists()
+
+
+def test_no_star_line_without_a_terminal_or_after_a_failure(box, monkeypatch, capsys):
+    code, out = run_setup()  # --yes, and no terminal
+    assert STAR not in out
+    interactive(monkeypatch)
+    json.dump({"refuse": True}, open(os.environ["FAKE_ENGINE_STATE"], "w"))
+    say = []
+    assert setup.main(cli.parser().parse_args(["setup", "--no-animation"]), say=say.append) == 1
+    assert not any(STAR in line for line in say) and not (layout.data_dir() / ".star-shown").exists()

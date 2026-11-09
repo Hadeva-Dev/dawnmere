@@ -155,6 +155,14 @@ def check_model(cfg, ping=True):
     if name == "none":
         return Check("model", "ok", f"none: {backend.NONE_LOSES}")
     model = backend.MODELS.get(llm["main_model"], llm["main_model"])
+    if name == "claude-cli":  # the service runs the claude setup found (claude_path), else one on launchd's PATH
+        where = llm.get("claude_path")
+        if where and not os.access(where, os.X_OK):
+            return Check("model", "warn", f"Claude Code is not at {where} any more",
+                         f"run {COMMAND} setup again: it finds claude again")
+        if not where and not layout.find_claude():
+            return Check("model", "warn", "Claude Code is not installed",
+                         f"install Claude Code, then run {COMMAND} setup again")
     s = backend.engine_status(ping) or (backend.claude_status(llm["main_model"], ping) if name == "claude-cli" else None)
     if name == "anthropic-api" and s is None:
         from . import keychain

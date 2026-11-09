@@ -134,6 +134,21 @@ def test_doctor_checks_the_lf_labs_folder(mac, monkeypatch, tmp_path, connector)
     assert "\ndata: the folder is readable by others: chmod 700 '" + str(layout.data_dir().parent) + "'" in text
 
 
+def test_doctor_warns_when_claude_moved(mac, monkeypatch, tmp_path, connector):
+    healthy(mac, monkeypatch, tmp_path)
+    cfg = layout.data_dir() / "config.toml"
+    cfg.write_text(cfg.read_text() + f'claude_path = "{tmp_path}/gone/claude"\n')
+    code, text = run_doctor()
+    assert f"model         warn  Claude Code is not at {tmp_path}/gone/claude any more" in text
+    assert "\nmodel: run dawnmere setup again: it finds claude again" in text
+    cfg.write_text(cfg.read_text().replace(f"{tmp_path}/gone/claude", f"{mac.bin}/claude"))
+    assert "model         ok" in run_doctor()[1]
+    mac.remove("claude")
+    cfg.write_text(cfg.read_text().replace(f'claude_path = "{mac.bin}/claude"\n', ""))
+    code, text = run_doctor()
+    assert "model         warn  Claude Code is not installed" in text
+
+
 def test_doctor_none_mode_line(mac, monkeypatch, tmp_path, connector):
     healthy(mac, monkeypatch, tmp_path, backend_name="none")
     code, text = run_doctor()
