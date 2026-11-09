@@ -93,6 +93,8 @@ def mac(tmp_path, monkeypatch):
     monkeypatch.delenv("LFLABS_MEMORY_HOME", raising=False)
     monkeypatch.delenv("LFLABS_MEMORY_MODELS", raising=False)
     monkeypatch.setenv("LFLABS_MEMORY_SOCKET", str(home / "connector.sock"))
+    from lflabs_memory_cli import layout
+    layout._GIT.clear()
     from lflabs_memory_cli.access import AGENT_ENV
     for k in AGENT_ENV:  # these tests may run in an AI app's shell: setup must not see its markers
         monkeypatch.delenv(k, raising=False)

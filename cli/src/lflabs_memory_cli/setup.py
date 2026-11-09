@@ -23,7 +23,7 @@ from . import (access, apps, backend, claude_settings, edits, install_record, ke
                screen, settings, sockets)
 from .brand import COMMAND, PRODUCT, REPO
 from .layout import (CLI_DIST, CONNECTOR_VERSION, ENGINE, ENGINE_DIST, MARKETPLACE, SERVER, data_dir,
-                     engine_bin, engine_record, find_claude, home, lf_labs_dir, on_shell_path, path_advice, short, uv_bin)
+                     engine_bin, engine_record, find_claude, git_available, home, lf_labs_dir, on_shell_path, path_advice, short, uv_bin)
 from .run import run
 from .screen import AppResult, Memory, Step, pick_memory, self_check_row
 
@@ -383,28 +383,22 @@ def _context(out):
 
 NO_GIT = "git does not work"
 NO_GIT_NOTE = ("git does not work on this Mac: install Apple's Command Line Tools (xcode-select --install). Until "
-               "then memory tells your projects apart by folder rather than by repo, and only inside your home "
-               "folder.")
-
-
-def git_works():
-    try:
-        return subprocess.run(["git", "--version"], capture_output=True, timeout=15).returncode == 0
-    except (OSError, subprocess.SubprocessError):
-        return False
+               "then memory finds a repo by its .git folder, and only inside your home folder.")
 
 
 def self_check(engine):
-    """(passed, recall seconds, why it failed): the try-it path end to end (spec 9.2 step 9), in a new git repo.
-    Without a working git (macOS's /usr/bin/git only offers to install the Command Line Tools) the engine tells
-    projects apart by folder, inside the home folder only: the check folder is then made there for the few seconds it
-    takes, and why is NO_GIT with passed True."""
-    git = git_works()
+    """(passed, recall seconds, why it failed): the try-it path end to end (spec 9.2 step 9), in a new repo. Without
+    the Command Line Tools git is never run (its stub would put up a dialog: layout.git_available): the repo is a .git
+    folder made by hand, in the home folder (where the engine finds repos without git) for the few seconds it takes,
+    and why is NO_GIT with passed True."""
+    git = git_available()
     with tempfile.TemporaryDirectory(prefix="lflabs-check-", dir=None if git else home()) as d:
         project = Path(d).resolve() / "check-project"
         project.mkdir()
         if git:
             subprocess.run(["git", "init", "-q", str(project)], capture_output=True, timeout=15)
+        else:
+            (project / ".git").mkdir(mode=0o700)
         sid = f"self-check-{secrets.token_hex(4)}"
         base = {"session_id": sid, "transcript_path": str(project / "t.jsonl"), "cwd": str(project),
                 "hook_event_name": "UserPromptSubmit"}

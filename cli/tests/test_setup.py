@@ -638,21 +638,55 @@ def test_uninstall_removes_stale_sockets(box):
         shutil.rmtree(stale.parent, ignore_errors=True)
 
 
-def test_self_check_without_git(box, capsys):
-    """Without Apple's Command Line Tools /usr/bin/git only asks to install them, so the check folder is no repo, and
-    the engine cannot tell which repo a new Cursor chat is in (macOS 26 runners failed "a new Cursor chat would not
-    see it" this way). Setup then says so instead of failing."""
-    (box.bin / "git").write_text("#!/bin/sh\necho 'xcrun: error: invalid active developer path' >&2\nexit 1\n")
+def test_self_check_without_git(box, monkeypatch, capsys):
+    """No Command Line Tools: /usr/bin/git is Apple's stub, and running it puts up an install dialog, so git is never
+    run. The check folder is made in the home folder with a .git folder of its own (the engine finds the repo by it);
+    setup says git is missing instead of failing ("a new Cursor chat would not see it", macOS 26 runners)."""
+    (box.bin / "git").write_text(f"#!/bin/sh\necho \"$@\" >> '{box.home}/git-ran'\necho 'GIT WAS RUN' >&2\nexit 99\n")
     (box.bin / "git").chmod(0o755)
+    monkeypatch.setattr(setup, "git_available", lambda: False)
+    seen = []
+    real = setup._hook
+
+    def hook(engine, sub, payload, client=None):
+        seen.append((Path(payload.get("cwd", "")) / ".git").is_dir())
+        return real(engine, sub, payload, client)
+    monkeypatch.setattr(setup, "_hook", hook)
     code, out = run_setup()
     shown = capsys.readouterr().out
     assert code == 0, out + shown
+    assert not (box.home / "git-ran").exists(), "git was run"
+    assert seen and all(seen), "the check folder has its own .git"
     assert "[warn] Self-check: recall in" in shown and "git missing (see below)" in shown
     assert "git does not work on this Mac: install Apple's Command Line Tools (xcode-select --install)" in out
-    start = next(json.loads(r)["stdin"] for r in box.log.read_text().splitlines()
-                 if json.loads(r)["argv"] == ["hook-cursor-start"]) if False else None
-    assert start is None
     assert not list(box.home.glob("lflabs-check-*")), "the check folder in the home folder is gone again"
+
+
+def test_git_available_never_runs_git(tmp_path, monkeypatch):
+    calls = []
+    clt = tmp_path / "CLT"
+    (clt / "usr/bin").mkdir(parents=True)
+    link = tmp_path / "xcode_select_link"
+    monkeypatch.delenv("DEVELOPER_DIR", raising=False)
+
+    def ask(which, link_to=None, dev=None):
+        layout._GIT.clear()
+        if dev:
+            monkeypatch.setenv("DEVELOPER_DIR", str(dev))
+        else:
+            monkeypatch.delenv("DEVELOPER_DIR", raising=False)
+        link.unlink(missing_ok=True)
+        if link_to:
+            link.symlink_to(link_to)
+        return layout.git_available(which=lambda name: calls.append(name) or which, link=str(link))
+    assert ask(None) is False, "no git at all"
+    assert ask("/opt/homebrew/bin/git") is True, "a git that is not Apple's stub"
+    assert ask("/usr/bin/git", link_to=clt) is False, "the stub, and no git in the developer folder"
+    (clt / "usr/bin/git").write_text("")
+    assert ask("/usr/bin/git", link_to=clt) is True
+    assert ask("/usr/bin/git", dev=tmp_path / "nothing") is False, "DEVELOPER_DIR first"
+    assert set(calls) == {"git"}, "only looked up, never run"
+
 
 
 def test_setup_stores_where_claude_is(box, tmp_path):
