@@ -123,6 +123,17 @@ def git_available(which=None, link="/var/db/xcode_select_link"):
     return ok
 
 
+XCODE_SELECT = "/usr/bin/xcode-select"  # a real program, not one of Apple's stubs: it never opens a dialog
+
+
+def developer_tools():
+    """Whether Apple's developer tools are there: xcode-select names a folder holding usr/bin/git (Xcode's or the
+    Command Line Tools'). Without them, /usr/bin/git, install_name_tool and the like are stubs that open a dialog
+    offering to install them."""
+    r = run([XCODE_SELECT, "-p"], timeout=10)
+    return r.ok and os.path.isfile(os.path.join(r.out.strip(), "usr", "bin", "git"))
+
+
 def find_claude():
     """Claude Code's absolute path as a new Terminal window finds it (login and interactive zsh: its PATH, or the
     alias the old local installer made), else the claude on this PATH. The background service has launchd's fixed

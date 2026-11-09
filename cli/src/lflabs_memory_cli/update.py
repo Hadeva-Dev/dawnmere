@@ -13,6 +13,7 @@ import http.client
 import json
 import os
 import re
+import shutil
 import sqlite3
 import sys
 import tempfile
@@ -24,7 +25,7 @@ from pathlib import Path
 from . import apps, edits, install_record, launchd, models, prompt
 from .brand import COMMAND, PRODUCT, REPO
 from .layout import (CLI_DIST, CONNECTOR, CONNECTOR_VERSION, ENGINE_DIST, LABEL, MARKETPLACE, SERVER, data_dir,
-                     engine_bin, engine_record, home, short, uv_bin)
+                     developer_tools, engine_bin, engine_record, home, short, uv_bin)
 from .run import Result, run
 
 API = f"https://api.github.com/repos/{REPO}/releases"
@@ -111,10 +112,14 @@ def verified_deps(lock, where):
     """Every dependency in lock downloaded into `where` by pip, each file checked against its hash there (uv tool
     install does not check the hashes in a constraints file, uv 0.12.5), with uv's own Python 3.12. Nothing of
     theirs runs and nothing is installed. A Result."""
-    uv = uv_bin() or "uv"
-    r = run([uv, "python", "install", "--managed-python", "--no-bin", "3.12"], timeout=600)
-    if r.ok:
-        r = run([uv, "python", "find", "--managed-python", "3.12"], timeout=60)
+    uv = uv_bin() or shutil.which("uv") or "uv"
+    r = run([uv, "python", "find", "--managed-python", "3.12"], timeout=60)
+    if not r.ok:  # `uv python install` runs install_name_tool, whose stub opens the developer-tools dialog: as in
+        # install.sh, without the tools it runs with no PATH (uv then only warns that it could not rename the library)
+        env = None if developer_tools() else {**os.environ, "PATH": "/var/empty"}
+        r = run([uv, "python", "install", "--managed-python", "--no-bin", "3.12"], timeout=600, env=env)
+        if r.ok:
+            r = run([uv, "python", "find", "--managed-python", "3.12"], timeout=60)
     if not r.ok or not r.out.strip():
         return Result(r.code or 1, "", f"uv has no Python 3.12 ({(r.err or r.out).strip()[-200:]})")
     return run([r.out.strip(), "-I", "-m", "pip", "download", "--require-hashes", "--only-binary", ":all:", "--no-deps",

@@ -9,7 +9,8 @@ import json, os, sys
 prog = os.path.basename(sys argv0)
 argv = sys.argv[1:]
 with open(os.environ["FAKE_LOG"], "a") as f:
-    f.write(json.dumps({{"prog": prog, "argv": argv, "stdin": "" if sys.stdin.isatty() else sys.stdin.read()}}) + "\\n")
+    f.write(json.dumps({{"prog": prog, "argv": argv, "stdin": "" if sys.stdin.isatty() else sys.stdin.read(),
+                        "path": os.environ.get("PATH", "")}}) + "\\n")
 rules = json.load(open(os.environ["FAKE_RULES"])).get(prog, [])
 for prefix, code, out in rules:
     if argv[:len(prefix)] == prefix:
@@ -51,6 +52,13 @@ class Fakes:
             return []
         rows = [json.loads(line) for line in self.log.read_text().splitlines()]
         return [r["argv"] for r in rows if prog is None or r["prog"] == prog]
+
+    def paths(self, prog):
+        """(argv, PATH) of each call to prog."""
+        if not self.log.exists():
+            return []
+        rows = [json.loads(line) for line in self.log.read_text().splitlines()]
+        return [(r["argv"], r.get("path", "")) for r in rows if r["prog"] == prog]
 
     def env(self, monkeypatch):
         monkeypatch.setenv("PATH", f"{self.bin}{os.pathsep}/usr/bin{os.pathsep}/bin")

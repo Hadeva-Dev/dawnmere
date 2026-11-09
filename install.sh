@@ -141,8 +141,18 @@ cp "$TMP/dl.$ENGINE_WHEEL" "$TMP/$ENGINE_WHEEL"
 # install does not check those hashes), with uv's own Python 3.12 (its download checked by uv); nothing of theirs
 # runs. A mismatch stops here, before anything is installed.
 LOCK="$TMP/dl.constraints.txt"
-if ! { "$UV" python install --managed-python --no-bin 3.12 && PY=$("$UV" python find --managed-python 3.12) &&
-  "$PY" -I -m pip download --require-hashes --only-binary :all: --no-deps --no-cache-dir \
+# `uv python install` runs install_name_tool every time: without the developer tools Apple's stub opens their install
+# dialog. So none when the Python is there; without the tools, no PATH (uv only warns; nothing here builds natively).
+XCODE_SELECT="${LFLABS_MEMORY_XCODE_SELECT:-/usr/bin/xcode-select}"
+py312() {
+  "$UV" python find --managed-python 3.12 2>/dev/null && return 0
+  if dev=$("$XCODE_SELECT" -p 2>/dev/null) && [ -f "$dev/usr/bin/git" ]; then
+    "$UV" python install --managed-python --no-bin 3.12 >&2
+  else
+    PATH=/var/empty "$UV" python install --managed-python --no-bin 3.12 >&2
+  fi && "$UV" python find --managed-python 3.12
+}
+if ! { PY=$(py312) && "$PY" -I -m pip download --require-hashes --only-binary :all: --no-deps --no-cache-dir \
     --disable-pip-version-check -q -r "$LOCK" -d "$TMP/deps"; } >"$TMP/uv.log" 2>&1; then
   tail -n 5 "$TMP/uv.log" >&2
   fail "A dependency could not be downloaded or did not match its hash, so nothing was installed."
