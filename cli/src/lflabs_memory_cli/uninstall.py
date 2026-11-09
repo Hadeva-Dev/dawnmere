@@ -98,6 +98,28 @@ def _backups(path, original):
     return keep
 
 
+def _zprofile(rep):
+    """The PATH line install.sh put in ~/.zprofile (DATA_DIR/zprofile-line: "created" or "existing", then exactly
+    what it appended): taken out, and the file too when install.sh made it and nothing else is in it."""
+    rec = data_dir() / "zprofile-line"
+    try:
+        was, added = rec.read_text().split("\n", 1)
+    except (OSError, ValueError):
+        return
+    path = home() / ".zprofile"
+    try:
+        old = edits.read(path)
+        if old is not None and old.count(added) == 1:
+            i = old.index(added)
+            rest = old[i + len(added):]  # lines added since stay on lines of their own
+            new = old[:i] + ("\n" if added.startswith("\n") and rest else "") + rest
+            edits.write(path, None if was == "created" and not new.strip() else new, old, backup=False)
+            rep.row("Your PATH", "removed", "~/.zprofile: the installer's PATH line taken out")
+    except edits.Skip as e:
+        rep.row("Your PATH", "error", f"~/.zprofile: {e}")
+    rec.unlink(missing_ok=True)
+
+
 def _stale_sockets(rep):
     """The engine's two sockets, left behind when nothing answers on them any more."""
     for sock in (connector_sock(), engine_sock()):
@@ -127,6 +149,7 @@ def main(keep_data=False, out=print):
                 if p.state == "remove":
                     _file(entry, rep)
 
+    _zprofile(rep)
     rep.row("API key", *(("removed", "removed from the Keychain") if keychain.delete() else
                           ("gone", "none in the Keychain")))
 

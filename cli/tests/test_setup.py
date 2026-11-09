@@ -393,20 +393,20 @@ def test_setup_reports_a_bootstrap_launchd_refused(box, capsys):
 
 
 def test_path_advice_when_a_new_terminal_would_not_find_dawnmere(box, capsys):
-    """Checked the way a new Terminal window starts zsh (login and interactive), so the advice is ~/.zshrc."""
+    """Checked the way a new Terminal window starts zsh (login and interactive), so the advice is ~/.zprofile."""
     box.on("zsh", ["-lic"], 1, "")
     code, out = run_setup()
     assert code == 0
     assert ["-lic", "command -v dawnmere"] in box.calls("zsh")
-    assert 'To run dawnmere later, add this line to ~/.zshrc:\n  export PATH="' in out
+    assert 'To run dawnmere later, add this line to ~/.zprofile:\n  export PATH="' in out
     box.rules["zsh"] = []
     box.save()
-    assert "~/.zshrc" not in run_setup()[1]
+    assert "~/.zprofile" not in run_setup()[1]
 
 
 @pytest.mark.skipif(not os.path.exists("/bin/zsh"), reason="no zsh")
 def test_path_advice_and_check_agree(tmp_path, monkeypatch):
-    """The real zsh: the line the advice gives, put in ~/.zshrc, is what makes the check pass."""
+    """The real zsh: the line the advice gives, put in ~/.zprofile, is what makes the check pass."""
     home = tmp_path / "home"
     tools = tmp_path / "tools bin"
     tools.mkdir(parents=True)
@@ -418,8 +418,8 @@ def test_path_advice_and_check_agree(tmp_path, monkeypatch):
     monkeypatch.setattr(layout, "tool_bin", lambda: str(tools))
     assert not layout.on_shell_path()
     advice = layout.path_advice()
-    assert advice.startswith("To run dawnmere later, add this line to ~/.zshrc:\n  ")
-    (home / ".zshrc").write_text(advice.splitlines()[1].strip() + "\n")
+    assert advice.startswith("To run dawnmere later, add this line to ~/.zprofile:\n  ")
+    (home / ".zprofile").write_text(advice.splitlines()[1].strip() + "\n")
     assert layout.on_shell_path()
 
 

@@ -59,7 +59,7 @@ def sh(script, env):
 def test_install_sh_posix():
     r = subprocess.run(["shellcheck", "-s", "sh", str(ROOT / "install.sh")], capture_output=True, text=True)
     assert r.returncode == 0, r.stdout
-    assert len((ROOT / "install.sh").read_text().splitlines()) <= 180  # 150 until retries and the API fallback
+    assert len((ROOT / "install.sh").read_text().splitlines()) <= 200  # 150, 180 with the retries, 200 with .zprofile
 
 
 def test_source_copy_refuses(release):
@@ -164,33 +164,43 @@ def test_render_fills_every_release_line(release):
     assert os.access(ROOT / "install.sh", os.X_OK) or True
 
 
-def test_path_advice_is_setups(release, tmp_path):
-    """Without setup to follow, install.sh gives setup's own PATH advice, checked the way setup and doctor check it
-    (zsh as a new Terminal window starts it). With setup to follow, setup says it at its end."""
-    from lflabs_memory_cli import layout
+def zprofile_run(release, **env):
     release.add("zsh")
-    release.on("zsh", ["-lic", "command -v dawnmere"], 1, "")
-    r = sh(release.script, {**release.env_vars, "LFLABS_MEMORY_NO_SETUP": "1"})
-    assert r.returncode == 0, r.stderr
-    tools = tmp_path / "tools-bin"
-    assert f'To run dawnmere later, add this line to ~/.zshrc:\n  export PATH="{tools}:$PATH"\n' in r.stdout
-    assert ["-lic", "command -v dawnmere"] in release.calls("zsh")
-    assert "add this line to ~/.zshrc:\n  " in layout.path_advice()
-    release.rules["zsh"] = []
+    release.rules["zsh"] = [[["-lic", "command -v dawnmere"], 1, ""]]
     release.save()
-    assert "~/.zshrc" not in sh(release.script, {**release.env_vars, "LFLABS_MEMORY_NO_SETUP": "1"}).stdout
-    assert "~/.zshrc" not in sh(release.script, release.env_vars).stdout
+    return sh(release.script, {**release.env_vars, "LFLABS_MEMORY_NO_SETUP": "1", **env})
 
 
-def test_no_terminal_means_no_setup(release):
-    """`curl | sh </dev/null`: nobody can say yes to changing the apps' files, so setup does not run, and the
-    installer says how to run it."""
-    env = {k: v for k, v in release.env_vars.items() if k != "LFLABS_MEMORY_TTY"}
-    r = sh(release.script, env)
+def test_a_new_terminal_finds_dawnmere(release, tmp_path):
+    """A login shell would not find dawnmere: the tool folder goes on PATH in ~/.zprofile (made if missing), once,
+    said in one line, and recorded for uninstall. Checked as setup and doctor check it (zsh -lic)."""
+    tools = tmp_path / "tools-bin"
+    line = f'export PATH="{tools}:$PATH"  # added by the Dawnmere installer'
+    r = zprofile_run(release)
     assert r.returncode == 0, r.stderr
-    assert release.calls("dawnmere") == []
-    assert ("There is no terminal for setup's questions, so no app was changed. Run \"dawnmere setup\" in a "
-            "Terminal window, or \"dawnmere setup --yes\" to take the defaults.") in " ".join(r.stdout.split())
+    assert (release.home / ".zprofile").read_text() == line + "\n"
+    assert f"New Terminal windows find dawnmere: {tools} is on PATH in ~/.zprofile now." in r.stdout
+    record = release.home / "Library/Application Support/LF Labs/Memory/zprofile-line"
+    assert record.read_text() == f"created\n{line}\n"
+    assert ["-lic", "command -v dawnmere"] in release.calls("zsh")
+    assert zprofile_run(release).returncode == 0
+    assert (release.home / ".zprofile").read_text() == line + "\n", "never twice"
+
+
+def test_zprofile_of_ones_own_is_appended_to(release, tmp_path):
+    (release.home / ".zprofile").write_text('eval "$(/opt/homebrew/bin/brew shellenv)"')  # no newline at the end
+    assert zprofile_run(release).returncode == 0
+    line = f'export PATH="{tmp_path / "tools-bin"}:$PATH"  # added by the Dawnmere installer'
+    assert (release.home / ".zprofile").read_text() == f'eval "$(/opt/homebrew/bin/brew shellenv)"\n{line}\n'
+    assert (release.home / "Library/Application Support/LF Labs/Memory/zprofile-line").read_text() == \
+        f"existing\n\n{line}\n"
+
+
+def test_no_zprofile_line_when_a_new_terminal_finds_it(release):
+    release.add("zsh")
+    r = sh(release.script, {**release.env_vars, "LFLABS_MEMORY_NO_SETUP": "1"})
+    assert r.returncode == 0 and not (release.home / ".zprofile").exists() and "zprofile" not in r.stdout
+
 
 
 @pytest.mark.parametrize("locale,cell", [({"LC_ALL": "C"}, "-"), ({"LANG": "en_US.UTF-8"}, "─"),
