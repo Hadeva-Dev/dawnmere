@@ -1,0 +1,12 @@
+#!/bin/sh
+# Claude Code's hooks run the engine through this, so they never depend on PATH: the absolute path setup wrote
+# into the data folder, else uv's tool bin folder. No engine: quiet (exit 0, no output), so a broken install never
+# blocks a prompt. apps.hook_engine() in the CLI looks in the same places.
+data="${LFLABS_MEMORY_HOME:-$HOME/Library/Application Support/LF Labs/Memory}"
+recorded=$(cat "$data/engine-path" 2>/dev/null)
+for e in "$recorded" ${UV_TOOL_BIN_DIR:+"$UV_TOOL_BIN_DIR/lflabs-memory"} \
+  ${XDG_BIN_HOME:+"$XDG_BIN_HOME/lflabs-memory"} "$HOME/.local/bin/lflabs-memory"; do
+  case $e in /*) if [ -x "$e" ]; then exec "$e" "$@"; fi ;; esac
+done
+cat >/dev/null 2>&1
+exit 0

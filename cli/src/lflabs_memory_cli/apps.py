@@ -9,6 +9,7 @@ Ours, wherever it appears:
 An entry named lflabs-memory that is not ours (another tool's) is left alone and reported.
 """
 import json
+import os
 import re
 import shlex
 import shutil
@@ -16,7 +17,7 @@ from dataclasses import dataclass
 
 from . import edits
 from .edits import Skip
-from .layout import CLIENT_ENV, CONNECTOR, CONNECTOR_VERSION, ENGINE, SERVER, home
+from .layout import CLIENT_ENV, CONNECTOR, CONNECTOR_VERSION, ENGINE, SERVER, engine_record, home
 from .run import run
 
 KEY_ENV = "LFLABS_MEMORY_CLIENT_KEY"  # an app trusted with more than work only carries its key (access.py)
@@ -56,6 +57,20 @@ def node_status():
     if int(m.group(1)) < MIN_NODE:
         return v, f"Node.js {v} is too old"
     return v, None
+
+
+def hook_engine():
+    """The engine the Claude Code plugin's hooks run, found where plugin/scripts/engine looks (never PATH): the path
+    setup recorded, else uv's tool bin folder. None when there is none."""
+    try:
+        recorded = engine_record().read_text().strip()
+    except OSError:
+        recorded = ""
+    bins = [os.environ.get("UV_TOOL_BIN_DIR"), os.environ.get("XDG_BIN_HOME"), str(home() / ".local/bin")]
+    for e in [recorded] + [os.path.join(b, ENGINE) for b in bins if b]:
+        if os.path.isabs(e) and os.access(e, os.X_OK):
+            return e
+    return None
 
 
 def connector_args():

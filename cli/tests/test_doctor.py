@@ -42,8 +42,9 @@ def healthy(mac, monkeypatch, tmp_path, backend_name="claude-cli"):
     mac.on("ps", [], 0, " 2-03:04:05\n")
     mac.add("ps")
     mac.add("lflabs-memory")
-    for prog in ("node", "npx"):
+    for prog in ("node", "npx", "zsh"):
         mac.add(prog)
+    layout.engine_record().write_text(f"{mac.bin}/lflabs-memory\n")
     mac.on("node", ["--version"], 0, "v20.11.0\n")
     mac.on("claude", ["--version"], 0, "2.1.301 (Claude Code)\n")
     mac.on("claude", ["plugin", "list"], 0, "  lflabs-memory@lflabs  1.0.0b1  enabled\n")
@@ -69,6 +70,7 @@ backlog       ok    0 sessions waiting to be read
 Claude Code   ok    plugin lflabs-memory 1.0.0b1, hooks on
 Codex         ok    MCP + hook (Codex asks you to trust the hook once: /hooks)
 Cursor        ok    MCP, work only (change it: dawnmere access cursor)
+dawnmere      ok    on your PATH
 privacy       ok    local only; Codex sessions off; chat index off; no telemetry
 backups       ok    last local snapshot 6 h ago (1 kept)"""
 
@@ -111,6 +113,16 @@ def test_doctor_node_too_old(mac, monkeypatch, tmp_path, connector):
     assert "Node.js       warn  Node.js v16.20.2 is too old" in text
     assert "Codex cannot use memory's tools until Node.js 18 or later is installed" in text
     assert "\nNode.js: install Node.js 18 or later from nodejs.org" in text
+
+
+def test_doctor_path_row(mac, monkeypatch, tmp_path, connector):
+    """The same check and advice as setup and install.sh: zsh as a new Terminal window starts it, ~/.zshrc."""
+    healthy(mac, monkeypatch, tmp_path)
+    mac.on("zsh", ["-lic"], 1, "")
+    code, text = run_doctor()
+    assert "dawnmere      warn  not on your PATH: a new Terminal window will not find it" in text
+    assert '\ndawnmere: add this line to ~/.zshrc, then open a new Terminal window: export PATH="' in text
+    assert ["-lic", "command -v dawnmere"] in mac.calls("zsh")
 
 
 def test_doctor_none_mode_line(mac, monkeypatch, tmp_path, connector):
@@ -304,10 +316,12 @@ def test_first_day_wording(mac, monkeypatch, tmp_path):
     mac.on("claude", ["plugin", "list"], 0, "Installed plugins:\n\n  > lflabs-memory@lflabs\n    Version: 0.1.0\n"
            "    Scope: user\n    Status: enabled\n")
     mac.add("lflabs-memory")
+    layout.engine_record().write_text(f"{mac.bin}/lflabs-memory\n")
     assert doctor.check_claude().note == "plugin lflabs-memory 0.1.0, hooks on"
     mac.remove("lflabs-memory")
     c = doctor.check_claude()
-    assert c.state == "warn" and c.note.endswith("but its hooks cannot find lflabs-memory") and "~/.local/bin" in c.fix
+    assert c.state == "warn" and c.note.endswith("but its hooks cannot find the engine")
+    assert c.fix == "run dawnmere setup again"
     out = []
     export.export(str(tmp_path / "x.json"), say=out.append)
     assert out[0].startswith("Exported 1 memory to ")

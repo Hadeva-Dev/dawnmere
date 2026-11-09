@@ -5,6 +5,7 @@ import sys
 from pathlib import Path
 
 from .brand import COMMAND
+from .run import run
 
 SERVER = "lflabs-memory"                 # our MCP entry in every app's config, and the Claude Code plugin's name
 ENGINE = "lflabs-memory"                 # the engine's console script
@@ -33,6 +34,11 @@ def data_dir():
 
 def install_json():
     return data_dir() / "install.json"
+
+
+def engine_record():
+    """The engine's absolute path, written by setup: what the Claude Code plugin's hooks run (plugin/scripts/engine)."""
+    return data_dir() / "engine-path"
 
 
 def logs_dir():
@@ -69,6 +75,28 @@ def uv_bin():
         return found
     local = home() / ".local/bin/uv"
     return str(local) if os.access(local, os.X_OK) else None
+
+
+def tool_bin():
+    """The folder uv links the CLI's command into (uv tool dir --bin), as install.sh asks it."""
+    r = run([uv_bin(), "tool", "dir", "--bin"], timeout=15) if uv_bin() else None
+    return r.out.strip() if r and r.ok and r.out.strip() else str(home() / ".local/bin")
+
+
+def on_shell_path():
+    """Whether a new Terminal window finds the CLI's command: zsh started as Terminal starts it, login and
+    interactive, so ~/.zprofile and ~/.zshrc are both read (the advice below names ~/.zshrc). install.sh and doctor
+    check it the same way."""
+    return run(["zsh", "-lic", f"command -v {COMMAND}"], timeout=15).ok
+
+
+def path_line():
+    return f'export PATH="{tool_bin()}:$PATH"'
+
+
+def path_advice():
+    """Word for word what install.sh prints."""
+    return f"To run {COMMAND} later, add this line to ~/.zshrc:\n  {path_line()}"
 
 
 def short(path):

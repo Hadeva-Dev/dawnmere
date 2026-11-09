@@ -8,9 +8,9 @@ import time
 from dataclasses import asdict, dataclass
 from importlib import metadata
 
-from . import apps, backend, launchd, models, settings, sockets
+from . import apps, backend, launchd, layout, models, settings, sockets
 from .brand import COMMAND
-from .layout import CONNECTOR, CONNECTOR_VERSION, ENGINE, ENGINE_DIST, SERVER, data_dir, engine_bin, home, short
+from .layout import CONNECTOR, CONNECTOR_VERSION, ENGINE_DIST, SERVER, data_dir, engine_bin, home, short
 from .run import run
 
 SLOW = 1.5
@@ -212,10 +212,9 @@ def check_claude():
     if r.ok and SERVER in r.out:
         m = re.search(rf"{re.escape(SERVER)}\S*\s+(?:Version:\s*)?v?(\d[\w.]*)", r.out)  # 2.1.301 lists "Version: x"
         plugin = f"plugin {SERVER}" + (f" {m.group(1)}" if m else "")
-        if not run(["zsh", "-lc", f"command -v {ENGINE}"], timeout=15).ok:  # the plugin's hooks run it by name
-            return Check("Claude Code", "warn", f"{plugin}, but its hooks cannot find {ENGINE}",
-                         'add ~/.local/bin to your PATH (export PATH="$HOME/.local/bin:$PATH" in ~/.zshrc), then '
-                         "restart Claude Code")
+        if not apps.hook_engine():  # where the plugin's hook launcher looks, never PATH
+            return Check("Claude Code", "warn", f"{plugin}, but its hooks cannot find the engine",
+                         f"run {COMMAND} setup again")
         return Check("Claude Code", "ok", f"{plugin}, hooks on")
     try:
         text = (home() / ".claude/settings.json").read_text()
@@ -258,6 +257,13 @@ def check_cursor():
     return Check("Cursor", "warn", "not connected", f"run {COMMAND} setup")
 
 
+def check_command():
+    if layout.on_shell_path():
+        return Check(COMMAND, "ok", "on your PATH")
+    return Check(COMMAND, "warn", "not on your PATH: a new Terminal window will not find it",
+                 f"add this line to ~/.zshrc, then open a new Terminal window: {layout.path_line()}")
+
+
 def check_privacy(cfg):
     p = cfg["privacy"]
     return Check("privacy", "ok", "local only; Codex sessions " + ("on" if p["codex_sessions"] else "off") +
@@ -282,7 +288,7 @@ def checks(ping=True):
     try:
         return [check_engine(), check_data(db), check_models(), check_hook(), check_connector(), check_node(node),
                 check_model(cfg, ping), check_budget(db, cfg), check_backlog(db),
-                *(_no_tools(c, node) for c in (check_claude(), check_codex(), check_cursor())),
+                *(_no_tools(c, node) for c in (check_claude(), check_codex(), check_cursor())), check_command(),
                 check_privacy(cfg), check_backups()]
     finally:
         if db is not None:
