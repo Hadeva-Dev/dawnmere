@@ -20,7 +20,8 @@ from importlib import metadata
 from . import edits
 from .brand import REPO
 from .edits import Skip
-from .layout import CLI_DIST, CLIENT_ENV, CONNECTOR, CONNECTOR_VERSION, ENGINE, SERVER, engine_record, home
+from .layout import (CLI_DIST, CLIENT_ENV, CONNECTOR, CONNECTOR_VERSION, ENGINE, MARKETPLACE, SERVER, engine_record,
+                     home)
 from .run import run
 
 KEY_ENV = "LFLABS_MEMORY_CLIENT_KEY"  # an app trusted with more than work only carries its key (access.py)
@@ -67,6 +68,23 @@ def marketplace_source(version=None):
     plugin (and what its hooks run) changes with a release, never with a push to main. LFLABS_MEMORY_MARKETPLACE
     overrides it (a local checkout, for testing)."""
     return os.environ.get("LFLABS_MEMORY_MARKETPLACE") or f"{REPO}#v{version or metadata.version(CLI_DIST)}"
+
+
+def marketplace_pinned(version=None):
+    """Whether Claude Code's marketplace (`claude plugin marketplace list --json`) is this repo at this release's tag.
+    True when it cannot tell (an old claude), or under LFLABS_MEMORY_MARKETPLACE (a local checkout)."""
+    if os.environ.get("LFLABS_MEMORY_MARKETPLACE"):
+        return True
+    r = run(["claude", "plugin", "marketplace", "list", "--json"], timeout=30)
+    try:
+        listed = json.loads(r.out) if r.ok else None
+    except ValueError:
+        listed = None
+    if not isinstance(listed, list):
+        return True
+    ours = next((m for m in listed if isinstance(m, dict) and m.get("name") == MARKETPLACE), None)
+    return ours is not None and ours.get("repo") == REPO and \
+        ours.get("ref") == f"v{version or metadata.version(CLI_DIST)}"
 
 
 def hook_engine():

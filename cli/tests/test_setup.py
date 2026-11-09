@@ -810,3 +810,30 @@ def test_self_check_waits_for_the_service_and_tries_again(box, monkeypatch, caps
     code, out = run_setup()
     assert code == 1 and [e for e in events if e[0] == "check"] == [("check", None)] * 3
     assert "[fail] Self-check: a new Cursor chat would not see it" in capsys.readouterr().out
+
+
+def marketplace_at(box, ref):
+    entry = {"name": "lflabs", "source": "github", "repo": "Hadeva-Dev/dawnmere", **({"ref": ref} if ref else {})}
+    box.on("claude", ["plugin", "marketplace", "list", "--json"], 0, json.dumps([entry]))
+    box.on("claude", ["plugin", "list"], 0, "  lflabs-memory@lflabs  0.1.0  enabled\n")
+
+
+@pytest.mark.parametrize("ref", [None, "v0.1.5"])
+def test_rerun_pins_an_unpinned_marketplace(box, capsys, ref):
+    """The install line run again on a 0.1.5 install: the plugin is there, but its marketplace follows main (or an
+    older tag), so it is moved to this release's tag (remove, add at the tag, install)."""
+    marketplace_at(box, ref)
+    assert run_setup()[0] == 0
+    version = importlib.metadata.version("lflabs-memory-cli")
+    calls = [c for c in box.calls("claude") if c[:2] == ["plugin", "marketplace"] and c[2] != "list"]
+    calls += [c for c in box.calls("claude") if c[:2] == ["plugin", "install"]]
+    assert calls == [["plugin", "marketplace", "remove", "lflabs"],
+                     ["plugin", "marketplace", "add", f"Hadeva-Dev/dawnmere#v{version}", "--scope", "user"],
+                     ["plugin", "install", "lflabs-memory@lflabs", "--scope", "user", "-y"]]
+
+
+def test_rerun_leaves_a_marketplace_at_this_tag(box):
+    marketplace_at(box, f"v{importlib.metadata.version('lflabs-memory-cli')}")
+    assert run_setup()[0] == 0
+    assert not [c for c in box.calls("claude") if c[:3] in (["plugin", "marketplace", "remove"],
+                                                           ["plugin", "marketplace", "add"], ["plugin", "install"])]
