@@ -96,6 +96,43 @@ def agent_shell(env=None):
     return next((k for k in AGENT_ENV if env.get(k)), None)
 
 
+# Processes an AI app runs commands under, and how they are looked up: the engine's own list (access.AGENT_PROCS),
+# /bin/ps by its absolute path with a fixed PATH, so nothing an agent put on PATH answers instead.
+AGENT_PROCS = ("claude", "codex", "cursor", "cursor helper", "node", "windsurf", "copilot", "aider", "goose")
+PS, SAFE_ENV = "/bin/ps", {"PATH": "/usr/bin:/bin"}
+
+
+def agent_ancestor(pid=None, run=None):
+    """The name of an AI app among this process's ancestors, up to launchd; "unknown (...)" when the walk cannot be
+    read (fails closed); None when there is none (which proves nothing about a person on its own)."""
+    run = run or subprocess.run
+    pid, seen = pid or os.getppid(), set()
+    while pid != 1:
+        if pid in seen or pid <= 0:
+            return "unknown (a broken process chain)"
+        seen.add(pid)
+        try:
+            out = run([PS, "-o", "ppid=,comm=", "-p", str(pid)], capture_output=True, text=True, timeout=5,
+                      env=SAFE_ENV).stdout
+        except (OSError, subprocess.SubprocessError):
+            return "unknown (ps failed)"
+        parts = (out or "").strip().split(None, 1)
+        if len(parts) < 2 or not parts[0].isdigit():
+            return "unknown (ps gave nothing readable)"
+        name = os.path.basename(parts[1]).lower()
+        if any(name == a or name.startswith(a + " ") or name.startswith(a + ".") for a in AGENT_PROCS):
+            return name
+        pid = int(parts[0])
+    return None
+
+
+def person_at_terminal():
+    """The engine's test for "the user typed this": no AI app's shell markers, no AI app among the ancestors, and a
+    terminal on stdin and stdout. Each can be faked alone; together they keep an agent's commands from passing as
+    the user's own words."""
+    return not agent_shell() and agent_ancestor() is None and sys.stdin.isatty() and sys.stdout.isatty()
+
+
 def engine_widens(engine, app, level):
     """The engine's own `clients level`, on this terminal: its gate refuses an AI app's shell or a process an AI app
     started, asks for the app's name, then needs Allow clicked in a macOS dialog, and logs the change to the access

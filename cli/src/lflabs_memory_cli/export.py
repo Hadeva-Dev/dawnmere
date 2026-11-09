@@ -1,8 +1,8 @@
 """export / import: your memory as one file, to keep or to move Macs (spec 9.5).
 
 Secrets (memories the engine marked `secret`) never leave: they are left out and counted. Import goes through the
-engine's own remember(), so a memory already there is not added twice; imported memories are labelled "unknown"
-origin, never "your own words" (a file can say anything about where it came from).
+engine's own remember(), so a memory already there is not added twice. Imported by the user at a terminal, their own
+memories stay their own (import_origin); imported by an AI app, every one is of "unknown" origin.
 """
 import json
 import os
@@ -92,13 +92,27 @@ def export(out_file=None, fmt="json", include_claims=False, say=print):
     return 0
 
 
+OWN = {"owner_key", "owner_typed", "owner_vouched", "owner_desk"}  # the engine's OWNER_ORIGINS: the user's own words
+
+
+def import_origin(exported, by_person):
+    """The origin an imported memory is saved with. Run by the user at a terminal (access.person_at_terminal), they
+    vouch for their own file: an origin of their own stays, and a row without one is owner_vouched. Anything else,
+    and everything an AI app imports, is unknown (a file can say anything about where it came from)."""
+    if not by_person:
+        return "unknown"
+    if exported in OWN:
+        return exported
+    return "owner_vouched" if not exported else "unknown"
+
+
 def _engine_remember():
-    """remember(content, kind, project) through the engine, on its own store."""
+    """remember(content, kind, project, origin) through the engine, on its own store."""
     from lflabs_memory import mem  # noqa: the engine is installed with this CLI
     db = mem.connect()
 
-    def save(content, kind, project):
-        return mem.remember(db, content, kind, project, origin="unknown", via="import")
+    def save(content, kind, project, origin="unknown"):
+        return mem.remember(db, content, kind, project, origin=origin, via="import")
     return save
 
 
@@ -116,13 +130,16 @@ def import_file(path, say=print, remember=None):
         say(f"Cannot import {path}: {e}.")
         return 1
     save = remember or _engine_remember()
+    from .access import person_at_terminal
+    by_person = person_at_terminal()
     added = same = refused = 0
     for m in doc["memories"]:
         content = m.get("content") if isinstance(m, dict) else None
         if not isinstance(content, str) or not content.strip():
             refused += 1
             continue
-        mid, action = save(content, m.get("kind") or "note", m.get("project"))
+        mid, action = save(content, m.get("kind") or "note", m.get("project"),
+                           origin=import_origin(m.get("origin"), by_person))
         if mid is None:
             refused += 1
         elif action == "added":
