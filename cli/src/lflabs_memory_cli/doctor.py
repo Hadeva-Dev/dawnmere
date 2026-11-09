@@ -171,6 +171,9 @@ def _no_tools(check, node, on_npm=True):
     return check
 
 
+READING_WAITS = "background reading waits (recall and remember still work)"
+
+
 def check_model(cfg, ping=True):
     llm = cfg["llm"]
     name = llm["backend"]
@@ -188,11 +191,11 @@ def check_model(cfg, ping=True):
     s = backend.engine_status(ping) or (backend.claude_status(llm["main_model"], ping) if name == "claude-cli" else None)
     if name == "anthropic-api" and s is None:
         from . import keychain
-        if not keychain.present():
-            return Check("model", "fail", "API key missing from the Keychain", f"run {COMMAND} setup")
+        if not keychain.present():  # warn, not fail: background reading waits; recall and remember still work
+            return Check("model", "warn", f"API key missing from the Keychain; {READING_WAITS}", f"run {COMMAND} setup")
         return Check("model", "ok", f"Anthropic API key, {model}")
     if not s.ok:
-        return Check("model", "fail", s.note or "not working",
+        return Check("model", "warn", f"{s.note or 'not working'}; {READING_WAITS}",
                      s.note if "run claude" in (s.note or "") else f"run {COMMAND} setup to choose again")
     who = f"Claude Code {s.version}" if name == "claude-cli" else "Anthropic API key"
     login = ", logged in" if s.logged_in else ""

@@ -89,6 +89,7 @@ def remove():
     was, _ = loaded()
     if was:
         run(["launchctl", "bootout", f"{domain()}/{LABEL}"], timeout=30)
+        wait_gone()  # bootout returns before the daemon has exited (and let go of its sockets)
     path = plist_path()
     had = path.exists()
     path.unlink(missing_ok=True)

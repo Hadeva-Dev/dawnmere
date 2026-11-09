@@ -199,6 +199,17 @@ def test_doctor_counts_saves_held_back(mac, monkeypatch, tmp_path, connector):
     assert "held back" not in run_doctor()[1]
 
 
+def test_signed_out_of_claude_code_is_a_warning(mac, monkeypatch, tmp_path, connector):
+    """Background reading cannot run, but recall and remember still work: warn, exit 0."""
+    healthy(mac, monkeypatch, tmp_path)
+    mac.rules["claude"] = [r for r in mac.rules["claude"] if r[0][:1] != ["-p"]]
+    mac.on("claude", ["-p"], 1, "Invalid API key · Please run /login")
+    code, text = run_doctor()
+    row = next(x for x in text.splitlines() if x.startswith("model "))
+    assert row.startswith("model         warn") and "recall and remember still work" in row
+    assert code == 0
+
+
 def test_doctor_none_mode_line(mac, monkeypatch, tmp_path, connector):
     healthy(mac, monkeypatch, tmp_path, backend_name="none")
     code, text = run_doctor()

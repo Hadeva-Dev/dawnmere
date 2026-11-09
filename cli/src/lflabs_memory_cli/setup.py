@@ -651,7 +651,8 @@ def main(args, say=print):
     intro = full_show(args.show)
     if a.api_key and keychain.store(a.api_key):
         record["keychain"] = True
-    settings.save(settings.render(a.name, a.backend, a.model, a.codex_sessions, claude_path=find_claude()))
+    settings.save(settings.render(a.name, a.backend, a.model, a.codex_sessions, claude_path=find_claude(),
+                                  keep=settings.raw()))
     record["versions"] = {"cli": _version(CLI_DIST), "engine": _version(ENGINE_DIST), "connector": CONNECTOR_VERSION}
     install_record.save(record)
     work = RealSetup(a, record, say)
