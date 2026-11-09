@@ -68,7 +68,8 @@ export function createServer(env = process.env): McpServer {
       title: "Forget a memory",
       description:
         "Use this when a memory recall showed is wrong, out of date, or the user asks you to forget it. " +
-        "Deletes that memory and its exact copies for good; it cannot be restored. The reply says what was removed.",
+        "Hides that memory and its exact copies at once; they are deleted for good after 24 hours unless the user " +
+        "restores them first. The reply says what was hidden.",
       inputSchema: {
         id: z
           .union([z.number().int().min(0), z.string().regex(/^\s*[cC]?\d{1,9}\s*$/)])
