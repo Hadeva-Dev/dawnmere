@@ -127,17 +127,17 @@ if ! "$UV" pip install --python "$("$UV" tool dir)/lflabs-memory-cli/bin/python"
 fi
 
 TOOLS=$("$UV" tool dir --bin 2>/dev/null || printf '%s' "$BIN")
-if [ -n "${LFLABS_MEMORY_NO_SETUP:-}" ]; then
-  # setup's PATH advice, checked as setup and doctor check it: zsh as a new Terminal window starts it
-  # shellcheck disable=SC2016  # the line to paste keeps a literal $PATH
-  zsh -lic 'command -v dawnmere' </dev/null >/dev/null 2>&1 ||
-    printf 'To run dawnmere later, add this line to ~/.zshrc:\n  export PATH="%s:$PATH"\n' "$TOOLS"
-  exit 0
-fi
 rm -rf "$TMP"
 trap - EXIT INT TERM
-# Under `curl | sh` our stdin is the script itself: setup asks its questions on the terminal.
-if (exec </dev/tty) 2>/dev/null; then
-  exec "$TOOLS/dawnmere" setup </dev/tty
+if [ -z "${LFLABS_MEMORY_NO_SETUP:-}" ]; then
+  # Under `curl | sh` our stdin is the script itself: setup asks its questions on the terminal (and gives the
+  # PATH advice below at its end). No terminal: nobody can say yes to changing the apps' files.
+  TTY="${LFLABS_MEMORY_TTY:-/dev/tty}"
+  if (exec <"$TTY") 2>/dev/null; then exec "$TOOLS/dawnmere" setup <"$TTY"; fi
+  printf '\nThere is no terminal for setup'\''s questions, so no app was changed. Run "dawnmere setup" in a\n'
+  printf 'Terminal window, or "dawnmere setup --yes" to take the defaults.\n'
 fi
-exec "$TOOLS/dawnmere" setup
+# setup's PATH advice, checked as setup and doctor check it: zsh as a new Terminal window starts it
+# shellcheck disable=SC2016  # the line to paste keeps a literal $PATH
+zsh -lic 'command -v dawnmere' </dev/null >/dev/null 2>&1 ||
+  printf 'To run dawnmere later, add this line to ~/.zshrc:\n  export PATH="%s:$PATH"\n' "$TOOLS"

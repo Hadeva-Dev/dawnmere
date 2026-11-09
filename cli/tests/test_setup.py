@@ -429,3 +429,15 @@ def test_marketplace_override_for_testing(box, monkeypatch, tmp_path):
 def test_dry_run_names_the_tag(box):
     version = importlib.metadata.version("lflabs-memory-cli")
     assert f"claude plugin marketplace add Hadeva-Dev/dawnmere#v{version} --scope user" in run_setup("--dry-run")[1]
+
+
+def test_no_terminal_needs_yes(box, monkeypatch, capsys):
+    """Nobody at a terminal to say yes: no consent is assumed, nothing changes. --yes still works, for scripts."""
+    import io
+    monkeypatch.setattr(setup.sys, "stdin", io.StringIO(""))
+    out = []
+    code = setup.main(cli.parser().parse_args(["setup", "--plain"]), say=out.append)
+    assert code == 1 and box.calls("launchctl") == [] and not (layout.data_dir() / "config.toml").exists()
+    assert out[-1] == ("There is no terminal to ask on, so nothing was changed. Run dawnmere setup in a Terminal "
+                       "window, or dawnmere setup --yes to take the defaults.")
+    assert run_setup("--backend", "none")[0] == 0
