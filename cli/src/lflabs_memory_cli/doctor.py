@@ -286,7 +286,7 @@ def check_command():
     if layout.on_shell_path():
         return Check(COMMAND, "ok", "on your PATH")
     return Check(COMMAND, "warn", "not on your PATH: a new Terminal window will not find it",
-                 f"add this line to ~/.zshrc, then open a new Terminal window: {layout.path_line()}")
+                 f"add this line to ~/.zprofile, then open a new Terminal window: {layout.path_line()}")
 
 
 def check_privacy(cfg):

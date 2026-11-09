@@ -188,3 +188,31 @@ def test_a_file_setup_created_goes_when_only_empty_structure_is_left(mac):
     (home / ".cursor/mcp.json").write_text(json.dumps(data))
     assert uninstall.main(keep_data=True, out=lambda s: None) == 0
     assert not (home / ".cursor/mcp.json").exists() and not (home / ".cursor/hooks.json").exists()
+
+
+def zprofile(home, before, was):
+    line = 'export PATH="/u/.local/bin:$PATH"  # added by the Dawnmere installer'
+    add = ("\n" if before and not before.endswith("\n") else "") + line
+    if before is not None:
+        (home / ".zprofile").write_text(before)
+    with open(home / ".zprofile", "a") as f:
+        f.write(add + "\n")
+    layout.data_dir().mkdir(parents=True, exist_ok=True)
+    (layout.data_dir() / "zprofile-line").write_text(f"{was}\n{add}\n")
+
+
+def test_uninstall_takes_out_the_installers_zprofile_line(mac):
+    mine = 'eval "$(/opt/homebrew/bin/brew shellenv)"'
+    zprofile(mac.home, mine, "existing")
+    (mac.home / ".zprofile").write_text((mac.home / ".zprofile").read_text() + "alias ll='ls -l'\n")  # added since
+    out = []
+    assert uninstall.main(keep_data=True, out=out.append) == 0
+    assert (mac.home / ".zprofile").read_text() == mine + "\nalias ll='ls -l'\n", "exactly our line, nothing else"
+    assert any("~/.zprofile: the installer's PATH line taken out" in x for x in out)
+    assert not (layout.data_dir() / "zprofile-line").exists()
+
+
+def test_uninstall_removes_a_zprofile_the_installer_made(mac):
+    zprofile(mac.home, None, "created")
+    assert uninstall.main(keep_data=True, out=lambda s: None) == 0
+    assert not (mac.home / ".zprofile").exists()

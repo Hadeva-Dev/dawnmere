@@ -90,8 +90,8 @@ def tool_bin():
 
 def on_shell_path():
     """Whether a new Terminal window finds the CLI's command: zsh started as Terminal starts it, login and
-    interactive, so ~/.zprofile and ~/.zshrc are both read (the advice below names ~/.zshrc). install.sh and doctor
-    check it the same way."""
+    interactive, so ~/.zprofile and ~/.zshrc are both read. install.sh and doctor check it the same way; install.sh
+    puts the line in ~/.zprofile, and the advice below names it too."""
     return run(["zsh", "-lic", f"command -v {COMMAND}"], timeout=15).ok
 
 
@@ -145,7 +145,7 @@ def path_line():
 
 def path_advice():
     """Word for word what install.sh prints."""
-    return f"To run {COMMAND} later, add this line to ~/.zshrc:\n  {path_line()}"
+    return f"To run {COMMAND} later, add this line to ~/.zprofile:\n  {path_line()}"
 
 
 def short(path):

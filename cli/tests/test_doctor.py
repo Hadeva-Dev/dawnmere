@@ -117,12 +117,12 @@ def test_doctor_node_too_old(mac, monkeypatch, tmp_path, connector):
 
 
 def test_doctor_path_row(mac, monkeypatch, tmp_path, connector):
-    """The same check and advice as setup and install.sh: zsh as a new Terminal window starts it, ~/.zshrc."""
+    """The same check and advice as setup and install.sh: zsh as a new Terminal window starts it, ~/.zprofile."""
     healthy(mac, monkeypatch, tmp_path)
     mac.on("zsh", ["-lic"], 1, "")
     code, text = run_doctor()
     assert "dawnmere      warn  not on your PATH: a new Terminal window will not find it" in text
-    assert '\ndawnmere: add this line to ~/.zshrc, then open a new Terminal window: export PATH="' in text
+    assert '\ndawnmere: add this line to ~/.zprofile, then open a new Terminal window: export PATH="' in text
     assert ["-lic", "command -v dawnmere"] in mac.calls("zsh")
 
 

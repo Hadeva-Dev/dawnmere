@@ -160,15 +160,31 @@ fi
 TOOLS=$("$UV" tool dir --bin 2>/dev/null || printf '%s' "$BIN")
 rm -rf "$TMP"
 trap - EXIT INT TERM
+# New Terminal windows find dawnmere: unless zsh started as Terminal starts it already does (setup and doctor check it
+# the same way), the tool folder goes on PATH in ~/.zprofile, once, recorded so `dawnmere uninstall` takes out exactly
+# that line (and the file, if this made it and nothing else is in it).
+if ! zsh -lic 'command -v dawnmere' </dev/null >/dev/null 2>&1; then
+  ZP="$HOME/.zprofile" DATA="${LFLABS_MEMORY_HOME:-$HOME/Library/Application Support/LF Labs/Memory}"
+  LINE="export PATH=\"$TOOLS:\$PATH\"  # added by the Dawnmere installer"
+  if ! grep -qxF "$LINE" "$ZP" 2>/dev/null; then
+    if [ -e "$ZP" ]; then was=existing; else was=created; fi
+    ADD="$LINE"
+    if [ -s "$ZP" ] && [ -n "$(tail -c 1 "$ZP")" ]; then ADD="
+$LINE"; fi
+    if printf '%s\n' "$ADD" >>"$ZP" 2>/dev/null; then
+      mkdir -p "$DATA" && chmod 700 "$DATA" && printf '%s\n%s\n' "$was" "$ADD" >"$DATA/zprofile-line"
+      printf 'New Terminal windows find dawnmere: %s is on PATH in ~/.zprofile now.\n' "$TOOLS"
+    else
+      # shellcheck disable=SC2016  # the line to paste keeps a literal $PATH
+      printf 'To run dawnmere later, add this line to ~/.zprofile:\n  export PATH="%s:$PATH"\n' "$TOOLS"
+    fi
+  fi
+fi
 if [ -z "${LFLABS_MEMORY_NO_SETUP:-}" ]; then
-  # Under `curl | sh` our stdin is the script itself: setup asks its questions on the terminal (and gives the
-  # PATH advice below at its end). No terminal: nobody can say yes to changing the apps' files.
+  # Under `curl | sh` our stdin is the script itself: setup asks its questions on the terminal. No terminal: nobody
+  # can say yes to changing the apps' files.
   TTY="${LFLABS_MEMORY_TTY:-/dev/tty}"
   if (exec <"$TTY") 2>/dev/null; then exec "$TOOLS/dawnmere" setup <"$TTY"; fi
   printf '\nThere is no terminal for setup'\''s questions, so no app was changed. Run "dawnmere setup" in a\n'
   printf 'Terminal window, or "dawnmere setup --yes" to take the defaults.\n'
 fi
-# setup's PATH advice, checked as setup and doctor check it: zsh as a new Terminal window starts it
-# shellcheck disable=SC2016  # the line to paste keeps a literal $PATH
-zsh -lic 'command -v dawnmere' </dev/null >/dev/null 2>&1 ||
-  printf 'To run dawnmere later, add this line to ~/.zshrc:\n  export PATH="%s:$PATH"\n' "$TOOLS"
