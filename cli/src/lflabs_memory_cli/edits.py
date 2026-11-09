@@ -5,7 +5,8 @@ uninstall must not do).
 - a file is changed only when the new text parses and holds our entry, only while it still holds what was read (an app
   that rewrote it meanwhile wins), never when it is read-only, and never when it is not plain JSON (comments, a BOM,
   duplicate keys) or not valid TOML: then the lines to add are printed instead;
-- every changed file is copied first, next to it: <file>.lflabs-backup-<UTC time>, at most 0600;
+- the first change to a file copies it first, next to it: <file>.lflabs-backup-<UTC time>, at most 0600 (the user's
+  original, which uninstall puts back; a file that already holds a key is never copied);
 - TOML is appended to in the file's own line endings; JSON is loaded and written back whole, keeping key order, the
   indent and the line endings;
 - a symlinked config is written through the link.
@@ -105,13 +106,13 @@ def backup_name(real):
     return b
 
 
-def write(path, new, old, secret=False):
-    """Back up and replace one file (through a symlink, keeping its mode), only if it still holds `old` and is not
-    read-only. new=None deletes it. secret: the new text holds a key, so the file is made readable by its owner only
-    (a stricter mode is kept, never loosened). Returns the backup's path, or None when there was no file. Raises Skip,
-    and leaves no temp file behind."""
+def write(path, new, old, secret=False, backup=True):
+    """Back up (unless backup is False) and replace one file (through a symlink, keeping its mode), only if it still
+    holds `old` and is not read-only. new=None deletes it. secret: the new text holds a key, so the file is made
+    readable by its owner only (a stricter mode is kept, never loosened). Returns the backup's path, or None when
+    there was none. Raises Skip, and leaves no temp file behind."""
     real = Path(os.path.realpath(path))
-    mode, backup = 0o600, None
+    want_backup, mode, backup = backup, 0o600, None
     tmp = real.with_name(real.name + ".lflabs-tmp")
     try:
         if real.exists():
@@ -123,7 +124,7 @@ def write(path, new, old, secret=False):
             mode &= 0o600
         if read(real) != old:
             raise Skip("changed while I was reading it (the app wrote it?): left alone; run this again")
-        if old is not None:
+        if old is not None and want_backup:
             backup = backup_name(real)
             shutil.copy2(real, backup)
             os.chmod(backup, real.stat().st_mode & 0o600)

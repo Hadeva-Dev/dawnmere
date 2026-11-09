@@ -1,10 +1,12 @@
 """uninstall: take out everything setup added (spec 9.4). Each step is fine with its thing already gone."""
+import os
 import shutil
 from pathlib import Path
 
-from . import apps, edits, install_record, keychain, launchd, prompt
+from . import apps, claude_settings, edits, install_record, keychain, launchd, prompt, sockets
 from .brand import COMMAND
-from .layout import CLI_DIST, MARKETPLACE, SERVER, connector_sock, data_dir, home, logs_dir, short, uv_bin
+from .layout import (BACKUP_TAG, CLI_DIST, MARKETPLACE, SERVER, connector_sock, data_dir, engine_sock, home, logs_dir,
+                     short, uv_bin)
 from .run import run
 
 
@@ -39,11 +41,15 @@ def _claude_plugin(record, rep):
                 f"MCP entry {SERVER} removed" if a.ok else f"MCP entry {SERVER} already removed")
     if not has_plugin and not has_mcp:
         rep.row("Claude Code", "gone", "no plugin or MCP entry")
+    note = claude_settings.put_back()  # after the commands, which rewrite it too
+    if note:
+        rep.row("Claude Code", "removed", note)
 
 
 def _file(entry, rep):
     """One app file: put back from its backup while it still holds exactly what setup wrote, else take our entries
-    out of it as it is now."""
+    out of it as it is now. Then the backups setup (or the engine's connect) made of it go, but for the user's
+    original when the file could not be put back from it."""
     label = f"{apps.LABELS.get(entry.get('app'), entry.get('app', ''))}"
     path = Path(entry["path"])
     if entry.get("sha256"):
@@ -54,22 +60,50 @@ def _file(entry, rep):
         if now == entry["sha256"]:
             if entry.get("created"):
                 path.unlink(missing_ok=True)
+                _backups(path, None)
                 return rep.row(label, "removed", f"{short(path)}: removed (setup created it)")
             if entry.get("backup") and edits.restore(path, entry["backup"], entry["sha256"]):
-                rep.backups.append(entry["backup"])
+                _backups(path, None)
                 return rep.row(label, "removed", f"{short(path)}: put back as it was")
     p = apps.unplan(entry)
+    if p.state in ("gone", "remove"):
+        kept = _backups(path, entry.get("backup"))
+        rep.backups += [str(kept)] if kept else []
     if p.state == "gone":
         return rep.row(label, "gone", f"{short(path)}: {p.note}")
     if p.state == "error":
         return rep.row(label, "error", f"{short(path)}: {p.note}; remove the {SERVER} entries by hand")
     try:
-        backup = edits.write(path, p.new, p.old)
+        edits.write(path, p.new, p.old, backup=False)
     except edits.Skip as e:
         return rep.row(label, "error", f"{short(path)}: {e}")
-    if backup:
-        rep.backups.append(str(backup))
     rep.row(label, "removed", f"{short(path)}: {p.note}")
+
+
+def _backups(path, original):
+    """Delete the <file>.lflabs-backup-* copies next to path, keeping `original` (the copy of the file from before
+    setup) when it is given, still there, and holds no key. The kept one's path, or None."""
+    real = Path(os.path.realpath(path))
+    keep = None
+    for b in sorted(real.parent.glob(f"{real.name}.{BACKUP_TAG}-*")):
+        try:
+            holds_key = apps.KEY_ENV in b.read_text(errors="replace") or "_MEMORY_CLIENT_KEY" in b.read_text(
+                errors="replace")
+        except OSError:
+            continue
+        if original and str(b) == str(original) and not holds_key:
+            keep = b
+            continue
+        b.unlink(missing_ok=True)
+    return keep
+
+
+def _stale_sockets(rep):
+    """The engine's two sockets, left behind when nothing answers on them any more."""
+    for sock in (connector_sock(), engine_sock()):
+        if sockets._owned(sock) and not sockets.alive(sock):
+            sock.unlink(missing_ok=True)
+            rep.row("Background service", "removed", f"{short(sock)}: removed (nothing answered on it)")
 
 
 def main(keep_data=False, out=print):
@@ -79,6 +113,7 @@ def main(keep_data=False, out=print):
 
     ok, note = launchd.remove()
     rep.row("Background service", "removed" if ok else "gone", note)
+    _stale_sockets(rep)
 
     _claude_plugin(record, rep)
     entries = record["files"] if record else apps.discover()
@@ -132,7 +167,8 @@ def main(keep_data=False, out=print):
     if rep.gone:
         out("Already gone: " + ", ".join(dict.fromkeys(rep.gone)) + ".")
     if rep.backups:
-        out("Backups of your app settings are next to each file; delete them when you like:")
+        out("Your files from before setup are kept next to them (they could not be put back as they were); delete "
+            "them when you like:")
         for b in dict.fromkeys(rep.backups):
             out(f"  {short(b)}")
     if uv:  # install.sh may have fetched it, but other tools may use it now: it stays (uv's own uninstall steps)

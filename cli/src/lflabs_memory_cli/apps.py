@@ -87,23 +87,43 @@ def connector_args():
     return ["-y", f"{CONNECTOR}@{CONNECTOR_VERSION}"]
 
 
+def _is_engine(word):
+    return isinstance(word, str) and (word == ENGINE or word.endswith("/" + ENGINE))
+
+
+def _program(words):
+    """The words from the program on: without `env` and VAR=value words (whatever the names: older engines wrote
+    JARVIS_MEMORY_*), and without a python that runs the engine's script (the engine's own `connect` writes
+    "/…/python /…/lflabs-memory hook-prompt")."""
+    words = [w for w in words if w != "env" and not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*=.*", w)]
+    if len(words) > 1 and re.fullmatch(r"python[0-9.]*", words[0].rsplit("/", 1)[-1]) and _is_engine(words[1]):
+        words = words[1:]
+    return words
+
+
 def ours_server(v):
+    """An MCP entry that runs the connector package, or the engine itself (`lflabs-memory serve`, as the engine's own
+    `connect` writes it), whatever its env holds."""
     args = v.get("args") if isinstance(v, dict) else None
-    return isinstance(args, list) and any(isinstance(a, str) and (a == CONNECTOR or a.startswith(CONNECTOR + "@"))
-                                          for a in args)
+    if not isinstance(args, list):
+        return False
+    if any(isinstance(a, str) and (a == CONNECTOR or a.startswith(CONNECTOR + "@")) for a in args):
+        return True
+    words = _program([v.get("command")] + args) if all(isinstance(a, str) for a in args) and \
+        isinstance(v.get("command"), str) else []
+    return len(words) > 1 and _is_engine(words[0]) and words[1] == "serve"
 
 
 def ours_command(cmd):
-    """A hook command that runs our engine: its program (after any VAR=value words) is lflabs-memory or a path to it."""
+    """A hook command that runs our engine: its program (after any env and VAR=value words, and a python running it)
+    is lflabs-memory or a path to it, with one of our hook- subcommands."""
     if not isinstance(cmd, str):
         return False
     try:
-        words = shlex.split(cmd)
+        words = _program(shlex.split(cmd))
     except ValueError:
         return False
-    words = [w for w in words if not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*=.*", w)]
-    return bool(words) and (words[0] == ENGINE or words[0].endswith("/" + ENGINE)) and len(words) > 1 and \
-        words[1].startswith("hook-")
+    return len(words) > 1 and _is_engine(words[0]) and words[1].startswith("hook-")
 
 
 def engine_cmd(engine, sub, client=None):
@@ -289,6 +309,14 @@ def _drop_toml(text, block):
     return out, removed
 
 
+def empty_structure(data, ignore=("version",)):
+    """Nothing but empty tables and lists left (a hooks file's "version" aside): what is left of a file setup created
+    once our entries are out of it."""
+    if isinstance(data, dict):
+        return all(k in ignore or empty_structure(v, ()) for k, v in data.items())
+    return isinstance(data, list) and all(empty_structure(v, ()) for v in data)
+
+
 def unplan(entry, h=None):
     """The plan that takes our entry out of one file (entry: an install.json file record, or one found by discovery:
     {"path", "kind", "added", "created"})."""
@@ -304,6 +332,8 @@ def unplan(entry, h=None):
             if not any(ours_server(v) for v in servers.values()):
                 return Plan(app, kind, path, "gone", f"no {SERVER} table (already removed)")
             new, removed = _drop_toml(old, entry.get("added"))
+            if entry.get("created") and empty_structure(edits.load_toml(new)) and not new.strip(" \t\r\n#"):
+                return Plan(app, kind, path, "remove", "remove config.toml (setup created it)", new=None, old=old)
             edits.load_toml(new)
             return Plan(app, kind, path, "remove", f"remove [mcp_servers.{SERVER}]", new=new, old=old)
         data = edits.load_json(old)
@@ -316,12 +346,14 @@ def unplan(entry, h=None):
             new = json.loads(json.dumps(data))
             for k in mine:
                 del new[key][k]
+            if entry.get("created") and empty_structure(new):
+                return Plan(app, kind, path, "remove", f"remove {path.name} (setup created it)", new=None, old=old)
             return Plan(app, kind, path, "remove", f'remove {key}."{SERVER}"', new=edits.dump_json(new, old), old=old)
         new, n = _drop_hooks(data)
         if not n:
             return Plan(app, kind, path, "gone", "no memory hooks (already removed)")
-        if kind == "cursor-hooks" and entry.get("created") and new in ({"version": 1}, {"version": 1, "hooks": {}}):
-            return Plan(app, kind, path, "remove", "remove hooks.json (setup created it)", new=None, old=old)
+        if entry.get("created") and empty_structure(new):
+            return Plan(app, kind, path, "remove", f"remove {path.name} (setup created it)", new=None, old=old)
         return Plan(app, kind, path, "remove", f"remove {n} memory hook" + ("s" if n > 1 else ""),
                     new=edits.dump_json(new, old), old=old)
     except Skip as e:
@@ -339,8 +371,12 @@ def discover(h=None):
 
 
 def apply(plan, record):
-    """Write one "add" plan and note it in the install record. Raises edits.Skip (the file is then as it was)."""
+    """Write one "add" plan and note it in the install record. Raises edits.Skip (the file is then as it was).
+    Only the first change to a file is backed up (the user's original: the one uninstall puts back), and never a
+    file that already holds a key."""
     from . import install_record
-    backup = edits.write(plan.path, plan.new, plan.old)
+    first = install_record.file_entry(record, plan) is None
+    backup = edits.write(plan.path, plan.new, plan.old, secret=KEY_ENV in (plan.new or ""),
+                         backup=first and KEY_ENV not in (plan.old or ""))
     install_record.add_file(record, plan, backup, edits.sha256(plan.new))
     return backup

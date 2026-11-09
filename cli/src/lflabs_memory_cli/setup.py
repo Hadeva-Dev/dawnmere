@@ -19,7 +19,7 @@ import time
 from importlib import metadata
 from pathlib import Path
 
-from . import access, apps, backend, edits, install_record, keychain, launchd, models, prompt, settings, sockets
+from . import access, apps, backend, claude_settings, edits, install_record, keychain, launchd, models, prompt, settings, sockets
 from .brand import COMMAND, PRODUCT
 from .layout import (CLI_DIST, CONNECTOR_VERSION, ENGINE, ENGINE_DIST, MARKETPLACE, SERVER, data_dir,
                      engine_bin, engine_record, home, lf_labs_dir, on_shell_path, path_advice, short, uv_bin)
@@ -453,13 +453,14 @@ def main(args, say=print):
     node = node_problem()
     if node:
         say(f"Note: {node}")
-    a = ask(args, say)
-    record = install_record.load() or install_record.empty()
-    intro = full_show(args.show)
     data_dir().mkdir(parents=True, exist_ok=True, mode=0o700)
     for d in (data_dir(), lf_labs_dir()):  # mkdir's mode is the last folder's only: LF Labs would be 0755
         if d.is_dir():
             os.chmod(d, 0o700)
+    claude_settings.snapshot()  # before the first claude command (ask's check): Claude Code rewrites it as it runs
+    a = ask(args, say)
+    record = install_record.load() or install_record.empty()
+    intro = full_show(args.show)
     if a.api_key and keychain.store(a.api_key):
         record["keychain"] = True
     settings.save(settings.render(a.name, a.backend, a.model, a.codex_sessions))

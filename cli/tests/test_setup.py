@@ -527,3 +527,112 @@ def test_narrowing_needs_no_confirmation(box, monkeypatch):
     out = []
     assert access.main("cursor", "nothing", layout.engine_bin(), say=out.append) == 0
     assert asked == [] and ["clients", "level", "cursor", "nothing"] in box.calls("lflabs-memory")
+
+
+# ---------- uninstall after setup, access and the engine's own connect ----------
+
+def claude_plugin_rewrites(home):
+    """What Claude Code does to settings.json while setup's plugin commands run (seen on 2.1.301): keys reordered,
+    "opus" made "opus[1m]", the marketplace and the plugin added; and its cached copy of the plugin."""
+    s = json.loads((home / ".claude/settings.json").read_text()) if (home / ".claude/settings.json").exists() else {}
+    s = dict(reversed(list(s.items())))
+    if s.get("model") == "opus":
+        s["model"] = "opus[1m]"
+    s["extraKnownMarketplaces"] = {"lflabs": {"source": {"source": "github", "repo": "Hadeva-Dev/dawnmere"}}}
+    s["enabledPlugins"] = {"lflabs-memory@lflabs": True}
+    (home / ".claude/settings.json").write_text(json.dumps(s, indent=2) + "\n")
+    cache = home / ".claude/plugins/cache/lflabs/lflabs-memory/0.1.6"
+    cache.mkdir(parents=True)
+    (cache / ".orphaned_at").write_text("1")
+    (home / ".claude/plugins/known_marketplaces.json").write_text("{}")
+    (home / ".claude/plugins/installed_plugins.json").write_text('{"version": 2, "plugins": {}}')
+
+
+def engine_connect(home):
+    """What the engine's own `lflabs-memory connect --yes` wrote on older installs: the python running the engine's
+    script, the old JARVIS_MEMORY_* names, a key; and its own key-bearing backups."""
+    hooks = json.loads((home / ".codex/hooks.json").read_text())
+    hooks["hooks"]["UserPromptSubmit"].append({"hooks": [{"type": "command", "timeout": 10, "command":
+        "JARVIS_MEMORY_CLIENT=codex JARVIS_MEMORY_CLIENT_KEY=k3y /u/.local/share/uv/tools/x/bin/python "
+        "/u/.local/share/uv/tools/x/bin/lflabs-memory hook-prompt"}]})
+    (home / ".codex/hooks.json").write_text(json.dumps(hooks, indent=2))
+    mcp = home / ".cursor/mcp.json"
+    (mcp.parent / "mcp.json.lflabs-backup-20261101T000000Z").write_text(mcp.read_text())
+    m = json.loads(mcp.read_text())
+    m["mcpServers"]["lflabs-memory"]["env"] = {"JARVIS_MEMORY_CLIENT": "cursor", "JARVIS_MEMORY_CLIENT_KEY": "k3y"}
+    m["mcpServers"]["lflabs-memory-2"] = {"command": "/u/bin/python", "args": ["/u/bin/lflabs-memory", "serve",
+                                                                               "--client", "cursor"]}
+    mcp.write_text(json.dumps(m, indent=2))
+
+
+def test_uninstall_after_access_and_the_engines_connect_leaves_the_users_files(box, monkeypatch, capsys):
+    from lflabs_memory_cli import access, prompt, uninstall
+    (box.home / ".codex/config.toml").write_bytes(b'model = "o5"\r\n')
+    (box.home / ".claude/settings.json").write_text('{\n  "theme": "dark",\n  "model": "opus"\n}\n')
+    before = tree(box.home)
+    assert run_setup()[0] == 0
+    claude_plugin_rewrites(box.home)
+    at_a_terminal(monkeypatch, "cursor")
+    assert access.main("cursor", "everything", layout.engine_bin(), say=lambda s: None) == 0
+    key = json.loads((box.home / ".cursor/mcp.json").read_text())["mcpServers"]["lflabs-memory"]["env"][
+        "LFLABS_MEMORY_CLIENT_KEY"]
+    for b in box.home.rglob("*.lflabs-backup-*"):
+        assert key not in b.read_text(), f"{b} holds Cursor's key"
+    engine_connect(box.home)
+    monkeypatch.setattr(prompt, "yes_no", lambda q, default, assume=None: True)
+    out = []
+    assert uninstall.main(out=out.append) == 0, "\n".join(out)
+    assert tree(box.home) == before, "every file as it was, no backups, no empty files, no plugin cache"
+
+
+def test_access_then_uninstall_puts_cursors_own_file_back(box, monkeypatch, capsys):
+    """`access cursor everything` rewrote mcp.json without telling install.json: uninstall could not restore it."""
+    from lflabs_memory_cli import access, uninstall
+    mine = '{\n    "mcpServers": {"gh": {"command": "gh-mcp"}}\n}\n'
+    (box.home / ".cursor/mcp.json").write_text(mine)
+    assert run_setup()[0] == 0
+    at_a_terminal(monkeypatch, "cursor")
+    assert access.main("cursor", "everything", layout.engine_bin(), say=lambda s: None) == 0
+    assert uninstall.main(keep_data=True, out=lambda s: None) == 0
+    assert (box.home / ".cursor/mcp.json").read_text() == mine
+    assert not list((box.home / ".cursor").glob("mcp.json.lflabs-backup-*"))
+
+
+def test_uninstall_keeps_changes_made_since_and_takes_out_only_the_plugins(box, monkeypatch):
+    from lflabs_memory_cli import uninstall
+    (box.home / ".claude/settings.json").write_text('{\n  "theme": "dark"\n}\n')
+    assert run_setup()[0] == 0
+    claude_plugin_rewrites(box.home)
+    s = json.loads((box.home / ".claude/settings.json").read_text())
+    s["theme"] = "light"  # the user's own change since
+    (box.home / ".claude/settings.json").write_text(json.dumps(s, indent=2) + "\n")
+    assert uninstall.main(keep_data=True, out=lambda s: None) == 0
+    assert json.loads((box.home / ".claude/settings.json").read_text()) == {"theme": "light"}
+    assert not (box.home / ".claude/plugins").exists(), "setup made it; only empty bookkeeping was left"
+
+
+def test_uninstall_removes_a_settings_json_that_was_not_there(box):
+    from lflabs_memory_cli import uninstall
+    assert run_setup()[0] == 0
+    claude_plugin_rewrites(box.home)
+    assert uninstall.main(keep_data=True, out=lambda s: None) == 0
+    assert not (box.home / ".claude/settings.json").exists()
+
+
+def test_uninstall_removes_stale_sockets(box):
+    """Sockets nothing answers on (the service is gone) are removed; the data stays (--keep-data)."""
+    import socket as sk
+    from lflabs_memory_cli import uninstall
+    assert run_setup()[0] == 0
+    stale = Path(tempfile.mkdtemp(prefix="lfs", dir="/tmp")) / "c.sock"
+    s = sk.socket(sk.AF_UNIX)
+    s.bind(str(stale))
+    s.close()
+    os.environ["LFLABS_MEMORY_SOCKET"] = str(stale)
+    try:
+        out = []
+        assert uninstall.main(keep_data=True, out=out.append) == 0
+        assert not stale.exists() and any("nothing answered on it" in x for x in out)
+        assert (layout.data_dir() / "engine.sock").exists(), "the engine still answers there (the test's server)"
+    finally:
+        shutil.rmtree(stale.parent, ignore_errors=True)
