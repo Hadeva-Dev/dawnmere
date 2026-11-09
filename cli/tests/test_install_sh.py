@@ -318,3 +318,62 @@ def test_an_old_curl_is_retried_by_a_loop(release, tmp_path):
         assert [p for p, _ in gh.hits].count(f"/dl/{CLI}") == 2
     finally:
         gh.close()
+
+
+STUBS = ("install_name_tool", "xcrun", "git", "codesign", "clang", "make")  # Apple's stubs open the tools' dialog
+
+
+def first_python(release, tmp_path, tools):
+    """uv without its Python yet (find fails until `python install` ran), logging each call's argv and PATH; the
+    developer tools there (an xcode-select naming a folder with usr/bin/git) or not; Apple's stubs on PATH, logging."""
+    log = tmp_path / "uv-calls"
+    real = release.bin / "uv"
+    (tmp_path / "rules-uv").mkdir()
+    (tmp_path / "rules-uv/uv").write_bytes(real.read_bytes())  # the rule-driven fake, still named uv
+    (tmp_path / "rules-uv/uv").chmod(0o755)
+    real.write_text(f"""#!/bin/sh
+printf '%s\\t%s\\n' "$*" "$PATH" >> '{log}'
+if [ "$1 $2" = "python find" ]; then
+  [ -e '{tmp_path}/py-installed' ] || exit 1
+  echo '{release.bin}/python3.12'; exit 0
+fi
+if [ "$1 $2" = "python install" ]; then : > '{tmp_path}/py-installed'; exit 0; fi
+exec '{tmp_path}/rules-uv/uv' "$@"
+""")
+    real.chmod(0o755)
+    for stub in STUBS:
+        release.add(stub)
+    dev = tmp_path / "Developer"
+    (dev / "usr/bin").mkdir(parents=True)
+    (dev / "usr/bin/git").write_text("")
+    xs = tmp_path / "xcode-select"
+    xs.write_text(f"#!/bin/sh\necho '{dev}'\n" if tools else
+                  "#!/bin/sh\necho 'xcode-select: error: unable to get active developer directory' >&2\nexit 2\n")
+    xs.chmod(0o755)
+    return log, {**release.env_vars, "LFLABS_MEMORY_XCODE_SELECT": str(xs)}
+
+
+def test_no_developer_tools_dialog_from_the_python_install(release, tmp_path):
+    """Without the tools, `uv python install` runs with no PATH, so uv cannot reach Apple's install_name_tool stub
+    (which opens the "install developer tools" dialog); no stub is run by the installer."""
+    log, env = first_python(release, tmp_path, tools=False)
+    r = sh(release.script, env)
+    assert r.returncode == 0, r.stderr
+    calls = [line.split("\t") for line in log.read_text().splitlines()]
+    install = [p for a, p in calls if a.startswith("python install")]
+    assert install == ["/var/empty"]
+    for stub in STUBS:
+        assert release.calls(stub) == [], stub
+
+
+def test_python_install_with_the_tools_keeps_path(release, tmp_path):
+    log, env = first_python(release, tmp_path, tools=True)
+    assert sh(release.script, env).returncode == 0
+    calls = [line.split("\t") for line in log.read_text().splitlines()]
+    assert [p for a, p in calls if a.startswith("python install")] == [env["PATH"]]
+
+
+def test_no_python_install_when_uv_has_it(release, tmp_path):
+    """Python already there (a reinstall): no `uv python install` at all."""
+    assert sh(release.script, release.env_vars).returncode == 0
+    assert not [c for c in release.calls("uv") if c[:2] == ["python", "install"]]

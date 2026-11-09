@@ -862,3 +862,41 @@ def test_finish_that_cannot_check_now_says_how(mac, monkeypatch, tmp_path):
     assert any(x.startswith("Your dependencies came from the old updater, unchecked, and could not be checked now")
                for x in out)
     assert ["tool", "uninstall", "lflabs-memory-cli"] not in mac.calls("uv")
+
+
+@pytest.mark.parametrize("tools", [False, True])
+def test_update_python_install_never_reaches_the_tools_stub(mac, monkeypatch, tmp_path, tools):
+    """`dawnmere update` installs uv's Python as install.sh does: none when it is there, else with no PATH when the
+    developer tools are absent (Apple's install_name_tool stub would open their dialog)."""
+    calls, have = [], []
+
+    def run(argv, timeout=60, env=None, **kw):
+        calls.append((argv[1:3], (env or {}).get("PATH")))
+        if argv[1:3] == ["python", "find"]:
+            return update.Result(0, f"{mac.bin}/python3.12\n", "") if have else update.Result(1, "", "")
+        if argv[1:3] == ["python", "install"]:
+            have.append(1)
+        return update.Result(0, "", "")
+    monkeypatch.setattr(update, "run", run)
+    monkeypatch.setattr(update, "developer_tools", lambda: tools)
+    assert update.verified_deps(tmp_path / "c.txt", tmp_path / "deps").ok
+    install = [p for a, p in calls if a == ["python", "install"]]
+    assert install == ([None] if tools else ["/var/empty"])
+    calls.clear()
+    update.verified_deps(tmp_path / "c.txt", tmp_path / "deps")
+    assert not [a for a, _ in calls if a == ["python", "install"]], "there already: not installed again"
+
+
+def test_developer_tools_is_xcode_selects_folder(tmp_path, monkeypatch):
+    from lflabs_memory_cli import layout
+    dev = tmp_path / "Dev"
+    xs = tmp_path / "xs"
+    xs.write_text(f"#!/bin/sh\necho '{dev}'\n")
+    xs.chmod(0o755)
+    monkeypatch.setattr(layout, "XCODE_SELECT", str(xs))
+    assert layout.developer_tools() is False, "a folder without usr/bin/git"
+    (dev / "usr/bin").mkdir(parents=True)
+    (dev / "usr/bin/git").write_text("")
+    assert layout.developer_tools() is True
+    xs.write_text("#!/bin/sh\nexit 2\n")
+    assert layout.developer_tools() is False
