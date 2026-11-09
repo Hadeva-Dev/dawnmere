@@ -1,6 +1,7 @@
 """uninstall: take out everything setup added (spec 9.4). Each step is fine with its thing already gone."""
 import os
 import shutil
+import time
 from pathlib import Path
 
 from . import apps, claude_settings, edits, install_record, keychain, launchd, prompt, sockets
@@ -13,6 +14,7 @@ from .run import run
 class Report:
     def __init__(self, out):
         self.out, self.removed, self.gone, self.errors, self.backups = out, [], [], [], []
+        self.said = set()  # files a row already told about (settings.json, by claude_settings.put_back)
 
     def row(self, what, state, note):
         self.out(f"{what:<21}{note}")
@@ -44,6 +46,7 @@ def _claude_plugin(record, rep):
     note = claude_settings.put_back()  # after the commands, which rewrite it too
     if note:
         rep.row("Claude Code", "removed", note)
+        rep.said.add(str(claude_settings.path()))
 
 
 def _file(entry, rep):
@@ -66,6 +69,9 @@ def _file(entry, rep):
                 _backups(path, None)
                 return rep.row(label, "removed", f"{short(path)}: put back as it was")
     p = apps.unplan(entry)
+    if p.state == "gone" and str(path) in rep.said:  # put back already, with its row: no second, "already gone" one
+        _backups(path, None)
+        return None
     if p.state in ("gone", "remove"):
         kept = _backups(path, entry.get("backup"))
         rep.backups += [str(kept)] if kept else []
@@ -120,9 +126,13 @@ def _zprofile(rep):
     rec.unlink(missing_ok=True)
 
 
-def _stale_sockets(rep):
-    """The engine's two sockets, left behind when nothing answers on them any more."""
+def _stale_sockets(rep, wait=5.0):
+    """The engine's two sockets, left behind when nothing answers on them any more (the service just stopped may
+    still answer for a moment: up to `wait` seconds for that)."""
+    end = time.monotonic() + wait
     for sock in (connector_sock(), engine_sock()):
+        while sockets._owned(sock) and sockets.alive(sock) and time.monotonic() < end:
+            time.sleep(0.25)
         if sockets._owned(sock) and not sockets.alive(sock):
             sock.unlink(missing_ok=True)
             rep.row("Background service", "removed", f"{short(sock)}: removed (nothing answered on it)")
@@ -187,8 +197,9 @@ def main(keep_data=False, out=print):
     out("")
     if rep.removed:
         out("Removed: " + ", ".join(dict.fromkeys(rep.removed)) + ".")
-    if rep.gone:
-        out("Already gone: " + ", ".join(dict.fromkeys(rep.gone)) + ".")
+    gone = [g for g in dict.fromkeys(rep.gone) if g not in rep.removed]  # removed is the news for that app
+    if gone:
+        out("Already gone: " + ", ".join(gone) + ".")
     if rep.backups:
         out("Your files from before setup are kept next to them (they could not be put back as they were); delete "
             "them when you like:")

@@ -88,7 +88,7 @@ def test_install_sh_installs_then_runs_setup(release, tmp_path):
     order = [(x["prog"], x["argv"][:2]) for x in rows if x["prog"] == "python3.12" or x["argv"][:2] == ["tool", "install"]
              and "--help" not in x["argv"]]
     assert order == [("python3.12", ["-I", "-m"]), ("uv", ["tool", "install"])], "every hash checked before installing"
-    assert ["python", "install", "--managed-python", "--no-bin", "3.12"] in release.calls("uv")
+    assert ["python", "find", "--managed-python", "3.12"] in release.calls("uv"), "uv's own Python 3.12"
     download = release.calls("python3.12")[0]
     assert download[:4] == ["-I", "-m", "pip", "download"]
     assert download[4:13] == ["--require-hashes", "--only-binary", ":all:", "--no-deps", "--no-cache-dir",

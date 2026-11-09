@@ -974,3 +974,51 @@ def test_self_check_purges_only_the_memory_it_made(box, capsys):
     (box.data / "memory.db").unlink()
     assert run_setup()[0] == 0
     assert ["purge", "7"] in box.calls("lflabs-memory")
+
+
+def test_uninstall_tells_of_settings_json_once(box, monkeypatch):
+    """Put back by the snapshot, then "already gone" by the file step: one row, and no "Already gone: Claude Code"."""
+    from lflabs_memory_cli import prompt, uninstall
+    (box.home / ".claude/settings.json").write_text('{"theme": "dark"}\n')
+    box.on("claude", ["plugin", "marketplace", "add"], 1, "")  # the fallback: hooks in settings.json
+    assert run_setup()[0] == 0
+    s = json.loads((box.home / ".claude/settings.json").read_text())
+    (box.home / ".claude/settings.json").write_text(json.dumps(dict(reversed(list(s.items()))), indent=1))  # claude's
+    monkeypatch.setattr(prompt, "yes_no", lambda q, default, assume=None: False)
+    out = []
+    assert uninstall.main(keep_data=True, out=out.append) == 0
+    assert len([x for x in out if "~/.claude/settings.json" in x]) == 1, "\n".join(out)
+    assert not any(x.startswith("Already gone:") and "Claude Code" in x for x in out)
+    assert (box.home / ".claude/settings.json").read_text() == '{"theme": "dark"}\n'
+
+
+def test_uninstall_removes_the_connector_socket_once_the_service_lets_go(box):
+    """The service just stopped can answer a moment longer: uninstall waits for it, then removes its socket."""
+    import socket as sk
+    from lflabs_memory_cli import uninstall
+    assert run_setup()[0] == 0
+    d = Path(tempfile.mkdtemp(prefix="lfs", dir="/tmp"))
+    path = d / "c.sock"
+    s = sk.socket(sk.AF_UNIX)
+    s.bind(str(path))
+    s.listen(5)
+    threading.Timer(1.0, s.close).start()  # closes without unlinking, as a killed daemon leaves it
+    os.environ["LFLABS_MEMORY_SOCKET"] = str(path)
+    try:
+        assert uninstall.main(keep_data=True, out=lambda x: None) == 0
+        assert not path.exists()
+    finally:
+        shutil.rmtree(d, ignore_errors=True)
+
+
+def test_rerun_keeps_what_the_questions_do_not_ask(box):
+    """daily_calls, chat_index, a models folder: a re-run of setup left them at the defaults."""
+    assert run_setup()[0] == 0
+    cfg = layout.data_dir() / "config.toml"
+    text = cfg.read_text().replace("daily_calls = 200", "daily_calls = 50").replace("chat_index = false",
+                                                                                     "chat_index = true")
+    cfg.write_text(f'models = "{box.data}/shared-models"\n' + text)
+    assert run_setup()[0] == 0
+    got = tomllib.loads(cfg.read_text())
+    assert got["llm"]["daily_calls"] == 50 and got["privacy"]["chat_index"] is True
+    assert got["models"] == f"{box.data}/shared-models" and got["llm"]["backend"] == "claude-cli"
