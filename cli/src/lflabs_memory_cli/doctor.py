@@ -132,6 +132,22 @@ def check_connector():
                  "Codex and Cursor cannot reach memory: is the background service running?")
 
 
+def check_node(node):
+    version, problem = node
+    if problem:
+        return Check("Node.js", "warn", problem, apps.NODE_FIX)
+    return Check("Node.js", "ok", version)
+
+
+def _no_tools(check, node):
+    """An app row while Node.js is missing: its MCP entry (npx) cannot start, so the row warns (the fix is the
+    Node.js row's)."""
+    if not node[1] or check.note == "not installed":
+        return check
+    return Check(check.name, "warn", f"{check.note}; {check.name} cannot use memory's tools until Node.js 18 or "
+                 "later is installed", check.fix)
+
+
 def check_model(cfg, ping=True):
     llm = cfg["llm"]
     name = llm["backend"]
@@ -262,10 +278,12 @@ def check_backups():
 def checks(ping=True):
     cfg = settings.load()
     db = _db()
+    node = apps.node_status()
     try:
-        return [check_engine(), check_data(db), check_models(), check_hook(), check_connector(),
-                check_model(cfg, ping), check_budget(db, cfg), check_backlog(db), check_claude(), check_codex(),
-                check_cursor(), check_privacy(cfg), check_backups()]
+        return [check_engine(), check_data(db), check_models(), check_hook(), check_connector(), check_node(node),
+                check_model(cfg, ping), check_budget(db, cfg), check_backlog(db),
+                *(_no_tools(c, node) for c in (check_claude(), check_codex(), check_cursor())),
+                check_privacy(cfg), check_backups()]
     finally:
         if db is not None:
             db.close()

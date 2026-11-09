@@ -81,10 +81,14 @@ def preflight(say):
         problems.append(f"{PRODUCT} needs 1 GB of free disk space (this Mac has {free / 1e9:.1f} GB).")
     if not uv_bin():
         say(f"Note: uv is not on PATH, so `{COMMAND} update` and `{COMMAND} uninstall` will ask you to install it.")
-    if not shutil.which("npx"):  # every app's MCP entry runs the connector with npx
-        say("Note: Node.js is not installed, so your apps cannot use memory's tools (recall, remember) until you "
-            "install it from nodejs.org.")
     return problems
+
+
+def node_problem():
+    """What setup's last screen says instead of its success line when the apps cannot start memory's tools (every
+    app's MCP entry runs the connector with npx), else None."""
+    problem = apps.node_status()[1]
+    return f"{problem}: your apps cannot use memory's tools until you {apps.NODE_FIX}." if problem else None
 
 
 class Answers:
@@ -456,6 +460,9 @@ def main(args, say=print):
         for p in problems:
             say(p)
         return 1
+    node = node_problem()
+    if node:
+        say(f"Note: {node}")
     a = ask(args, say)
     record = install_record.load() or install_record.empty()
     intro = full_show(args.show)
@@ -467,6 +474,7 @@ def main(args, say=print):
     record["versions"] = {"cli": _version(CLI_DIST), "engine": _version(ENGINE_DIST), "connector": CONNECTOR_VERSION}
     install_record.save(record)
     work = RealSetup(a, record, say)
+    work.problem = node
     code = play(work, intro=intro, plain=args.plain, animate=not args.no_animation)
     for app, path, note, snippet in work.left_alone:
         say(f"\n{apps.LABELS.get(app, app)}: {short(path) + ': ' if path else ''}{note}")

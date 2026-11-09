@@ -22,7 +22,7 @@ def full_show(show=False):
 def play(setup, intro=True, plain=False, animate=True):
     """Run a setup behind the screen. Returns its exit code."""
     state = screen.ScreenState(steps=setup.plan(), expect_apps=setup.expect_apps, intro=intro,
-                               **screen.detect(plain=plain, animate=animate))
+                               problem=getattr(setup, "problem", None), **screen.detect(plain=plain, animate=animate))
     ui = screen.Animator(state)
     ui.start()
     try:
