@@ -283,6 +283,7 @@ def test_cursor_starts_at_work_only(box, capsys):
 def test_cursor_personal_notes_when_asked(box, monkeypatch, capsys):
     from lflabs_memory_cli import uninstall
     asked = answering(monkeypatch, {"Let Cursor see your personal notes too?": True})
+    typed = at_a_terminal(monkeypatch, "cursor")
     code, out = run_setup()
     shown = capsys.readouterr().out
     assert code == 0, out + shown
@@ -298,7 +299,8 @@ def test_cursor_personal_notes_when_asked(box, monkeypatch, capsys):
     assert ["clients", "level", "cursor", "everything"] in box.calls("lflabs-memory")
     for text in (out, shown, layout.install_json().read_text()):
         assert key not in text, "the key is never shown or recorded"
-    assert "MCP (all)" in shown or "Cursor: MCP (all)" in shown
+    assert typed == ["To let Cursor see everything, personal notes too, type cursor: "], "confirmed like access"
+    assert "Cursor now sees everything, personal notes too. Restart Cursor to load it." in out
     assert uninstall.main(keep_data=True, out=lambda s: None) == 0
     assert key not in (box.home / ".cursor/mcp.json").read_text() if (box.home / ".cursor/mcp.json").exists() else True
 
@@ -334,6 +336,7 @@ def test_access_command(box, monkeypatch, capsys):
     assert access.main("cursor", None, eng, say=out.append) == 1
     assert out[-1] == "Memory is not set up yet: run dawnmere setup first.", "not \"Cursor sees not set up\""
     assert run_setup()[0] == 0
+    at_a_terminal(monkeypatch, "cursor")
     assert access.main("cursor", "everything", eng, say=out.append) == 0
     assert out[-1] == "Cursor now sees everything, personal notes too. Restart Cursor to load it."
     entry = json.loads((box.home / ".cursor/mcp.json").read_text())["mcpServers"]["lflabs-memory"]
@@ -451,3 +454,76 @@ def test_setup_closes_the_lf_labs_folder(box):
     assert run_setup()[0] == 0
     assert oct(parent.stat().st_mode & 0o777) == "0o700"
     assert oct(layout.data_dir().stat().st_mode & 0o777) == "0o700"
+
+
+# ---------- widening what an app sees needs a person ----------
+
+def test_an_agent_is_never_offered_cursors_personal_notes(box, monkeypatch):
+    asked = answering(monkeypatch, {"Let Cursor see your personal notes too?": True})
+    monkeypatch.setenv("CODEX_THREAD_ID", "t1")
+    assert run_setup()[0] == 0
+    assert not any("personal notes" in q for q in asked)
+    assert "LFLABS_MEMORY_CLIENT_KEY" not in (box.home / ".cursor/mcp.json").read_text()
+
+
+def at_a_terminal(monkeypatch, typed):
+    """stdin and stdout are a terminal, and the person types `typed` when asked to confirm."""
+    from lflabs_memory_cli import access
+    asked = []
+    monkeypatch.setattr(access, "_tty", lambda: True)
+    monkeypatch.setattr(access, "_ask", lambda q: asked.append(q) or typed)
+    for k in access.AGENT_ENV:
+        monkeypatch.delenv(k, raising=False)
+    return asked
+
+
+def test_widening_needs_the_app_name_typed(box, monkeypatch, capsys):
+    from lflabs_memory_cli import access
+    assert run_setup()[0] == 0
+    eng, out = layout.engine_bin(), []
+    asked = at_a_terminal(monkeypatch, "yes")
+    assert access.main("cursor", "everything", eng, say=out.append) == 1
+    assert asked == ["To let Cursor see everything, personal notes too, type cursor: "]
+    assert out[-1] == "Not confirmed: nothing was changed."
+    assert "LFLABS_MEMORY_CLIENT_KEY" not in (box.home / ".cursor/mcp.json").read_text()
+    assert not [c for c in box.calls("lflabs-memory") if c[:2] == ["clients", "level"]]
+    at_a_terminal(monkeypatch, "cursor")
+    assert access.main("cursor", "everything", eng, say=out.append) == 0
+    assert ["clients", "level", "cursor", "everything"] in box.calls("lflabs-memory"), \
+        "the engine's own command makes the change, so its access history logs it"
+
+
+def test_widening_without_a_terminal_is_refused(box, monkeypatch):
+    from lflabs_memory_cli import access
+    assert run_setup()[0] == 0
+    at_a_terminal(monkeypatch, "cursor")
+    monkeypatch.setattr(access, "_tty", lambda: False)
+    out = []
+    assert access.main("cursor", "everything", layout.engine_bin(), say=out.append) == 1
+    assert out[-1] == ("Widening what Cursor sees needs you at a terminal: run dawnmere access cursor everything in "
+                       "a Terminal window.")
+
+
+@pytest.mark.parametrize("marker", ["CLAUDECODE", "CLAUDE_CODE_ENTRYPOINT", "CODEX_SANDBOX", "CODEX_THREAD_ID",
+                                    "CURSOR_AGENT", "CURSOR_CONVERSATION_ID"])
+def test_widening_from_an_ai_apps_shell_is_refused(box, monkeypatch, marker):
+    """An agent with a shell tool cannot widen its own (or another app's) access, terminal or not."""
+    from lflabs_memory_cli import access
+    assert run_setup()[0] == 0
+    asked = at_a_terminal(monkeypatch, "cursor")
+    monkeypatch.setenv(marker, "1")
+    out = []
+    assert access.main("cursor", "everything", layout.engine_bin(), say=out.append) == 1
+    assert asked == [] and out[-1].startswith(f"Refused: this is an AI app's shell ({marker} is set).")
+    assert not [c for c in box.calls("lflabs-memory") if c[:2] == ["clients", "level"]]
+
+
+def test_narrowing_needs_no_confirmation(box, monkeypatch):
+    from lflabs_memory_cli import access
+    assert run_setup()[0] == 0
+    asked = at_a_terminal(monkeypatch, "")
+    monkeypatch.setenv("CLAUDECODE", "1")
+    monkeypatch.setattr(access, "_tty", lambda: False)
+    out = []
+    assert access.main("cursor", "nothing", layout.engine_bin(), say=out.append) == 0
+    assert asked == [] and ["clients", "level", "cursor", "nothing"] in box.calls("lflabs-memory")
