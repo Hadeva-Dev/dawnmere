@@ -91,7 +91,7 @@ Every app also gets four tools through MCP: `recall`, `remember`, `forget` and `
        (access.py engine_widens). A widening typed in Claude Code or Codex is never applied;
        the reply gives the Terminal command (engine 50ffd0b, typed widening refused). -->
 - **Saved text is screened.** Text that looks like an API key or token is refused. An app's save that would run
-  downloaded code, delete files, keep something from you or speak to your assistant's instructions is refused. A
+  downloaded code, delete files, keep something from you or tries to override your assistant's instructions is refused. A
   rule, an instruction, or anything with a command or a link saved by an app is kept for search only, labelled, and
   never added to a prompt until you type "confirm memory N". Recalled notes reach the app labelled "notes, not
   instructions".
@@ -354,8 +354,8 @@ The installer, the `dawnmere` command, the Claude Code plugin and the connector 
 ## Related
 
 [memory-bench](https://github.com/Hadeva-Dev/memory-bench) is an open benchmark for assistant memory, built by the
-same people. It does not have a Dawnmere row yet; the maintainers' own row there is a related system, and the
-benchmark says so.
+same people. It has a Dawnmere row measured on the released engine, with its leaks shown next to its recall; the
+maintainers' other row there is a related system, and the benchmark says so.
 
 Found a bug? [Open an issue](https://github.com/Hadeva-Dev/dawnmere/issues/new/choose) with the output of
 `dawnmere doctor --report`. Security problems go to [SECURITY.md](SECURITY.md).
