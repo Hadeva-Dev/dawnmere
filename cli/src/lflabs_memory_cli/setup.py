@@ -19,7 +19,7 @@ from importlib import metadata
 from pathlib import Path
 
 from . import apps, backend, edits, install_record, keychain, launchd, models, prompt, settings, sockets
-from .brand import COMMAND, PRODUCT, REPO
+from .brand import COMMAND, PRODUCT
 from .layout import (CLI_DIST, CONNECTOR_VERSION, ENGINE, ENGINE_DIST, MARKETPLACE, SERVER, data_dir,
                      engine_bin, engine_record, home, on_shell_path, path_advice, short, uv_bin)
 from .run import run
@@ -301,8 +301,7 @@ class RealSetup:
             return "plugin", None, True
         if os.path.isabs(self.engine):  # the plugin's hooks run this path (plugin/scripts/engine), never PATH's
             engine_record().write_text(self.engine + "\n")
-        source = os.environ.get("LFLABS_MEMORY_MARKETPLACE") or REPO  # a local checkout, for testing
-        if self._cmd(["claude", "plugin", "marketplace", "add", source, "--scope", "user"]).ok and \
+        if self._cmd(["claude", "plugin", "marketplace", "add", apps.marketplace_source(), "--scope", "user"]).ok and \
                 self._cmd(["claude", "plugin", "install", f"{SERVER}@{MARKETPLACE}", "--scope", "user", "-y"]).ok:
             return "plugin", None, True
         # fallback: the MCP entry by claude mcp add, the hooks in settings.json
@@ -423,7 +422,7 @@ def dry_run(a, say):
             continue
         say(f"\n  {apps.LABELS[app]}:")
         if app == "claude-code":
-            say(f"    run: claude plugin marketplace add {REPO} --scope user")
+            say(f"    run: claude plugin marketplace add {apps.marketplace_source()} --scope user")
             say(f"    run: claude plugin install {SERVER}@{MARKETPLACE} --scope user -y")
             say("    (if those fail: claude mcp add, and these hooks in ~/.claude/settings.json)")
         for p in apps.file_plans(app, eng):

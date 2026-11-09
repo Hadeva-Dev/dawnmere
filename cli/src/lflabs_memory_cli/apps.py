@@ -15,9 +15,12 @@ import shlex
 import shutil
 from dataclasses import dataclass
 
+from importlib import metadata
+
 from . import edits
+from .brand import REPO
 from .edits import Skip
-from .layout import CLIENT_ENV, CONNECTOR, CONNECTOR_VERSION, ENGINE, SERVER, engine_record, home
+from .layout import CLI_DIST, CLIENT_ENV, CONNECTOR, CONNECTOR_VERSION, ENGINE, SERVER, engine_record, home
 from .run import run
 
 KEY_ENV = "LFLABS_MEMORY_CLIENT_KEY"  # an app trusted with more than work only carries its key (access.py)
@@ -57,6 +60,13 @@ def node_status():
     if int(m.group(1)) < MIN_NODE:
         return v, f"Node.js {v} is too old"
     return v, None
+
+
+def marketplace_source(version=None):
+    """What `claude plugin marketplace add` gets: this repo at the release tag the CLI's wheels come from, so the
+    plugin (and what its hooks run) changes with a release, never with a push to main. LFLABS_MEMORY_MARKETPLACE
+    overrides it (a local checkout, for testing)."""
+    return os.environ.get("LFLABS_MEMORY_MARKETPLACE") or f"{REPO}#v{version or metadata.version(CLI_DIST)}"
 
 
 def hook_engine():
