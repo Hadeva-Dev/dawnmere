@@ -217,14 +217,35 @@ def wheelset(v, constraints=True):
 
 
 def uv_installs(mac):
-    return [c for c in mac.calls("uv") if c[:2] in (["tool", "install"], ["pip", "install"])]
+    return [c for c in mac.calls("uv") if c[:2] == ["tool", "install"]]
+
+
+def with_python(mac, tmp_path):
+    """uv's own Python 3.12, a fake that logs the pip download it is asked for."""
+    mac.add("python3.12")
+    mac.on("uv", ["python", "find", "--managed-python", "3.12"], 0, str(mac.bin / "python3.12"))
+    mac.on("uv", ["tool", "dir"], 0, str(tmp_path / "tools"))
+
+
+def failing_first_install(monkeypatch):
+    """uv tool install fails once (after its files landed), then works."""
+    real, failed = update.run, []
+
+    def run(argv, **kw):
+        if argv[1:3] == ["tool", "install"] and not failed:
+            failed.append(argv)
+            real(argv, **kw)
+            return update.Result(1, "", "uv broke halfway")
+        return real(argv, **kw)
+    monkeypatch.setattr(update, "run", run)
 
 
 def test_update_pins_and_checks_every_dependency(mac, monkeypatch, tmp_path):
-    """The release's constraints.txt, checked against SHA256SUMS: the versions for uv tool install, then the hashes
-    by a reinstall (uv tool install does not check hashes). Then the new program finishes."""
+    """The release's constraints.txt, checked against SHA256SUMS; every dependency downloaded by pip with its hash
+    checked, before anything is installed; uv tool install then takes only those files. Then the new program
+    finishes."""
     monkeypatch.setattr(update, "installed_version", lambda: "0.1.0")
-    mac.on("uv", ["tool", "dir"], 0, str(tmp_path / "tools"))
+    with_python(mac, tmp_path)
     finished = []
     monkeypatch.setattr(update.os, "execvp", lambda prog, argv: finished.append(argv))
     seen = {}
@@ -233,13 +254,18 @@ def test_update_pins_and_checks_every_dependency(mac, monkeypatch, tmp_path):
     def run(argv, **kw):
         if argv[1:3] == ["tool", "install"]:
             seen["lock"] = open(argv[argv.index("-c") + 1]).read()
+            seen["order"] = list(mac.calls())
         return real(argv, **kw)
     monkeypatch.setattr(update, "run", run)
     update.main(yes=True, say=lambda s: None, get=fake_github({"0.2.0": wheelset("0.2.0")}))
-    install, verify = uv_installs(mac)
-    assert "--no-build" in install and seen["lock"] == "idna==3.0\n"
-    assert verify[2:4] == ["--python", str(tmp_path / "tools/lflabs-memory-cli/bin/python")]
-    assert verify[4:-1] == ["--reinstall", "--no-deps", "--no-build", "--require-hashes", "-r"]
+    download = mac.calls("python3.12")[0]
+    assert download[:12] == ["-I", "-m", "pip", "download", "--require-hashes", "--only-binary", ":all:", "--no-deps",
+                             "--no-cache-dir", "--disable-pip-version-check", "-q", "-r"]
+    assert download in seen["order"], "the hashes are checked before uv tool install runs"
+    install, = uv_installs(mac)
+    deps = download[download.index("-d") + 1]
+    assert install[6:13] == ["--no-index", "--find-links", deps, "--no-build", "--no-cache", "-c", download[12]]
+    assert seen["lock"] == "idna==3.0\n"
     assert finished and finished[0][1:] == ["update", "--finish", "0.1.0"]
 
 
@@ -251,18 +277,55 @@ def test_update_refuses_a_release_without_constraints(mac, monkeypatch):
     assert uv_installs(mac) == []
 
 
-def test_update_puts_the_old_release_back_when_a_hash_differs(mac, monkeypatch, tmp_path):
+def test_update_with_a_wrong_hash_installs_nothing(mac, monkeypatch, tmp_path):
+    """pip refuses the file: uv tool install never runs, and the installed release is left as it was."""
     monkeypatch.setattr(update, "installed_version", lambda: "0.1.0")
-    mac.on("uv", ["tool", "dir"], 0, str(tmp_path / "tools"))
-    mac.on("uv", ["pip", "install"], 1, "")
+    with_python(mac, tmp_path)
+    mac.on("python3.12", ["-I", "-m", "pip", "download"], 1, "")
+    out = []
+    assert update.main(yes=True, say=out.append, get=fake_github({"0.2.0": wheelset("0.2.0")})) == 1
+    assert out[-1].startswith("Update stopped: a dependency could not be downloaded or did not match its hash: "
+                              "nothing was installed")
+    assert uv_installs(mac) == [] and ["tool", "uninstall", "lflabs-memory-cli"] not in mac.calls("uv")
+
+
+def test_update_failing_after_files_landed_puts_the_old_release_back(mac, monkeypatch, tmp_path):
+    """Fail closed: the half-made environment is taken out first, then the old release goes back, checked."""
+    monkeypatch.setattr(update, "installed_version", lambda: "0.1.0")
+    with_python(mac, tmp_path)
+    failing_first_install(monkeypatch)
+    out = []
+    get = fake_github({"0.1.0": wheelset("0.1.0"), "0.2.0": wheelset("0.2.0")})
+    assert update.main(yes=True, say=out.append, get=get) == 1
+    calls = [c for c in mac.calls("uv") if c[:2] in (["tool", "install"], ["tool", "uninstall"])]
+    assert [c[:2] for c in calls] == [["tool", "install"], ["tool", "uninstall"], ["tool", "install"]]
+    assert "lflabs_memory_cli-0.1.0-py3-none-any.whl" in calls[-1][13] and "--no-index" in calls[-1]
+    assert len(mac.calls("python3.12")) == 2, "the old release's dependencies are checked too"
+    assert out[-1] == "Back on 0.1.0."
+
+
+def test_update_that_cannot_put_the_old_release_back_leaves_nothing(mac, monkeypatch, tmp_path):
+    """The old release cannot be put back checked (here: it has no constraints.txt): nothing stays installed, and
+    the install line is given."""
+    monkeypatch.setattr(update, "installed_version", lambda: "0.1.0")
+    with_python(mac, tmp_path)
+    failing_first_install(monkeypatch)
     out = []
     get = fake_github({"0.1.0": wheelset("0.1.0", False), "0.2.0": wheelset("0.2.0")})
     assert update.main(yes=True, say=out.append, get=get) == 1
-    assert any(x.startswith("Update stopped: a dependency did not match the hashes this release was tested with")
-               for x in out)
-    assert out[-1] == "Back on 0.1.0."
-    last = uv_installs(mac)[-1]
-    assert last[:2] == ["tool", "install"] and "lflabs_memory_cli-0.1.0-py3-none-any.whl" in last[6]
+    assert len(uv_installs(mac)) == 1 and ["tool", "uninstall", "lflabs-memory-cli"] in mac.calls("uv")
+    assert out[-2] == "Could not reinstall 0.1.0 (0.1.0 has no constraints.txt to check it against), so Dawnmere is " \
+                      "uninstalled. Install it again with:"
+    assert out[-1] == "  curl -fsSL https://github.com/Hadeva-Dev/dawnmere/releases/latest/download/install.sh | sh"
+
+
+def test_quarantine_moves_the_environment_aside_when_uv_cannot_uninstall(mac, tmp_path):
+    mac.on("uv", ["tool", "uninstall"], 1, "")
+    mac.on("uv", ["tool", "dir"], 0, str(tmp_path / "tools"))
+    (tmp_path / "tools/lflabs-memory-cli/bin").mkdir(parents=True)
+    update.quarantine()
+    assert not (tmp_path / "tools/lflabs-memory-cli").exists()
+    assert [p.name.startswith("lflabs-memory-cli.quarantined-") for p in (tmp_path / "tools").iterdir()] == [True]
 
 
 def test_update_check_only(mac, monkeypatch):

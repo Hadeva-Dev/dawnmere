@@ -24,9 +24,10 @@ The engine checkout sits next to this repo as `../lflabs-memory-engine`.
    uv run --no-project python cli/tools/render_install.py "$VERSION" "$CLI" "$ENGINE" dist/constraints.txt dist/install.sh
    (cd dist && shasum -a 256 *.whl constraints.txt install.sh > SHA256SUMS)
    ```
-   install.sh and `dawnmere update` install with `-c constraints.txt`, then reinstall each dependency with
-   `--require-hashes` (uv tool install does not check the hashes in a constraints file), and refuse a release
-   without it.
+   install.sh and `dawnmere update` first download every dependency with uv's Python 3.12 and
+   `pip download --require-hashes --only-binary :all: --no-deps -r constraints.txt` (uv tool install does not
+   check the hashes in a constraints file), then `uv tool install --no-index --find-links` those files only; a
+   release without constraints.txt is refused.
 3. **Tests before publishing.**
    ```bash
    (cd cli && uv run pytest -q)
