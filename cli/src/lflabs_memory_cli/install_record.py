@@ -37,9 +37,13 @@ def save(record):
     os.replace(tmp, path)
 
 
+def file_entry(record, plan):
+    return next((f for f in record["files"] if f["path"] == str(plan.path) and f["kind"] == plan.kind), None)
+
+
 def add_file(record, plan, backup, sha256):
     """One changed file. A rerun that changes the same file again keeps the first backup (the user's original)."""
-    prev = next((f for f in record["files"] if f["path"] == str(plan.path) and f["kind"] == plan.kind), None)
+    prev = file_entry(record, plan)
     entry = {"app": plan.app, "kind": plan.kind, "path": str(plan.path),
              "backup": prev["backup"] if prev else (str(backup) if backup else None),
              "created": prev["created"] if prev else plan.old is None,

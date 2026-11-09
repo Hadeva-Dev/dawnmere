@@ -142,12 +142,8 @@ def widen_cursor(engine, record=None, say=print):
     for p in cursor_plans(engine, key):
         if p.state == "add":
             try:
-                if record is not None:
-                    p.added, p.snippet = mask(p.added, key), mask(p.snippet, key)
-                    backup = edits.write(p.path, p.new, p.old, secret=KEY_ENV in p.new)
-                    install_record.add_file(record, p, backup, edits.sha256(p.new))
-                else:
-                    edits.write(p.path, p.new, p.old, secret=KEY_ENV in p.new)
+                p.added, p.snippet = mask(p.added, key), mask(p.snippet, key)
+                apps.apply(p, record if record is not None else install_record.empty())
             except edits.Skip as e:
                 say(f"{short(p.path)}: {e}")
                 ok = False
