@@ -348,7 +348,7 @@ class RealSetup:
 
     def step_check(self, ui):
         ui.step("Self-check", "running")
-        ok, seconds, why = self_check(self.engine)
+        ok, seconds, why = checked(self.engine)
         if not ok:
             ui.step("Self-check", "failed", why)
             return False
@@ -358,6 +358,33 @@ class RealSetup:
             return True
         ui.step("Self-check", *self_check_row(seconds))
         return True
+
+
+CHECK_TRIES, CHECK_GAP = 3, 2.0
+
+
+def ready(timeout=None):
+    """The service answers: both its sockets (launchd.wait_ready), then a real recall on the connector."""
+    timeout = READY_WAIT if timeout is None else timeout
+    end = time.monotonic() + timeout
+    if not launchd.wait_ready(timeout):
+        return False
+    while not sockets.ask("recall", {"query": "ready", "k": 1}, client="cursor").get("ok"):
+        if time.monotonic() >= end:
+            return False
+        time.sleep(0.25)
+    return True
+
+
+def checked(engine):
+    """self_check once the service is ready, tried up to CHECK_TRIES times CHECK_GAP s apart: a service that has
+    just started can miss the first probe (macOS 26 runners, 2 of 7)."""
+    ready()
+    for n in range(CHECK_TRIES):
+        got = self_check(engine)
+        if got[0] or n + 1 == CHECK_TRIES:
+            return got
+        time.sleep(CHECK_GAP)
 
 
 def _hook(engine, sub, payload, client=None):
@@ -488,7 +515,7 @@ def finish_models(say):
     if not ran[-1][1] or not launchd.wait_ready(READY_WAIT):
         say("The memory service did not start: see ~/Library/Logs/LF Labs/memory.log")
         return 1
-    ok, _, why = self_check(engine)
+    ok, _, why = checked(engine)
     if not ok:
         say(f"Self-check: {why}")
         return 1

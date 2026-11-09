@@ -787,3 +787,25 @@ def test_setup_models_before_setup(mac, monkeypatch):
     out = []
     assert setup.main(cli.parser().parse_args(["setup", "--models"]), say=out.append) == 1
     assert out[-1] == "Memory is not set up yet: run dawnmere setup first."
+
+
+def test_self_check_waits_for_the_service_and_tries_again(box, monkeypatch, capsys):
+    """A service just started can miss the first probe (macOS 26: 2 of 7): wait for a real recall to answer, then
+    try the check up to 3 times, 2 s apart."""
+    from lflabs_memory_cli import sockets
+    events, waits = [], []
+    real_ask = sockets.ask
+    monkeypatch.setattr(setup.sockets, "ask", lambda tool, args=None, **kw: (events.append(("ask", tool)),
+                                                                             real_ask(tool, args, **kw))[1])
+    results = iter([(False, 0.3, "a new Cursor chat would not see it"), (False, 0.3, "x"), (True, 0.3, "")])
+    monkeypatch.setattr(setup, "self_check", lambda engine: (events.append(("check", None)), next(results))[1])
+    monkeypatch.setattr(setup.time, "sleep", waits.append)
+    code, out = run_setup()
+    assert code == 0, out + capsys.readouterr().out
+    assert events.index(("ask", "recall")) < events.index(("check", None)), "a real recall answers first"
+    assert [e for e in events if e[0] == "check"] == [("check", None)] * 3 and waits == [2.0, 2.0]
+    results = iter([(False, 0.3, "a new Cursor chat would not see it")] * 3)
+    events.clear()
+    code, out = run_setup()
+    assert code == 1 and [e for e in events if e[0] == "check"] == [("check", None)] * 3
+    assert "[fail] Self-check: a new Cursor chat would not see it" in capsys.readouterr().out
