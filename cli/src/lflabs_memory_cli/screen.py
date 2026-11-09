@@ -16,6 +16,7 @@ import shutil
 import signal
 import subprocess
 import sys
+import textwrap
 import threading
 import time
 from dataclasses import dataclass, field
@@ -101,6 +102,7 @@ class ScreenState:
     plain: bool = False            # plain lines only: no art, colour or escapes
     intro: bool = True             # the full show; False is the short version for a re-run
     expect_apps: int = 3           # the apps setup found: one post each, before they are wired
+    problem: str | None = None     # setup worked, but this stops the apps using memory: said instead of "is on"
 
 
 # ---------- timeline: when each row is on screen ----------
@@ -522,10 +524,15 @@ def _finale(t, state, tl, sc):
     paint = _paint(state)
     bold = (lambda s: f"\x1b[1;38;5;{WORD}m{s}\x1b[0m") if state.color else (lambda s: f"\x1b[1m{s}\x1b[0m")
     is_on = bold(f"{PRODUCT} is on.")
-    if not state.intro:
-        return ["", IND + is_on]
     moving = _moving(state, t)
     at = _ending(state, tl, sc)
+    if state.problem:
+        if state.intro and moving and t < at + 2.6:
+            return []
+        return [""] + [IND + (paint(AMBER, "!") if i == 0 else " ") + " " + paint(ACTIVE, line)
+                       for i, line in enumerate(_problem_lines(state))]
+    if not state.intro:
+        return ["", IND + is_on]
     names = _connected(state)
     out = []
     if names and (not moving or t >= at + 1.3):
@@ -536,6 +543,10 @@ def _finale(t, state, tl, sc):
             tries, eg = _try_lines(state.width, names)
             out += [IND + paint(GREY, line) for line in tries] + [IND + paint(DIMMER, eg)]
     return out
+
+
+def _problem_lines(state):
+    return textwrap.wrap(state.problem, min(BLOCK, state.width) - len(IND) - 2)
 
 
 def _memory_lines(state, names):
@@ -577,7 +588,9 @@ def plain_lines(state):
             for a in state.apps:
                 if a.status in ("ok", "failed"):
                     out.append(f"     {a.name}: {a.how or a.status}" + (f" ({a.hint})" if a.hint else ""))
-    if state.finished is not None and not _failed(state):
+    if state.finished is not None and not _failed(state) and state.problem:
+        out.append(f"! {state.problem}")
+    elif state.finished is not None and not _failed(state):
         out.append(f"{PRODUCT} is on.")
         names = _connected(state)
         if names and state.intro:

@@ -387,3 +387,17 @@ def test_long_note_stays_on_one_row(final):
     state.steps[0].note = "found; background reading off (Claude Code 2.0.1 is older than 2.1.301: update it)"
     row = next(visible(x) for x in frame(end, state) if "Claude Code" in x and "found" in x)
     assert len(row) <= 68 and row.endswith("…")
+
+
+def test_a_problem_replaces_the_success_line():
+    """Setup worked but the apps cannot use memory's tools (no Node.js): the end says so, not "Dawnmere is on."."""
+    problem = "Node.js is not installed: your apps cannot use memory's tools until you install Node.js 18 or later " \
+              "from nodejs.org."
+    for display in ({}, {"plain": True}, {"intro": False}, {"width": 60}):
+        state = scripted(**display)
+        state.problem = problem
+        lines = [visible(x) for x in frame(done_at(state), state)]
+        text = " ".join(" ".join(line.split()) for line in lines)
+        assert "Dawnmere is on." not in text and TRY_PREFIX not in text and "reaches the others" not in text
+        assert problem in text.replace("! ", ""), display
+        assert state.plain or all(len(line) <= state.width for line in lines), display  # plain lines never wrap

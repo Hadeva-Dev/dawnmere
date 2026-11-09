@@ -32,6 +32,9 @@ def box(mac, monkeypatch, tmp_path):
     engine.write_text(f"#!{sys.executable}\n" + (HERE / "fake_engine.py").read_text())
     engine.chmod(engine.stat().st_mode | stat.S_IXUSR)
     mac.add("zsh")
+    for prog in ("node", "npx"):
+        mac.add(prog)
+    mac.on("node", ["--version"], 0, "v22.1.0\n")
     mac.on("claude", ["--version"], 0, "2.1.301 (Claude Code)\n")
     mac.on("claude", ["-p"], 0, '{"is_error": false, "result": "ok"}')
     mac.on("claude", ["mcp", "get"], 1, "")
@@ -334,12 +337,28 @@ def test_access_command(box, monkeypatch, capsys):
     assert out[-1].startswith("Cursor sees ") and "dawnmere access cursor everything | nothing-personal" in out[-1]
 
 
-def test_node_missing_is_said(box):
-    """No npx: setup still works (the hooks need no Node), and says the apps' memory tools wait for Node.js."""
+def test_node_missing_is_said(box, capsys):
+    """No npx: setup still works (the hooks need no Node), says the apps' memory tools wait for Node.js, and its
+    final screen repeats that instead of saying Dawnmere is on."""
+    box.remove("node")
+    box.remove("npx")
     code, out = run_setup()
+    shown = capsys.readouterr().out
     assert code == 0 and "Node.js is not installed" in out
+    assert "Dawnmere is on." not in shown and "Try it" not in shown
+    assert "your apps cannot use memory's tools until you install Node.js 18 or later from nodejs.org" in shown
     box.add("npx")
-    assert "Node.js" not in run_setup()[1]
+    box.add("node")
+    box.rules["node"] = [[["--version"], 0, "v16.20.2\n"]]
+    box.save()
+    code, out = run_setup()
+    shown = capsys.readouterr().out
+    assert "Node.js v16.20.2 is too old" in out and "Dawnmere is on." not in shown
+    box.rules["node"] = [[["--version"], 0, "v22.1.0\n"]]
+    box.save()
+    code, out = run_setup()
+    shown = capsys.readouterr().out
+    assert "Node.js" not in out + shown and "Dawnmere is on." in shown
 
 
 def test_service_reload_waits_for_the_old_agent_to_leave(box, monkeypatch):

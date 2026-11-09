@@ -11,11 +11,13 @@ An entry named lflabs-memory that is not ours (another tool's) is left alone and
 import json
 import re
 import shlex
+import shutil
 from dataclasses import dataclass
 
 from . import edits
 from .edits import Skip
 from .layout import CLIENT_ENV, CONNECTOR, CONNECTOR_VERSION, ENGINE, SERVER, home
+from .run import run
 
 KEY_ENV = "LFLABS_MEMORY_CLIENT_KEY"  # an app trusted with more than work only carries its key (access.py)
 
@@ -25,6 +27,8 @@ DEFAULT = ("claude-code", "codex", "cursor")
 CLAUDE_HOOKS = (("UserPromptSubmit", "hook-prompt", 10), ("SessionStart", "hook-session-start", 120),
                 ("Stop", "hook-activity", 10), ("SessionEnd", "hook-session-end", 10))
 HINTS = {"codex": "type /hooks once", "cursor": "restart Cursor"}
+MIN_NODE = 18                # the connector's package.json engines
+NODE_FIX = "install Node.js 18 or later from nodejs.org"
 
 
 @dataclass
@@ -38,6 +42,20 @@ class Plan:
     new: str | None = None
     old: str | None = None
     added: str = ""      # exactly what was added (install.json): the TOML block, or the JSON entry
+
+
+def node_status():
+    """(node's version or None, the problem or None). Every app's MCP entry starts the connector with npx."""
+    if not shutil.which("npx"):
+        return None, "Node.js is not installed"
+    r = run(["node", "--version"], timeout=10)
+    v = r.out.strip() if r.ok else ""
+    m = re.match(r"v?(\d+)\.", v)
+    if not m:
+        return None, "Node.js is not installed"
+    if int(m.group(1)) < MIN_NODE:
+        return v, f"Node.js {v} is too old"
+    return v, None
 
 
 def connector_args():

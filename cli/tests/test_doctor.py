@@ -42,6 +42,9 @@ def healthy(mac, monkeypatch, tmp_path, backend_name="claude-cli"):
     mac.on("ps", [], 0, " 2-03:04:05\n")
     mac.add("ps")
     mac.add("lflabs-memory")
+    for prog in ("node", "npx"):
+        mac.add(prog)
+    mac.on("node", ["--version"], 0, "v20.11.0\n")
     mac.on("claude", ["--version"], 0, "2.1.301 (Claude Code)\n")
     mac.on("claude", ["plugin", "list"], 0, "  lflabs-memory@lflabs  1.0.0b1  enabled\n")
     mac.on("claude", ["-p"], 0, '{"is_error": false, "result": "ok"}')
@@ -59,6 +62,7 @@ data          ok    ~/Library/Application Support/LF Labs/Memory  (4 memories, 2
 models        ok    embed, rerank: checksums match
 hook speed    ok    recall in N s (limit 1.5 s)
 connector     ok    lflabs-memory/1 on SOCK
+Node.js       ok    v20.11.0
 model         ok    Claude Code 2.1.301, logged in, Haiku
 budget        ok    today 41 of 200 calls; last 7 days 0.9k in / 0.2k out tokens a day
 backlog       ok    0 sessions waiting to be read
@@ -82,6 +86,31 @@ def test_doctor_lines_golden(mac, monkeypatch, tmp_path, connector):
     code, text = run_doctor()
     assert text.replace(connector.path, "SOCK") == GOLDEN
     assert code == 0
+
+
+def test_doctor_without_node(mac, monkeypatch, tmp_path, connector):
+    """No Node.js: its own row says what to install, and every app's row says it cannot use memory's tools."""
+    healthy(mac, monkeypatch, tmp_path)
+    mac.remove("node")
+    mac.remove("npx")
+    code, text = run_doctor()
+    lines = {line[:14].strip(): line for line in text.splitlines() if len(line) > 14}
+    assert lines["Node.js"].startswith("Node.js       warn  Node.js is not installed")
+    for app in ("Claude Code", "Codex", "Cursor"):
+        assert lines[app][14:20] == "warn  ", lines[app]
+        assert f"{app} cannot use memory's tools until Node.js 18 or later is installed" in lines[app]
+    assert "\nNode.js: install Node.js 18 or later from nodejs.org" in text
+    assert text.count("nodejs.org") == 1, "one fix line, not one per app"
+
+
+def test_doctor_node_too_old(mac, monkeypatch, tmp_path, connector):
+    healthy(mac, monkeypatch, tmp_path)
+    mac.rules["node"] = [[["--version"], 0, "v16.20.2\n"]]
+    mac.save()
+    code, text = run_doctor()
+    assert "Node.js       warn  Node.js v16.20.2 is too old" in text
+    assert "Codex cannot use memory's tools until Node.js 18 or later is installed" in text
+    assert "\nNode.js: install Node.js 18 or later from nodejs.org" in text
 
 
 def test_doctor_none_mode_line(mac, monkeypatch, tmp_path, connector):
