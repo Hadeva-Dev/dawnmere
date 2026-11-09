@@ -118,8 +118,9 @@ def main(keep_data=False, out=print):
     else:
         out(f"{'Your memory':<21}kept in {short(data)} (delete the folder yourself if you change your mind)")
 
-    if uv_bin():
-        r = run([uv_bin(), "tool", "uninstall", CLI_DIST], timeout=120)
+    uv = uv_bin()
+    if uv:
+        r = run([uv, "tool", "uninstall", CLI_DIST], timeout=120)
         rep.row("Programs", "removed" if r.ok else "gone",
                 f"{CLI_DIST} and the engine removed" if r.ok else f"{CLI_DIST} was not installed with uv")
     else:
@@ -134,6 +135,10 @@ def main(keep_data=False, out=print):
         out("Backups of your app settings are next to each file; delete them when you like:")
         for b in dict.fromkeys(rep.backups):
             out(f"  {short(b)}")
+    if uv:  # install.sh may have fetched it, but other tools may use it now: it stays (uv's own uninstall steps)
+        out("uv and the Python it downloaded stay on this Mac (other tools may use them). If nothing else needs them:")
+        u = short(uv)
+        out(f'  {u} cache clean && rm -rf "$({u} python dir)" "$({u} tool dir)" {u} {u}x')
     if rep.errors:
         out("Some files were left alone (see above): take the entries out by hand.")
         return 1

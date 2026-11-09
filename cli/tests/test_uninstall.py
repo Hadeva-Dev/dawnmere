@@ -145,3 +145,19 @@ def test_uv_in_local_bin_off_path(mac):
     uninstall.main(keep_data=True, out=out.append)
     assert ["tool", "uninstall", "lflabs-memory-cli"] in mac.calls("uv")
     assert any(line.startswith("Programs             lflabs-memory-cli and the engine removed") for line in out)
+
+
+def test_uv_is_said_to_stay(mac):
+    """uv (and the Python it downloaded) may serve other tools: it stays, and the end says so and how to remove it."""
+    seed(mac.home)
+    fake_setup(mac.home)
+    out = []
+    assert uninstall.main(keep_data=True, out=out.append) == 0
+    uv = f"{mac.bin}/uv"
+    assert out[-2:] == ["uv and the Python it downloaded stay on this Mac (other tools may use them). If nothing else "
+                        "needs them:",
+                        f'  {uv} cache clean && rm -rf "$({uv} python dir)" "$({uv} tool dir)" {uv} {uv}x']
+    mac.remove("uv")
+    out = []
+    uninstall.main(keep_data=True, out=out.append)
+    assert not any("uv cache clean" in line for line in out), "no uv, nothing to say about it"
