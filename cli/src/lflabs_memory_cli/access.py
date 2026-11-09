@@ -141,13 +141,6 @@ def agent_ancestor(pid=None, run=None):
     return None
 
 
-def person_at_terminal():
-    """The engine's test for "the user typed this": no AI app's shell markers, no AI app among the ancestors, and a
-    terminal on stdin and stdout. Each can be faked alone; together they keep an agent's commands from passing as
-    the user's own words."""
-    return not agent_shell() and agent_ancestor() is None and sys.stdin.isatty() and sys.stdout.isatty()
-
-
 def engine_widens(engine, app, level):
     """The engine's own `clients level`, on this terminal: its gate refuses an AI app's shell or a process an AI app
     started, asks for the app's name, then needs Allow clicked in a macOS dialog, and logs the change to the access

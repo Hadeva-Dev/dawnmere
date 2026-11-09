@@ -253,44 +253,88 @@ def test_export_import_roundtrip(mac, monkeypatch, tmp_path):
         return saved[content], "added"
     out = []
     assert export.import_file(f, say=out.append, remember=remember) == 0
-    assert out[-1] == "Imported 3 new memories; 0 were already here."
+    assert "Imported 3 new memories; 0 were already here." in out
     export.import_file(f, say=out.append, remember=remember)
-    assert out[-1] == "Imported 0 new memories; 3 were already here."
+    assert out[-2] == "Imported 0 new memories; 3 were already here."
     assert set(saved) == {m[0] for m in MEMS[:3]}
     bad = tmp_path / "bad.json"
     bad.write_text('{"format": "other"}')
     assert export.import_file(bad, say=out.append, remember=remember) == 1
 
 
-def test_import_keeps_the_users_own_words_only_when_they_run_it(mac, monkeypatch, tmp_path):
-    """At a terminal, not under an AI app: an origin of the user's own stays, a row without one is vouched for by
-    them, any other is unknown. Run by an AI app (markers, an ancestor, or no terminal): all unknown."""
-    from lflabs_memory_cli import access
-    f = tmp_path / "e.json"
+def crafted(tmp_path):
+    f = tmp_path / "mine.json"
     f.write_text(json.dumps({"format": "lflabs-memory-export/1", "memories": [
         {"content": "a", "origin": "owner_typed"}, {"content": "b"}, {"content": "c", "origin": "app_confirmed"},
         {"content": "d", "origin": "owner_key"}]}))
+    return f
+
+
+def importing(monkeypatch, agent=None):
+    """remember() as the engine's, recording the origin each memory is saved with; an AI app's shell when asked."""
+    from lflabs_memory_cli import access
     got = {}
 
     def remember(content, kind, project, origin="unknown"):
         got[content] = origin
-        return len(got), "added"
+        return 10 + len(got), "added"
     for k in access.AGENT_ENV:
         monkeypatch.delenv(k, raising=False)
-    monkeypatch.setattr(access, "agent_ancestor", lambda: None)
-    monkeypatch.setattr(access.sys.stdin, "isatty", lambda: True, raising=False)
-    monkeypatch.setattr(access.sys.stdout, "isatty", lambda: True, raising=False)
+    monkeypatch.setattr(access, "agent_ancestor", lambda: agent)
+    return got, remember
+
+
+def test_import_saves_everything_unknown_then_asks_the_engine_to_trust(mac, monkeypatch, tmp_path):
+    """Only the rows the file calls the user's own go to the engine's `trust` (one dialog); the rest stay unknown."""
+    healthy(mac, monkeypatch, tmp_path)
+    mac.on("lflabs-memory", ["trust"], 0, "trusted 2 as your own words\n")
+    got, remember = importing(monkeypatch)
+    out = []
+    assert export.import_file(crafted(tmp_path), say=out.append, remember=remember) == 0
+    assert set(got.values()) == {"unknown"}, "never saved as the user's by the CLI"
+    assert ["trust", "11", "14", "--from", "mine.json (from another Mac, or changed since it was made)"] in \
+        mac.calls("lflabs-memory")
+    assert out[-1] == "trusted 2 as your own words"
+    mac.rules["lflabs-memory"] = [[["trust"], 0, "not trusted (it needs Allow in the dialog)\n"]]
+    mac.save()
+    export.import_file(crafted(tmp_path), say=out.append, remember=importing(monkeypatch)[1])
+    assert out[-1] == "not trusted (it needs Allow in the dialog)"
+
+
+@pytest.mark.parametrize("agent", [{"env": "CODEX_THREAD_ID"}, {"ancestor": "claude"},
+                                   {"ancestor": "unknown (ps failed)"}])
+def test_import_from_an_ai_app_never_asks(mac, monkeypatch, tmp_path, agent):
+    healthy(mac, monkeypatch, tmp_path)
+    got, remember = importing(monkeypatch, agent.get("ancestor"))
+    if "env" in agent:
+        monkeypatch.setenv(agent["env"], "t")
+    out = []
+    export.import_file(crafted(tmp_path), say=out.append, remember=remember)
+    assert set(got.values()) == {"unknown"}
+    assert not [c for c in mac.calls("lflabs-memory") if c[:1] == ["trust"]]
+    assert out[-1].startswith("2 the file calls yours stay of unknown origin: an AI app ran this import.")
+
+
+def test_an_export_from_this_mac_says_so(mac, monkeypatch, tmp_path):
+    """Signed with this Mac's key (DATA_DIR/export-key, 0600): unchanged, the dialog's label says it was made here;
+    changed, or from another Mac, it says so. The dialog is asked either way."""
+    healthy(mac, monkeypatch, tmp_path)
+    f = tmp_path / "e.json"
+    export.export(f, say=lambda s: None)
+    key = layout.data_dir() / "export-key"
+    assert oct(key.stat().st_mode & 0o777) == "0o600"
+    doc = json.loads(f.read_text())
+    assert export.made_here(doc)
+    doc["memories"][0]["content"] = "something else"
+    assert not export.made_here(doc)
+    del doc["signature"]
+    assert not export.made_here(doc)
+    for m in json.loads(f.read_text())["memories"]:
+        assert m["origin"] == "owner_typed"
+    got, remember = importing(monkeypatch)
     export.import_file(f, say=lambda s: None, remember=remember)
-    assert got == {"a": "owner_typed", "b": "owner_vouched", "c": "unknown", "d": "owner_key"}
-    for agent in ({"env": "CODEX_THREAD_ID"}, {"ancestor": "claude"}, {"ancestor": "unknown (ps failed)"}):
-        got.clear()
-        with monkeypatch.context() as m:
-            if "env" in agent:
-                m.setenv(agent["env"], "t")
-            else:
-                m.setattr(access, "agent_ancestor", lambda a=agent["ancestor"]: a)
-            export.import_file(f, say=lambda s: None, remember=remember)
-        assert set(got.values()) == {"unknown"}, agent
+    trust = next(c for c in mac.calls("lflabs-memory") if c[:1] == ["trust"])
+    assert trust[-1] == "e.json (made on this Mac)"
 
 
 def test_agent_ancestor_reads_ps_by_absolute_path():
