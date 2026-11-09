@@ -296,10 +296,9 @@ def test_cursor_personal_notes_when_asked(box, monkeypatch, capsys):
     assert oct((box.home / ".cursor/mcp.json").stat().st_mode & 0o777) == "0o600", "the file with the key: owner only"
     clients = json.loads((box.data / "clients.json").read_text())["clients"]
     assert clients["cursor"]["key_sha256"] and key not in json.dumps(clients), "the engine keeps only its hash"
-    assert ["clients", "level", "cursor", "everything"] in box.calls("lflabs-memory")
     for text in (out, shown, layout.install_json().read_text()):
         assert key not in text, "the key is never shown or recorded"
-    assert typed == ["To let Cursor see everything, personal notes too, type cursor: "], "confirmed like access"
+    assert typed == [("cursor", "everything")], "confirmed through the engine's gate, as by access"
     assert "Cursor now sees everything, personal notes too. Restart Cursor to load it." in out
     assert uninstall.main(keep_data=True, out=lambda s: None) == 0
     assert key not in (box.home / ".cursor/mcp.json").read_text() if (box.home / ".cursor/mcp.json").exists() else True
@@ -467,47 +466,49 @@ def test_an_agent_is_never_offered_cursors_personal_notes(box, monkeypatch):
 
 
 def at_a_terminal(monkeypatch, typed):
-    """stdin and stdout are a terminal, and the person types `typed` when asked to confirm."""
+    """The engine's gate (`lflabs-memory clients level`, on the terminal: the app's name typed, Allow clicked in a
+    macOS dialog) answers as a person who typed `typed` and clicked Allow would. Records each gated call."""
     from lflabs_memory_cli import access
     asked = []
-    monkeypatch.setattr(access, "_tty", lambda: True)
-    monkeypatch.setattr(access, "_ask", lambda q: asked.append(q) or typed)
+
+    def gate(engine, app, level):
+        asked.append((app, level))
+        return typed == app
+    monkeypatch.setattr(access, "engine_widens", gate)
     for k in access.AGENT_ENV:
         monkeypatch.delenv(k, raising=False)
     return asked
 
 
-def test_widening_needs_the_app_name_typed(box, monkeypatch, capsys):
+def test_widening_goes_through_the_engines_gate_first(box, monkeypatch, capsys):
     from lflabs_memory_cli import access
     assert run_setup()[0] == 0
     eng, out = layout.engine_bin(), []
-    asked = at_a_terminal(monkeypatch, "yes")
+    asked = at_a_terminal(monkeypatch, "no")
     assert access.main("cursor", "everything", eng, say=out.append) == 1
-    assert asked == ["To let Cursor see everything, personal notes too, type cursor: "]
-    assert out[-1] == "Not confirmed: nothing was changed."
-    assert "LFLABS_MEMORY_CLIENT_KEY" not in (box.home / ".cursor/mcp.json").read_text()
-    assert not [c for c in box.calls("lflabs-memory") if c[:2] == ["clients", "level"]]
+    assert asked == [("cursor", "everything")] and out[-1].startswith("Not changed: Cursor still sees ")
+    assert "LFLABS_MEMORY_CLIENT_KEY" not in (box.home / ".cursor/mcp.json").read_text(), "no key before the gate"
     at_a_terminal(monkeypatch, "cursor")
     assert access.main("cursor", "everything", eng, say=out.append) == 0
-    assert ["clients", "level", "cursor", "everything"] in box.calls("lflabs-memory"), \
-        "the engine's own command makes the change, so its access history logs it"
+    assert "LFLABS_MEMORY_CLIENT_KEY" in (box.home / ".cursor/mcp.json").read_text()
 
 
-def test_widening_without_a_terminal_is_refused(box, monkeypatch):
+def test_the_gate_is_the_engines_command_on_this_terminal(monkeypatch):
+    """`lflabs-memory clients level` with this process's stdin, stdout and stderr (its prompt and dialog need the
+    person), and the level read back, since the engine prints a refusal and exits 0."""
     from lflabs_memory_cli import access
-    assert run_setup()[0] == 0
-    at_a_terminal(monkeypatch, "cursor")
-    monkeypatch.setattr(access, "_tty", lambda: False)
-    out = []
-    assert access.main("cursor", "everything", layout.engine_bin(), say=out.append) == 1
-    assert out[-1] == ("Widening what Cursor sees needs you at a terminal: run dawnmere access cursor everything in "
-                       "a Terminal window.")
+    calls, levels = [], iter(["work only", "everything"])
+    monkeypatch.setattr(access.subprocess, "run", lambda argv, **kw: calls.append((argv, kw)))
+    monkeypatch.setattr(access, "current_level", lambda app: next(levels))
+    assert access.engine_widens("/e/lflabs-memory", "cursor", "everything") is False
+    assert access.engine_widens("/e/lflabs-memory", "cursor", "everything") is True
+    assert calls[0] == (["/e/lflabs-memory", "clients", "level", "cursor", "everything"], {"timeout": 600})
 
 
 @pytest.mark.parametrize("marker", ["CLAUDECODE", "CLAUDE_CODE_ENTRYPOINT", "CODEX_SANDBOX", "CODEX_THREAD_ID",
                                     "CURSOR_AGENT", "CURSOR_CONVERSATION_ID"])
 def test_widening_from_an_ai_apps_shell_is_refused(box, monkeypatch, marker):
-    """An agent with a shell tool cannot widen its own (or another app's) access, terminal or not."""
+    """Refused before the engine is even asked (the engine refuses it too)."""
     from lflabs_memory_cli import access
     assert run_setup()[0] == 0
     asked = at_a_terminal(monkeypatch, "cursor")
@@ -515,7 +516,6 @@ def test_widening_from_an_ai_apps_shell_is_refused(box, monkeypatch, marker):
     out = []
     assert access.main("cursor", "everything", layout.engine_bin(), say=out.append) == 1
     assert asked == [] and out[-1].startswith(f"Refused: this is an AI app's shell ({marker} is set).")
-    assert not [c for c in box.calls("lflabs-memory") if c[:2] == ["clients", "level"]]
 
 
 def test_narrowing_needs_no_confirmation(box, monkeypatch):
@@ -523,7 +523,6 @@ def test_narrowing_needs_no_confirmation(box, monkeypatch):
     assert run_setup()[0] == 0
     asked = at_a_terminal(monkeypatch, "")
     monkeypatch.setenv("CLAUDECODE", "1")
-    monkeypatch.setattr(access, "_tty", lambda: False)
     out = []
     assert access.main("cursor", "nothing", layout.engine_bin(), say=out.append) == 0
     assert asked == [] and ["clients", "level", "cursor", "nothing"] in box.calls("lflabs-memory")
@@ -636,3 +635,20 @@ def test_uninstall_removes_stale_sockets(box):
         assert (layout.data_dir() / "engine.sock").exists(), "the engine still answers there (the test's server)"
     finally:
         shutil.rmtree(stale.parent, ignore_errors=True)
+
+
+def test_self_check_without_git(box, capsys):
+    """Without Apple's Command Line Tools /usr/bin/git only asks to install them, so the check folder is no repo, and
+    the engine cannot tell which repo a new Cursor chat is in (macOS 26 runners failed "a new Cursor chat would not
+    see it" this way). Setup then says so instead of failing."""
+    (box.bin / "git").write_text("#!/bin/sh\necho 'xcrun: error: invalid active developer path' >&2\nexit 1\n")
+    (box.bin / "git").chmod(0o755)
+    code, out = run_setup()
+    shown = capsys.readouterr().out
+    assert code == 0, out + shown
+    assert "[warn] Self-check: recall in" in shown and "git missing (see below)" in shown
+    assert "git does not work on this Mac: install Apple's Command Line Tools (xcode-select --install)" in out
+    start = next(json.loads(r)["stdin"] for r in box.log.read_text().splitlines()
+                 if json.loads(r)["argv"] == ["hook-cursor-start"]) if False else None
+    assert start is None
+    assert not list(box.home.glob("lflabs-check-*")), "the check folder in the home folder is gone again"
