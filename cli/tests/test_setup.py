@@ -899,3 +899,17 @@ def test_setup_says_when_the_connector_is_not_on_npm(box, capsys):
     shown = capsys.readouterr().out
     assert code == 0 and "Dawnmere is on." not in shown
     assert f"dawnmere-connector@{layout.CONNECTOR_VERSION} is not on npm yet: apps cannot start memory's tools" in shown
+
+
+def test_access_says_a_keyless_app_gets_work_only(box, monkeypatch):
+    """An app widened in the engine but without a key in its config is still held to work only: say so."""
+    from lflabs_memory_cli import access
+    assert run_setup()[0] == 0
+    out = []
+    assert access.keyless("claude-desktop") is False, "asks the real engine; a name-hinted app needs no key"
+    monkeypatch.setattr(access, "current_level", lambda app: "everything")
+    monkeypatch.setattr(access, "keyless", lambda app: app == "windsurf")
+    assert access.main("windsurf", None, layout.engine_bin(), say=out.append) == 0
+    assert out[-1].startswith("Windsurf sees everything (work only until it has a key). To change it:")
+    assert access.main("claude-desktop", None, layout.engine_bin(), say=out.append) == 0
+    assert out[-1].startswith("Claude Desktop sees everything. To change it:")
