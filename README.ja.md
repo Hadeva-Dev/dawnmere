@@ -275,6 +275,7 @@ Dawnmere は LF Labs（GitHub の [Hadeva-Dev](https://github.com/Hadeva-Dev) or
 
 - **Mac 専用**です。Apple シリコン、macOS 14 以降が必要です。エンジンの ONNX ランタイムには Intel Mac 版がなく、Linux 版や Windows 版もありません。
 - **Mac 1 台だけ。** マシン間の同期や、チームで共有するメモリはありません。
+- **英語がいちばん確実です。** 検索には英語のモデルを使っているため、日本語（ほかの言語も）のメモリや質問は、今のところうまく見つからないことが多いです。入力して保存するには英語で "remember that" と書く必要があります。今は、メモリも質問も英語で書くのがおすすめです。
 - **保存がいちばん確実なのは Claude Code です。** Codex では "remember that ..." と言ってください。Cursor ではモデルが `remember` を呼ぶ必要があります。Codex 自身のセッションファイルは、`dawnmere setup --codex-sessions` を実行した場合だけ読み取ります。
 - **チェックは自動なので、見逃すこともあります。** アプリが何を保存したかは `dawnmere export` で確認してください。
 - **初期ベータです。** リリースは手作業で、頻繁に出ます。アップデートの前に [リリースノート](https://github.com/Hadeva-Dev/dawnmere/releases) を読んでください。
