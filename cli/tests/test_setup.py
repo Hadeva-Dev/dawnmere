@@ -951,3 +951,26 @@ def test_a_service_that_never_starts_says_why_in_the_log(box, monkeypatch, capsy
     assert f"setup: the memory service did not answer within {total:.0f} s (one reload included)." in log
     assert "launchctl print (exit 113):" in log and 'Could not find service "com.lflabs.memory"' in log
     assert f"{box.bin}/lflabs-memory --version (exit 0)" in log
+
+
+def test_self_check_phrase_is_unlike_any_memory():
+    one, two = setup.check_phrase(), setup.check_phrase()
+    assert one != two and len(one.split()) == 6 and "self-check" not in one and "dawnmere" not in one
+
+
+def test_self_check_purges_only_the_memory_it_made(box, capsys):
+    """The save landed on an older memory (an id not above the store's highest before it): it is left alone, and the
+    row says so. A new id is purged, as before."""
+    import sqlite3
+    db = sqlite3.connect(box.data / "memory.db")
+    db.execute("create table memories(id integer primary key, content text)")
+    db.execute("insert into memories(id, content) values (9, 'older')")
+    db.commit()
+    db.close()
+    code, out = run_setup()  # the fake engine answers with #7, below 9: not made by this check
+    shown = capsys.readouterr().out
+    assert code == 0 and "[warn] Self-check: recall in" in shown and "kept #7 (not new)" in shown
+    assert not [c for c in box.calls("lflabs-memory") if c[:1] == ["purge"]]
+    (box.data / "memory.db").unlink()
+    assert run_setup()[0] == 0
+    assert ["purge", "7"] in box.calls("lflabs-memory")

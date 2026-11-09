@@ -11,6 +11,7 @@ import platform
 import re
 import secrets
 import shutil
+import sqlite3
 import subprocess
 import sys
 import tempfile
@@ -372,6 +373,9 @@ class RealSetup:
         if not ok:
             ui.step("Self-check", "failed", why)
             return False
+        if why.startswith(KEPT):  # never purge a memory the check did not make
+            ui.step("Self-check", "warn", f"{self_check_row(seconds)[1]}; {why} (not new)")
+            return True
         if why == NO_GIT:
             ui.step("Self-check", "warn", f"{self_check_row(seconds)[1]}; git missing (see below)")
             self.left_alone.append(("Self-check", None, NO_GIT_NOTE, ""))
@@ -452,13 +456,15 @@ def self_check(engine):
         ok, took, _ = _hook(engine, "hook-prompt", {**base, "prompt": "what do we know about this project?"})
         if not ok:
             return False, took, "the prompt hook failed: see ~/Library/Logs/LF Labs/memory.log"
-        word = secrets.token_hex(3)
-        fact = f"{COMMAND} self-check {word}"
+        fact = check_phrase()
+        word = fact.split()[-1]
+        before = _max_id()
         ok, _, out = _hook(engine, "hook-prompt", {**base, "session_id": sid + "b", "prompt": f"remember that {fact}"})
         saved = re.search(r"\(#(\d+)\)", _context(out))
         if not ok or not saved or fact not in _context(out):
             return False, took, "a typed \"remember that\" was not saved"
         mid = saved.group(1)
+        new = before is not None and int(mid) > before  # made by this check, not an older memory it merged into
         try:
             ok, _, out = _hook(engine, "hook-cursor-start", {"hook_event_name": "sessionStart", "workspace_roots":
                                                              [str(project)], "cwd": str(project)}, client="cursor")
@@ -469,8 +475,38 @@ def self_check(engine):
                 return False, took, "the memory service did not answer" if not got.get("ok") else \
                     "Codex and Cursor could not recall it"
         finally:
-            run([engine, "purge", mid], timeout=30)  # gone for good, not just retired
+            if new:  # only the exact memory this check made, gone for good
+                run([engine, "purge", mid], timeout=30)
+    if not new:
+        return True, took, f"{KEPT}{mid}"
     return True, took, "" if git else NO_GIT
+
+
+KEPT = "kept #"  # self_check's why when the save landed in a memory that was there before: not purged
+WORDS = ("amber", "basil", "cedar", "delta", "ember", "fjord", "garnet", "harbor", "indigo", "juniper", "kelp",
+         "lantern", "maple", "nectar", "oxbow", "pebble", "quartz", "ridge", "saffron", "thistle", "umber", "vellum",
+         "willow", "yarrow", "zephyr", "anvil", "birch", "cobalt", "dune", "estuary", "fennel", "gravel")
+
+
+def check_phrase():
+    """What the self-check saves: five random words and a random number, nothing like any real memory (an older
+    "<command> self-check <hex>" was taken as a restatement and merged, then purged with it)."""
+    return " ".join(secrets.choice(WORDS) for _ in range(5)) + f" {secrets.randbelow(10 ** 6):06d}"
+
+
+def _max_id():
+    """The highest memory id in the store before the check saves: 0 with no store yet, None when it cannot be read."""
+    p = data_dir() / "memory.db"
+    if not p.exists():
+        return 0
+    try:
+        db = sqlite3.connect(f"file:{p}?mode=ro", uri=True, timeout=5)
+        try:
+            return db.execute("select coalesce(max(id), 0) from memories").fetchone()[0]
+        finally:
+            db.close()
+    except sqlite3.Error:
+        return None
 
 
 # ---------- the command ----------
