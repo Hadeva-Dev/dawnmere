@@ -57,6 +57,21 @@ def current_level(client):
     return (r.stdout.strip() or None) if r.returncode == 0 else None
 
 
+NAMES = {**apps.LABELS, "claude-desktop": "Claude Desktop", "windsurf": "Windsurf", "gemini": "Gemini CLI",
+         "copilot": "VS Code (Copilot)"}  # the engine's connect_apps names those it connects itself
+
+
+def keyless(client):
+    """Whether the client's level is wider than work only but it has no key yet, so it still gets work only (an app
+    named only by its config proves nothing: connect_apps.needs_key). False when the engine cannot say."""
+    if not (data_dir() / "config.toml").exists():
+        return False
+    r = _engine("from lflabs_memory import connect_apps, mem\n"
+                f"key = (mem.client_policies().get({client!r}) or {{}}).get('key_sha256')\n"
+                f"print(int(connect_apps.needs_key(mem, {client!r}) and not key))")
+    return r.returncode == 0 and r.stdout.strip() == "1"
+
+
 # ---------- Cursor's two files with a key ----------
 
 def cursor_plans(engine, key, h=None):
@@ -180,13 +195,15 @@ def main(app, level, engine, say=print):
         return 1
     if level is None:  # just say what it sees, and how to change it
         now = current_level(app) or "what the memory service decides"
-        say(f"{apps.LABELS.get(app, app.capitalize())} sees {now}. To change it: {COMMAND} access {app} "
+        if keyless(app):  # as the engine's `clients` says it
+            now += " (work only until it has a key)"
+        say(f"{NAMES.get(app, app.capitalize())} sees {now}. To change it: {COMMAND} access {app} "
             f"{' | '.join(LEVELS)}")
         return 0
     if app != "cursor" and level in WIDER:
         say(f"Only Cursor can be widened from here for now. In Claude Code, say \"let {app} see everything\".")
         return 1
-    label = apps.LABELS.get(app, app.capitalize())
+    label = NAMES.get(app, app.capitalize())
     if widens(app, level):  # needs the person: the engine's gate decides, before any key is made
         if (marker := agent_shell()):
             say(f"Refused: this is an AI app's shell ({marker} is set). Widening what {label} sees needs you: run "
