@@ -113,7 +113,8 @@ def ask(args, say):
     yes = True if args.yes else None
     a.model = getattr(args, "model", None) or "haiku"
     a.codex_sessions = bool(args.codex_sessions)
-    a.name = first_name() if args.yes else prompt.text("What should your AI apps call you?", first_name())
+    known = settings.load().get("owner_name") or first_name()  # a re-run keeps the name given before
+    a.name = known if args.yes else prompt.text("What should your AI apps call you?", known)
     a.claude = backend.claude_status(a.model, ping=not args.dry_run) if shutil.which("claude") else \
         backend.Status("claude-cli", False, note="not installed")  # a dry run runs nothing, not even the ping
     # Plan first (decided 2026-10-28): the user's Claude plan whenever Claude Code is there, logged in or not; an API key

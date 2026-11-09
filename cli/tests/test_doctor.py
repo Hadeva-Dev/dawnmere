@@ -206,7 +206,7 @@ def test_export_import_roundtrip(mac, monkeypatch, tmp_path):
     export.export(f, say=lambda s: None)
     saved = {}
 
-    def remember(content, kind, project):  # the engine's remember(): dedup by text
+    def remember(content, kind, project, origin="unknown"):  # the engine's remember(): dedup by text
         if content in saved:
             return saved[content], "unchanged"
         saved[content] = len(saved) + 1
@@ -220,6 +220,51 @@ def test_export_import_roundtrip(mac, monkeypatch, tmp_path):
     bad = tmp_path / "bad.json"
     bad.write_text('{"format": "other"}')
     assert export.import_file(bad, say=out.append, remember=remember) == 1
+
+
+def test_import_keeps_the_users_own_words_only_when_they_run_it(mac, monkeypatch, tmp_path):
+    """At a terminal, not under an AI app: an origin of the user's own stays, a row without one is vouched for by
+    them, any other is unknown. Run by an AI app (markers, an ancestor, or no terminal): all unknown."""
+    from lflabs_memory_cli import access
+    f = tmp_path / "e.json"
+    f.write_text(json.dumps({"format": "lflabs-memory-export/1", "memories": [
+        {"content": "a", "origin": "owner_typed"}, {"content": "b"}, {"content": "c", "origin": "app_confirmed"},
+        {"content": "d", "origin": "owner_key"}]}))
+    got = {}
+
+    def remember(content, kind, project, origin="unknown"):
+        got[content] = origin
+        return len(got), "added"
+    for k in access.AGENT_ENV:
+        monkeypatch.delenv(k, raising=False)
+    monkeypatch.setattr(access, "agent_ancestor", lambda: None)
+    monkeypatch.setattr(access.sys.stdin, "isatty", lambda: True, raising=False)
+    monkeypatch.setattr(access.sys.stdout, "isatty", lambda: True, raising=False)
+    export.import_file(f, say=lambda s: None, remember=remember)
+    assert got == {"a": "owner_typed", "b": "owner_vouched", "c": "unknown", "d": "owner_key"}
+    for agent in ({"env": "CODEX_THREAD_ID"}, {"ancestor": "claude"}, {"ancestor": "unknown (ps failed)"}):
+        got.clear()
+        with monkeypatch.context() as m:
+            if "env" in agent:
+                m.setenv(agent["env"], "t")
+            else:
+                m.setattr(access, "agent_ancestor", lambda a=agent["ancestor"]: a)
+            export.import_file(f, say=lambda s: None, remember=remember)
+        assert set(got.values()) == {"unknown"}, agent
+
+
+def test_agent_ancestor_reads_ps_by_absolute_path():
+    from lflabs_memory_cli import access
+    calls = []
+    chain = {50: "40 /bin/zsh", 40: "30 /Applications/Codex.app/Contents/MacOS/codex"}
+
+    def run(argv, **kw):
+        calls.append((argv[0], kw.get("env")))
+        return type("R", (), {"stdout": chain.get(int(argv[-1]), "")})()
+    assert access.agent_ancestor(50, run=run) == "codex"
+    assert all(c == ("/bin/ps", {"PATH": "/usr/bin:/bin"}) for c in calls)
+    assert access.agent_ancestor(99, run=run) == "unknown (ps gave nothing readable)", "fails closed"
+    assert access.agent_ancestor(1, run=run) is None
 
 
 # ---------- update ----------

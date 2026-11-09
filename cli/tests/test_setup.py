@@ -837,3 +837,18 @@ def test_rerun_leaves_a_marketplace_at_this_tag(box):
     assert run_setup()[0] == 0
     assert not [c for c in box.calls("claude") if c[:3] in (["plugin", "marketplace", "remove"],
                                                            ["plugin", "marketplace", "add"], ["plugin", "install"])]
+
+
+def test_rerun_keeps_the_name_given_before(box, monkeypatch):
+    from lflabs_memory_cli import prompt
+    asked = []
+    monkeypatch.setattr(prompt, "text", lambda q, default="": asked.append(default) or "Sam")
+    monkeypatch.setattr(setup, "first_name", lambda: "Samuel")
+    args = cli.parser().parse_args(["setup", "--plain", "--dry-run"])
+    assert setup.ask(args, lambda s: None).name == "Sam" and asked == ["Samuel"]
+    assert run_setup()[0] == 0
+    (layout.data_dir() / "config.toml").write_text('owner_name = "Sam"\n')
+    asked.clear()
+    monkeypatch.setattr(prompt, "text", lambda q, default="": asked.append(default) or default)  # Enter
+    assert setup.ask(args, lambda s: None).name == "Sam" and asked == ["Sam"]
+    assert setup.ask(cli.parser().parse_args(["setup", "--yes", "--plain"]), lambda s: None).name == "Sam"
