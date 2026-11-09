@@ -1,7 +1,8 @@
 """update: the newest release from GitHub, installed with its checksums checked (spec 9.6).
 
 The only network call is GitHub's release API (and the release's own files). Two halves:
-1. this (old) program fetches the release, checks each wheel against the release's SHA256SUMS and installs them with uv;
+1. this (old) program fetches the release, checks each wheel and constraints.txt against the release's SHA256SUMS and
+   installs them with uv, every dependency at the version the release pinned and with the hash it recorded;
 2. the newly installed program finishes (`update --finish FROM`): models whose checksum changed, the engine's schema
    migration on a stopped service with a snapshot first, the service restarted, the plugin and the connector pins
    updated. A failed migration puts the snapshot back and reinstalls the old release.
@@ -21,9 +22,11 @@ from . import apps, edits, launchd, models, prompt
 from .brand import COMMAND, PRODUCT, REPO
 from .layout import (CLI_DIST, CONNECTOR, CONNECTOR_VERSION, ENGINE_DIST, LABEL, SERVER, data_dir, engine_bin,
                      home, short, uv_bin)
-from .run import run
+from .run import Result, run
 
 API = f"https://api.github.com/repos/{REPO}/releases"
+LOCK = "constraints.txt"   # every dependency of the two wheels, pinned with its hashes (RELEASING.md step 2)
+HASH_MISMATCH = "a dependency did not match the hashes this release was tested with"
 
 
 def vtuple(v):
@@ -51,9 +54,10 @@ def release(tag=None, get=fetch):
             "assets": {a["name"]: a["browser_download_url"] for a in doc.get("assets", [])}}
 
 
-def wheels(rel, get=fetch, where=None):
-    """Download the release's CLI and engine wheels into `where`, each checked against SHA256SUMS. [cli, engine]
-    paths. Raises RuntimeError on a missing file or a checksum that differs."""
+def wheels(rel, get=fetch, where=None, need_lock=True):
+    """Download the release's CLI and engine wheels and its constraints.txt into `where`, each checked against
+    SHA256SUMS. [cli, engine, constraints] paths; constraints is None for a release without one when need_lock is
+    False (one from before 0.1.6). Raises RuntimeError on a missing file or a checksum that differs."""
     sums = {}
     if "SHA256SUMS" not in rel["assets"]:
         raise RuntimeError("the release has no SHA256SUMS")
@@ -62,10 +66,15 @@ def wheels(rel, get=fetch, where=None):
         if len(parts) == 2:
             sums[parts[1].lstrip("*")] = parts[0]
     out = []
-    for prefix in ("lflabs_memory_cli-", "lflabs_memory_engine-"):
-        name = next((n for n in rel["assets"] if n.startswith(prefix) and n.endswith(".whl")), None)
+    for kind, pick in (("lflabs_memory_cli-*.whl", lambda n: n.startswith("lflabs_memory_cli-") and n.endswith(".whl")),
+                       ("lflabs_memory_engine-*.whl", lambda n: n.startswith("lflabs_memory_engine-") and
+                        n.endswith(".whl")), (LOCK, lambda n: n == LOCK)):
+        name = next((n for n in rel["assets"] if pick(n)), None)
         if not name or name not in sums:
-            raise RuntimeError(f"the release has no checked {prefix}*.whl")
+            if kind == LOCK and not need_lock:
+                out.append(None)
+                continue
+            raise RuntimeError(f"the release has no checked {kind}: nothing was installed")
         data = get(rel["assets"][name])
         if hashlib.sha256(data).hexdigest() != sums[name]:
             raise RuntimeError(f"{name} did not match its checksum: nothing was installed")
@@ -75,9 +84,31 @@ def wheels(rel, get=fetch, where=None):
     return out
 
 
-def install_wheels(cli_whl, engine_whl):
-    return run([uv_bin() or "uv", "tool", "install", "--force", "--managed-python", "--python", "3.12", str(cli_whl), "--with",
-                str(engine_whl), "--with-executables-from", ENGINE_DIST], timeout=600)
+def install_wheels(cli_whl, engine_whl, lock=None):
+    """uv tool install, every dependency at lock's version; then, since uv tool install does not check the hashes in
+    a constraints file (uv 0.12.5), each dependency again by a hash-checked reinstall. A Result; a hash that differs
+    is a failed one, its text saying so."""
+    uv = uv_bin() or "uv"
+    pins = ["--no-build", "-c", str(lock)] if lock else []
+    r = run([uv, "tool", "install", "--force", "--managed-python", "--python", "3.12", *pins, str(cli_whl), "--with",
+             str(engine_whl), "--with-executables-from", ENGINE_DIST], timeout=600)
+    if not r.ok or not lock:
+        return r
+    tools = run([uv, "tool", "dir"], timeout=30).out.strip()
+    v = run([uv, "pip", "install", "--python", str(Path(tools) / CLI_DIST / "bin/python"), "--reinstall", "--no-deps",
+             "--no-build", "--require-hashes", "-r", str(lock)], timeout=600)
+    return v if v.ok else Result(v.code, "", f"{HASH_MISMATCH} ({(v.err or v.out).strip()[-200:]})")
+
+
+def reinstall(version, get, say):
+    """Put a release back (after a failed update): pinned when it has a constraints.txt. Raises on failure."""
+    with tempfile.TemporaryDirectory() as tmp:
+        cli_whl, engine_whl, lock = wheels(release(f"v{version}", get), get, tmp, need_lock=False)
+        if lock is None:
+            say(f"{version} has no {LOCK}, so it goes back without pinned dependencies, as it was installed.")
+        r = install_wheels(cli_whl, engine_whl, lock)
+        if not r.ok:
+            raise RuntimeError((r.err or r.out).strip()[:200])
 
 
 def main(check_only=False, yes=False, say=print, get=fetch):
@@ -99,11 +130,19 @@ def main(check_only=False, yes=False, say=print, get=fetch):
         return 0
     with tempfile.TemporaryDirectory() as tmp:
         try:
-            cli_whl, engine_whl = wheels(rel, get, tmp)
+            cli_whl, engine_whl, lock = wheels(rel, get, tmp)
         except Exception as e:
             say(f"Update stopped: {e}")
             return 1
-        r = install_wheels(cli_whl, engine_whl)
+        r = install_wheels(cli_whl, engine_whl, lock)
+        if not r.ok and HASH_MISMATCH in r.err:
+            say(f"Update stopped: {r.err}")
+            try:
+                reinstall(have, get, say)
+                say(f"Back on {have}.")
+            except Exception as e:
+                say(f"Could not reinstall {have} ({e}): run the install line again.")
+            return 1
         if not r.ok:
             say(f"Update stopped: uv could not install it ({(r.err or r.out).strip()[:200]}). Nothing changed.")
             return 1
@@ -182,9 +221,7 @@ def finish(old_version, say=print, get=fetch):
         if snap:
             put_back(snap)
         try:
-            with tempfile.TemporaryDirectory() as tmp:
-                old = release(f"v{old_version}", get)
-                install_wheels(*wheels(old, get, tmp))
+            reinstall(old_version, get, say)
         except Exception as e:
             say(f"Could not reinstall {old_version} ({e}): run the install line again.")
         run(["launchctl", "bootstrap", launchd.domain(), str(launchd.plist_path())], timeout=30)

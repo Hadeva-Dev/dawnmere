@@ -1,6 +1,6 @@
 #!/bin/sh
 # Installs Dawnmere on a Mac: uv if it is missing, then the CLI and the engine, each file checked against the
-# sha256 written below, then `dawnmere setup` (spec 10.1).
+# sha256 written below, their dependencies pinned and hash-checked by constraints.txt, then `dawnmere setup`.
 #
 #   curl -fsSL https://github.com/Hadeva-Dev/dawnmere/releases/latest/download/install.sh | sh
 #
@@ -15,6 +15,8 @@ CLI_SIZE=0
 ENGINE_WHEEL=""
 ENGINE_SHA256=""
 ENGINE_SIZE=0
+CONSTRAINTS_SHA256=""
+CONSTRAINTS_SIZE=0
 # --- end ---
 
 UV_VERSION="0.12.5"
@@ -83,7 +85,7 @@ if [ -z "$UV" ]; then
   arch=aarch64 uv_sha=$UV_SHA256_arm64 uv_size=$UV_SIZE_arm64
   TOTAL=$uv_size
 fi
-TOTAL=$((TOTAL + CLI_SIZE + ENGINE_SIZE))
+TOTAL=$((TOTAL + CLI_SIZE + ENGINE_SIZE + CONSTRAINTS_SIZE))
 
 if [ -z "$UV" ]; then
   fetch "$UV_BASE/uv-$arch-apple-darwin.tar.gz" uv.tar.gz
@@ -91,8 +93,10 @@ if [ -z "$UV" ]; then
 fi
 fetch "$BASE/$CLI_WHEEL" "$CLI_WHEEL"
 fetch "$BASE/$ENGINE_WHEEL" "$ENGINE_WHEEL"
+fetch "$BASE/constraints.txt" constraints.txt
 check "$CLI_WHEEL" "$CLI_SHA256"
 check "$ENGINE_WHEEL" "$ENGINE_SHA256"
+check constraints.txt "$CONSTRAINTS_SHA256"
 printf '\nChecksums ok\n'
 
 if [ -z "$UV" ]; then
@@ -106,11 +110,20 @@ fi
 cp "$TMP/dl.$CLI_WHEEL" "$TMP/$CLI_WHEEL"
 cp "$TMP/dl.$ENGINE_WHEEL" "$TMP/$ENGINE_WHEEL"
 # --managed-python: uv's own arm64 Python, never an x86_64 one on PATH (onnxruntime has no Intel Mac wheels);
+# -c: every dependency at the version this release was tested with (uv tool install ignores the hashes there);
 # --with-executables-from: the engine's lflabs-memory command too, which the Claude Code plugin's hooks run
-if ! "$UV" tool install --force --managed-python --python 3.12 "$TMP/$CLI_WHEEL" --with "$TMP/$ENGINE_WHEEL" \
-  --with-executables-from lflabs-memory-engine >"$TMP/uv.log" 2>&1; then
+LOCK="$TMP/dl.constraints.txt"
+if ! "$UV" tool install --force --managed-python --python 3.12 --no-build -c "$LOCK" "$TMP/$CLI_WHEEL" \
+  --with "$TMP/$ENGINE_WHEEL" --with-executables-from lflabs-memory-engine >"$TMP/uv.log" 2>&1; then
   tail -n 5 "$TMP/uv.log" >&2
   fail "Could not install Dawnmere (uv stopped; its last lines are above)."
+fi
+# Each dependency again, its hash checked this time; a mismatch takes the install out before anything runs it.
+if ! "$UV" pip install --python "$("$UV" tool dir)/lflabs-memory-cli/bin/python" --reinstall --no-deps --no-build \
+  --require-hashes -r "$LOCK" >"$TMP/uv.log" 2>&1; then
+  tail -n 5 "$TMP/uv.log" >&2
+  "$UV" tool uninstall lflabs-memory-cli >/dev/null 2>&1 || true
+  fail "A dependency did not match the hashes this release was tested with, so Dawnmere was taken out again."
 fi
 
 TOOLS=$("$UV" tool dir --bin 2>/dev/null || printf '%s' "$BIN")

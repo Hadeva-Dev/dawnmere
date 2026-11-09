@@ -26,8 +26,9 @@ def release(tmp_path):
     rel.mkdir()
     (rel / CLI).write_bytes(b"cli wheel" * 1000)
     (rel / ENGINE).write_bytes(b"engine wheel" * 1000)
+    (rel / "constraints.txt").write_text("idna==3.20 \\\n    --hash=sha256:" + "ab" * 32 + "\n")
     script = tmp_path / "install.sh"
-    script.write_text(render_install.render("0.2.0", rel / CLI, rel / ENGINE))
+    script.write_text(render_install.render("0.2.0", rel / CLI, rel / ENGINE, rel / "constraints.txt"))
     home = tmp_path / "home"
     home.mkdir()
     fakes = Fakes(tmp_path, progs=("uv", "sysctl"))
@@ -36,6 +37,7 @@ def release(tmp_path):
     tools.mkdir()
     shutil.copy(fakes.bin / "uv", tools / "dawnmere")
     fakes.on("uv", ["tool", "dir", "--bin"], 0, str(tools))
+    fakes.on("uv", ["tool", "dir"], 0, str(tmp_path / "uv tools"))
     fakes.on("uv", ["tool", "install", "--help"], 0, "      --with-executables-from <WITH_EXECUTABLES_FROM>\n")
     env = {"HOME": str(home), "PATH": f"{fakes.bin}:/usr/bin:/bin", "FAKE_LOG": str(fakes.log),
            "FAKE_RULES": str(fakes.rules_file), "LFLABS_MEMORY_RELEASE_BASE": f"file://{rel}"}
@@ -65,19 +67,44 @@ def test_install_sh_checksum_mismatch_aborts(release):
     r = sh(release.script, release.env_vars)
     assert r.returncode != 0
     assert f"{ENGINE} did not match its checksum, so nothing was installed" in r.stderr
-    assert not [c for c in release.calls("uv") if c[:2] == ["tool", "install"] and "--help" not in c]
+    assert not installs(release)
     assert not (release.home / ".local").exists()
 
 
-def test_install_sh_installs_then_runs_setup(release):
+def installs(fakes):
+    return [c for c in fakes.calls("uv") if c[:2] in (["tool", "install"], ["pip", "install"]) and "--help" not in c]
+
+
+def test_install_sh_installs_then_runs_setup(release, tmp_path):
     r = sh(release.script, release.env_vars)
     assert r.returncode == 0, r.stderr
     assert "Dawnmere installer" in r.stdout and "Checksums ok" in r.stdout and "Downloading  " in r.stdout
-    install = next(c for c in release.calls("uv") if c[:2] == ["tool", "install"] and "--help" not in c)
-    assert install[2:6] == ["--force", "--managed-python", "--python", "3.12"]
-    assert install[6].endswith(CLI) and install[8].endswith(ENGINE)
-    assert install[9:] == ["--with-executables-from", "lflabs-memory-engine"], "the hooks' lflabs-memory is linked too"
+    install, verify = installs(release)
+    assert install[2:8] == ["--force", "--managed-python", "--python", "3.12", "--no-build", "-c"]
+    assert install[8].endswith("constraints.txt"), "every dependency at the version the release was tested with"
+    assert install[9].endswith(CLI) and install[11].endswith(ENGINE)
+    assert install[12:] == ["--with-executables-from", "lflabs-memory-engine"], "the hooks' lflabs-memory is linked too"
+    assert verify[:4] == ["pip", "install", "--python", str(tmp_path / "uv tools/lflabs-memory-cli/bin/python")]
+    assert verify[4:-1] == ["--reinstall", "--no-deps", "--no-build", "--require-hashes", "-r"]
+    assert verify[-1] == install[8], "then each of them again, its hash checked"
     assert release.calls("dawnmere") == [["setup"]]
+
+
+def test_constraints_checksum_mismatch_aborts(release):
+    (release.rel / "constraints.txt").write_text("idna==9.9\n")
+    r = sh(release.script, release.env_vars)
+    assert r.returncode != 0 and "constraints.txt did not match its checksum, so nothing was installed" in r.stderr
+    assert not installs(release)
+
+
+def test_a_dependency_with_the_wrong_hash_is_taken_out(release):
+    """uv tool install does not check the hashes in a constraints file (uv 0.12.5); the reinstall does, and a
+    mismatch takes the install out again before anything runs it."""
+    release.on("uv", ["pip", "install"], 1, "")
+    r = sh(release.script, release.env_vars)
+    assert r.returncode != 0 and "did not match the hashes this release was tested with" in r.stderr
+    assert ["tool", "uninstall", "lflabs-memory-cli"] in release.calls("uv")
+    assert release.calls("dawnmere") == []
 
 
 def test_uv_download_is_checked(release, tmp_path):
@@ -118,6 +145,8 @@ def test_render_fills_every_release_line(release):
     text = release.script.read_text()
     sha = hashlib.sha256((release.rel / CLI).read_bytes()).hexdigest()
     assert 'VERSION="0.2.0"' in text and f'CLI_SHA256="{sha}"' in text and f'CLI_WHEEL="{CLI}"' in text
+    lock = (release.rel / "constraints.txt").read_bytes()
+    assert f'CONSTRAINTS_SHA256="{hashlib.sha256(lock).hexdigest()}"' in text and f"CONSTRAINTS_SIZE={len(lock)}" in text
     assert os.access(ROOT / "install.sh", os.X_OK) or True
 
 
