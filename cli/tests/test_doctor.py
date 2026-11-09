@@ -3,6 +3,7 @@ import hashlib
 import json
 import os
 import re
+import sys
 import sqlite3
 import time
 
@@ -663,3 +664,63 @@ def test_hook_speed_right_after_the_service_started(mac, monkeypatch, tmp_path, 
     mac.save()
     slow_first(monkeypatch, 3.0, 1.8)
     assert doctor.check_hook().state == "warn", "warm and still slow"
+
+
+def finishing_from(mac, monkeypatch, tmp_path, old):
+    """`update --finish OLD` run by 0.2.0 (the new program), its release with a constraints.txt."""
+    data = layout.data_dir()
+    data.mkdir(parents=True, exist_ok=True)
+    mac.add("lflabs-memory")
+    with_python(mac, tmp_path)
+    monkeypatch.setattr(models, "manifest", lambda: None)
+    monkeypatch.setattr(update, "installed_version", lambda: "0.2.0")
+    return fake_github({"0.2.0": wheelset("0.2.0")})
+
+
+def test_finish_after_an_old_updater_checks_every_dependency(mac, monkeypatch, tmp_path):
+    """0.1.5's updater installed the dependencies without constraints or hashes: the new program downloads them again
+    with its release's constraints.txt (hashes checked) and reinstalls them from those files only."""
+    out = []
+    assert update.finish("0.1.5", say=out.append, get=finishing_from(mac, monkeypatch, tmp_path, "0.1.5")) == 0
+    download = mac.calls("python3.12")[0]
+    assert download[2:5] == ["pip", "download", "--require-hashes"]
+    deps = download[download.index("-d") + 1]
+    pip = next(c for c in mac.calls("uv") if c[:2] == ["pip", "install"])
+    assert pip[2:4] == ["--python", sys.executable]
+    assert pip[4:12] == ["--no-index", "--find-links", deps, "--reinstall", "--no-deps", "--no-build",
+                         "--require-hashes", "-r"] and pip[12].endswith("constraints.txt")
+    assert "Dependencies checked: each one against 0.2.0's hashes." in out
+    assert ["migrate"] in mac.calls("lflabs-memory")
+
+
+def test_finish_after_a_new_updater_checks_nothing_again(mac, monkeypatch, tmp_path):
+    update.finish("0.1.6", say=lambda s: None, get=finishing_from(mac, monkeypatch, tmp_path, "0.1.6"))
+    assert mac.calls("python3.12") == [] and not [c for c in mac.calls("uv") if c[:2] == ["pip", "install"]]
+
+
+def test_finish_with_a_hash_that_differs_takes_it_out(mac, monkeypatch, tmp_path):
+    get = finishing_from(mac, monkeypatch, tmp_path, "0.1.5")
+    mac.on("python3.12", ["-I", "-m", "pip", "download"], 1, "")
+    real = update.run
+
+    def run(argv, **kw):
+        r = real(argv, **kw)
+        if argv[1:4] == ["-I", "-m", "pip"]:
+            return update.Result(1, "", "ERROR: THESE PACKAGES DO NOT MATCH THE HASHES FROM THE REQUIREMENTS FILE.")
+        return r
+    monkeypatch.setattr(update, "run", run)
+    out = []
+    assert update.finish("0.1.5", say=out.append, get=get) == 1
+    assert ["tool", "uninstall", "lflabs-memory-cli"] in mac.calls("uv")
+    assert ["migrate"] not in mac.calls("lflabs-memory"), "nothing else runs from it"
+    assert out[-1].endswith("/releases/latest/download/install.sh | sh")
+
+
+def test_finish_that_cannot_check_now_says_how(mac, monkeypatch, tmp_path):
+    get = finishing_from(mac, monkeypatch, tmp_path, "0.1.5")
+    mac.on("python3.12", ["-I", "-m", "pip", "download"], 1, "")
+    out = []
+    assert update.finish("0.1.5", say=out.append, get=get) == 0
+    assert any(x.startswith("Your dependencies came from the old updater, unchecked, and could not be checked now")
+               for x in out)
+    assert ["tool", "uninstall", "lflabs-memory-cli"] not in mac.calls("uv")

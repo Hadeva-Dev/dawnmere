@@ -14,6 +14,7 @@ import json
 import os
 import re
 import sqlite3
+import sys
 import tempfile
 import time
 import urllib.request
@@ -273,8 +274,46 @@ def move_plugin(say):
         say(f"Claude Code's plugin could not move to v{v}: run {COMMAND} setup again")
 
 
+FIRST_VERIFIED = (0, 1, 6)  # the first release whose updater checks every dependency against constraints.txt
+
+
+def reverify(say, get=fetch):
+    """For an update made by an older updater (before 0.1.6), which installed the dependencies unchecked: download
+    them again with this release's constraints.txt, every hash checked, then reinstall them into this environment
+    from those files only. False when a hash did not match (the environment is then taken out: quarantine)."""
+    v = installed_version()
+    with tempfile.TemporaryDirectory() as tmp:
+        try:
+            rel = release(f"v{v}", get)
+            lock = wheels(rel, get, tmp)[2]
+            deps = Path(tmp) / "deps"
+            d = verified_deps(lock, deps)
+        except Exception as e:
+            d = Result(1, "", str(e))
+        if d.ok:
+            r = run([uv_bin() or "uv", "pip", "install", "--python", sys.executable, "--no-index", "--find-links",
+                     str(deps), "--reinstall", "--no-deps", "--no-build", "--require-hashes", "-r", str(lock)],
+                    timeout=900)
+            if r.ok:
+                say(f"Dependencies checked: each one against {v}'s hashes.")
+                return True
+            d = r
+    why = (d.err or d.out).strip()
+    if "DO NOT MATCH THE HASHES" in why or "Hash mismatch" in why:
+        say(f"A dependency did not match {v}'s hashes, so {PRODUCT} is taken out. Install it again with:")
+        say(f"  {INSTALL_LINE}")
+        quarantine()
+        return False
+    say(f"Your dependencies came from the old updater, unchecked, and could not be checked now ({why[-200:]}). To "
+        f"have them checked, run the install line again: {INSTALL_LINE}")
+    return True
+
+
 def finish(old_version, say=print, get=fetch):
-    """Run by the newly installed program. 0 when updated; 1 after a rollback."""
+    """Run by the newly installed program. 0 when updated; 1 after a rollback (or a dependency whose hash did not
+    match, when an updater from before 0.1.6 installed this one)."""
+    if vtuple(old_version) < FIRST_VERIFIED and not reverify(say, get):
+        return 1
     man = models.manifest()
     if man:
         stale = [n for n, s in models.check(man).items() if s == "mismatch" or (s == "missing" and n not in
