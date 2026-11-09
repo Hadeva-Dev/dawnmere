@@ -1,0 +1,11 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Questions and setup help
+    url: https://github.com/Hadeva-Dev/dawnmere/discussions
+    about: Ask how something works, or share how you use Dawnmere.
+  - name: Report a security problem
+    url: https://github.com/Hadeva-Dev/dawnmere/security/advisories/new
+    about: Privately, so it can be fixed before it is public.
+  - name: Email
+    url: mailto:hello@dawnmere.app
+    about: Anything that does not fit an issue.
