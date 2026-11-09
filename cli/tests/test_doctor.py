@@ -72,7 +72,7 @@ Claude Code   ok    plugin lflabs-memory 1.0.0b1, hooks on
 Codex         ok    MCP + hook (Codex asks you to trust the hook once: /hooks)
 Cursor        ok    MCP, work only (change it: dawnmere access cursor)
 dawnmere      ok    on your PATH
-privacy       ok    local only; Codex sessions off; chat index off; no telemetry
+privacy       ok    memory stored on this Mac; background reading on; Codex sessions off; chat index off; no telemetry
 backups       ok    last local snapshot 6 h ago (1 kept)"""
 
 
@@ -147,6 +147,15 @@ def test_doctor_warns_when_claude_moved(mac, monkeypatch, tmp_path, connector):
     cfg.write_text(cfg.read_text().replace(f'claude_path = "{mac.bin}/claude"\n', ""))
     code, text = run_doctor()
     assert "model         warn  Claude Code is not installed" in text
+
+
+def test_privacy_row_says_what_leaves_the_mac(mac, monkeypatch, tmp_path, connector):
+    """Never "local only": with background reading on, conversations go to the user's own model."""
+    healthy(mac, monkeypatch, tmp_path, backend_name="none")
+    code, text = run_doctor()
+    assert ("privacy       ok    memory stored on this Mac; background reading off; Codex sessions off; chat index "
+            "off; no telemetry") in text
+    assert "local only" not in text
 
 
 def test_doctor_none_mode_line(mac, monkeypatch, tmp_path, connector):
