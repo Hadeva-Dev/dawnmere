@@ -1341,3 +1341,59 @@ def test_a_provider_without_its_own_model_needs_one_named(box, monkeypatch, caps
     assert tried == [("ollama", "", "", "qwen3:8b")], "a model on this Mac: no key asked for"
     assert 'provider = "ollama"' in cfg and 'main_model = "qwen3:8b"' in cfg and 'cheap_model = "qwen3:8b"' in cfg
     assert "Background reading: Ollama on this Mac, up to" in out
+
+
+def plans_ready(box, monkeypatch, signed_in):
+    """Kimi Code, Qwen Code and Gemini CLI on PATH; those named are signed in (the engine's check is faked)."""
+    from lflabs_memory_cli import backend
+    monkeypatch.setattr(backend, "engine_backends", lambda: {"claude-cli", "anthropic-api", "none", *backend.PLANS,
+                                                             "openai-api"})
+    for cmd in ("kimi", "qwen", "gemini"):
+        box.add(cmd)
+    asked = []
+
+    def status(name, path=None):
+        asked.append(name)
+        ok = name in signed_in
+        return backend.Status(name, ok, "9.9.9", ok, "" if ok else "not signed in", usable=True)
+    monkeypatch.setattr(backend, "plan_status", status)
+    return asked
+
+
+def test_the_subscription_tool_that_is_signed_in_reads(box, monkeypatch, capsys):
+    box.remove("claude")
+    plans_ready(box, monkeypatch, {"qwen-cli"})
+    code, out = run_setup()
+    cfg = (layout.data_dir() / "config.toml").read_text()
+    assert code == 0 and 'backend = "qwen-cli"' in cfg and "qwen_path = " in cfg and "codex_path" not in cfg
+    assert "codex_sessions = false" in cfg, "Codex's sessions are read only when Codex itself reads"
+    assert "Background reading: your Qwen plan, through Qwen Code, up to 200 calls a day" in out
+
+
+def test_several_signed_in_the_first_by_default_or_the_one_named(box, monkeypatch, capsys):
+    box.remove("claude")
+    plans_ready(box, monkeypatch, {"kimi-cli", "gemini-cli"})
+    run_setup()
+    assert 'backend = "kimi-cli"' in (layout.data_dir() / "config.toml").read_text(), "--yes: the first in order"
+    from lflabs_memory_cli import prompt
+    asked = []
+    monkeypatch.setattr(prompt, "text", lambda q, default="": asked.append(q) or (
+        "gemini" if "Several are signed in" in q else default))
+    answering(monkeypatch, {})
+    args = cli.parser().parse_args(["setup", "--plain"])
+    a = setup.ask(args, [].append)
+    assert a.backend == "gemini-cli" and any("kimi, gemini, or none" in q for q in asked)
+
+
+def test_no_subscription_tool_signed_in_and_no_key_is_none(box, monkeypatch, capsys):
+    box.remove("claude")
+    asked = plans_ready(box, monkeypatch, set())
+    run_setup()
+    assert 'backend = "none"' in (layout.data_dir() / "config.toml").read_text()
+    assert set(asked) == {"kimi-cli", "qwen-cli", "gemini-cli"}
+
+
+def test_claude_plan_first_never_checks_the_others(box, monkeypatch, capsys):
+    asked = plans_ready(box, monkeypatch, {"kimi-cli"})
+    run_setup()
+    assert 'backend = "claude-cli"' in (layout.data_dir() / "config.toml").read_text() and asked == []

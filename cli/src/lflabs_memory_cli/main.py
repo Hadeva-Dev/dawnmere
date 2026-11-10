@@ -140,7 +140,8 @@ def parser():
             sp.add_argument("--demo", nargs="?", const="default", choices=SCENARIOS, metavar="SCENARIO",
                             help=f"play the setup screen with fake steps ({', '.join(SCENARIOS)})")
             sp.add_argument("--yes", action="store_true", help="take the defaults (the screen is still shown)")
-            sp.add_argument("--backend", choices=("claude-cli", "anthropic-api", "codex-cli", "openai-api", "none"),
+            sp.add_argument("--backend", choices=("claude-cli", "anthropic-api", "codex-cli", "kimi-cli", "qwen-cli",
+                                                  "gemini-cli", "openai-api", "none"),
                             help="what reads in the background: your Claude plan, an Anthropic key, your ChatGPT "
                                  "plan through Codex, another provider's key (--provider), or nothing")
             sp.add_argument("--provider", help="with --backend openai-api: openai, gemini, deepseek, kimi, kimi-cn, "

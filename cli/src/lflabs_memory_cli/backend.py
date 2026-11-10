@@ -212,3 +212,34 @@ def provider_ping(provider, key, api_base=None, model=None):
         return False, str(e)[:200]
     finally:
         config.CFG = old
+
+
+# The coding tools whose own sign-in can read for memory (the engine's plan backends), in the order setup offers them:
+# backend -> (command, name, what setup calls it)
+PLANS = {"codex-cli": ("codex", "Codex", "your ChatGPT plan, through Codex"),
+         "kimi-cli": ("kimi", "Kimi Code", "your Kimi plan, through Kimi Code"),
+         "qwen-cli": ("qwen", "Qwen Code", "your Qwen plan, through Qwen Code"),
+         "gemini-cli": ("gemini", "Gemini CLI", "your Google sign-in, through Gemini CLI")}
+
+
+def plan_status(name, path=None):
+    """Whether this tool's sign-in can read for memory. Codex says so itself (`codex login status`); the others have
+    no such command, so the engine's own backend makes one tiny call through them. ok: installed, new enough and
+    signed in."""
+    if name == "codex-cli":
+        return codex_status()
+    try:
+        from dataclasses import replace
+        from lflabs_memory import config, llm
+        cmd = PLANS[name][0]
+        cfg = config.peek() if hasattr(config, "peek") else config.current()
+        old = config.CFG
+        config.CFG = replace(cfg, llm=replace(cfg.llm, backend=name, **({f"{cmd}_path": path} if path else {})))
+        try:
+            s = llm.BACKENDS[name]().status(ping=True)
+        finally:
+            config.CFG = old
+        return Status(name, bool(s.ok), s.version, s.logged_in, s.note or "", usable=bool(s.version) and (
+            s.ok or s.logged_in is False))
+    except Exception as e:
+        return Status(name, False, note=str(e)[:200])
