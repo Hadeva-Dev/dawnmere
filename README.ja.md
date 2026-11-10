@@ -58,7 +58,7 @@ flowchart LR
 | **Codex** | 毎回のプロンプトに挿入 | "remember that ..." と入力したとき、またはモデルが `remember` を呼んだとき |
 | **Cursor** | 各チャットの開始時 | モデルが `remember` を呼んだとき |
 
-あなたが入力したこと（"remember that ..."）は、返答が終わるとすべてのアプリに届きます。モデルが自分の判断で `remember` を使って保存したメモは検索で見つかりますが、ほかのアプリのプロンプトに入るのは、あなたが確認したあと（`lflabs-memory held`）だけです。あなた自身の健康、家族、お金、法律に関わるメモは、個人的なメモのままになります。
+あなたが入力したこと（"remember that ..."）は、返答が終わるとすべてのアプリに届きます（Codex で入力した場合は、そこで次のプロンプトを送ったときです）。モデルが自分の判断で `remember` を使って保存したメモは検索で見つかりますが、ほかのアプリのプロンプトに入るのは、あなたが確認したあと（`lflabs-memory held`）だけです。あなた自身の健康、家族、お金、法律に関わるメモは、個人的なメモのままになります。
 <!-- checked against v0.1.6 (406ee39/c3ed5b1): a `remember` with no kind from a work-only app (Cursor by default) is
      filed as work, unless it is about the user's health, family, money or legal matters. -->
 
