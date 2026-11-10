@@ -1227,3 +1227,18 @@ def test_other_mcp_apps_not_installed_are_left_alone(box, capsys):
     code, out = run_setup()
     assert code == 0
     assert not (box.home / ".gemini").exists() and not (box.home / ".codeium").exists()
+
+
+def test_setup_says_where_claude_code_points_instead_of_asking_for_a_login(box, monkeypatch, capsys):
+    """Claude Code pointed at another provider (its settings.json "env"): setup's closing line says so, and never
+    advises /login as if the user had forgotten to log in."""
+    monkeypatch.delenv("ANTHROPIC_BASE_URL", raising=False)
+    (box.home / ".claude/settings.json").write_text(json.dumps({"env": {
+        "ANTHROPIC_BASE_URL": "https://api.moonshot.ai/anthropic", "ANTHROPIC_AUTH_TOKEN": "sk-secret"}}))
+    monkeypatch.setattr(setup.backend, "claude_status", lambda model="haiku", ping=True: setup.backend.Status(
+        "claude-cli", False, "2.1.301", False, "Claude Code is not logged in: run claude, then /login", usable=True))
+    code, out = run_setup()
+    shown = out + capsys.readouterr().out
+    assert code == 0, shown
+    assert "Background reading: Claude Code is set to use api.moonshot.ai: background reading needs a Claude login" in out
+    assert "/login" not in out and "sk-secret" not in shown

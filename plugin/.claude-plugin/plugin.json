@@ -1,6 +1,6 @@
 {
   "name": "lflabs-memory",
-  "version": "0.1.8",
+  "version": "0.1.9",
   "description": "One memory shared across your AI apps. Gives Claude Code the memory Codex, Cursor and your other AI apps share, kept by Dawnmere on your Mac.",
   "author": {
     "name": "LF Labs",
