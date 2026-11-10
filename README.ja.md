@@ -31,6 +31,7 @@ curl -fsSL https://dawnmere.app/install | sh
 ```
 
 **必要なもの：** Apple シリコン搭載の Mac、macOS 14 以降、1 GB の空きディスク容量、Node.js 18 以降。無料で、アカウントは不要です。<br>
+**ご注意：** 今は英語がいちばん確実です。日本語のメモリや質問は、まだうまく見つからないことが多いです（[#27](https://github.com/Hadeva-Dev/dawnmere/issues/27)）。<br>
 **ステータス：** 初期ベータ（0.1.x）。クライアントは MIT、エンジンはソース公開（source-available、FSL。2 年後に MIT へ移行）。開発は [LF Labs](#who-makes-it-and-the-lf-labs-names) です。
 
 <!-- Apple silicon and macOS 14: install.sh:35-38 refuses anything else, and setup.py:73-74 checks macOS again.
@@ -40,7 +41,7 @@ curl -fsSL https://dawnmere.app/install | sh
 
 ## できること
 
-覚えておく価値のあることを、AI アプリのどれかひとつに伝えます。Dawnmere はそれをあなたの Mac に一度だけ保存し、ほかのアプリは必要なときにそれを思い出します。Claude Code で上限に達して Codex に乗り換えても、Codex はもう「デプロイは金曜」「pnpm を使う」ことを知っています。
+覚えておく価値のあることを、Claude Code か Codex に伝えます（たとえば "remember that we deploy on Fridays"）。Dawnmere はそれをあなたの Mac に一度だけ保存します。もう一方のアプリで似た言葉でたずねると、そのメモリが出てきます。そのプロジェクトで新しく開いた Cursor のチャットにも、その後 1 日のあいだ表示されます。Claude Code で上限に達して Codex に乗り換えても、Codex は「デプロイは金曜」「pnpm を使う」ことを思い出せます。
 
 ```mermaid
 flowchart LR
@@ -73,7 +74,7 @@ flowchart LR
 ## Dawnmere を選ぶ理由
 
 - **アプリごとではなく、メモリはひとつ。** すべてのアプリがひとつのストアを共有するので、Claude Code で保存した事実が、そのまま Cursor が呼び出す事実になります。
-- **メモリはあなたの Mac に置かれます。** メモリは Library フォルダにあるひとつの SQLite ファイルです。検索は小さなローカルモデルを使って Mac 上で行います。アカウントはなく、LF Labs には何も送られず、ツールが利用データを集めることもありません。
+- **保存先はあなたの Mac だけです。** メモリは Library フォルダにあるひとつの SQLite ファイルです。検索は小さなローカルモデルを使って Mac 上で行います。アカウントはなく、LF Labs には何も送られず、ツールが利用データを集めることもありません。
 - **読み取りには、あなた自身のモデルを使います。** 自動保存には、Claude Code 経由のあなたの Claude プランか、あなた自身の Anthropic API キーを使います。モデルなしで動かすこともできます。
 - **各アプリが見られるのは、あなたが許可した範囲だけ。** Cursor は最初は仕事用のメモしか見られません。新しく接続したアプリも同じです。Claude Code と Claude Desktop のメモリツール、そして名前を名乗るだけのアプリも、今のところ仕事用のメモしか見られません。Claude Code がプロンプトに自動で挿入する呼び出しは、引き続きすべてを見られます。アプリが見られる範囲を広げるには、あなた自身がターミナルで操作する必要があります。`dawnmere access cursor everything` を実行し、アプリの名前をもう一度入力して、macOS のダイアログで「Allow」をクリックします。チャットで頼んでも、このコマンドが返ってくるだけです。
   <!-- checked against v0.1.6 (406ee39/c3ed5b1): MCP tools of Claude Code, Claude Desktop and self-named apps see
