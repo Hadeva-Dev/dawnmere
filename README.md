@@ -281,6 +281,9 @@ background job can find other notes that mention them, then erased. When an app 
 is hidden at once and deleted for good after 24 hours; until then `lflabs-memory restore 12` brings it back. A
 fingerprint with no words stays, so the same thing is not saved again from an old chat. `dawnmere uninstall` can also
 delete the whole memory (it asks first).
+
+Claude Code also keeps its own memory files (under `~/.claude/projects/`); forgetting a note in Dawnmere doesn't
+delete them. Remove the note there too, or ask Claude Code to forget it.
 <!-- checked against v0.1.6 (406ee39/c3ed5b1): your own forget is a real delete (words kept up to 24 h when a model
      is on); an app's forget hides the memory, deletes it after 24 h, and `restore` brings it back until then. Before
      v0.1.6 every forget was a soft delete with `lflabs-memory purge` and `restore` (mem.py:1787-1790, 1954-1973). -->
