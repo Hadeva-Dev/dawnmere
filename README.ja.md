@@ -286,9 +286,6 @@ Dawnmere は LF Labs（GitHub の [Hadeva-Dev](https://github.com/Hadeva-Dev) or
 
 このリポジトリにあるインストーラー、`dawnmere` コマンド、Claude Code プラグイン、コネクタは MIT ライセンスです（[LICENSE](LICENSE)）。[エンジン](https://github.com/Hadeva-Dev/lflabs-memory-engine) は [Functional Source License 1.1, MIT future license](https://github.com/Hadeva-Dev/lflabs-memory-engine/blob/main/LICENSE)（FSL-1.1-MIT）のもとでソースコードを公開しており、各バージョンはリリースから 2 年後に MIT になります。検索モデルにはそれぞれのライセンスが適用されます（`dawnmere doctor --licenses` と [THIRD_PARTY.md](THIRD_PARTY.md) を参照）。
 
-<!-- ENGINE-PUBLIC: both engine links need Hadeva-Dev/lflabs-memory-engine public, with LICENSE at the root of main.
-     Engine license: wheel METADATA "License-Expression: FSL-1.1-MIT". -->
-
 ## 関連プロジェクト
 
 [memory-bench](https://github.com/Hadeva-Dev/memory-bench) は、アシスタントのメモリを評価するオープンなベンチマークで、同じチームが作っています。公開されているエンジンで測った Dawnmere の行があり、漏れの数と呼び出しの結果が並べて示されています。そこにあるメンテナーのもう一つの行は関連するシステムのもので、ベンチマークにもそう明記されています。
