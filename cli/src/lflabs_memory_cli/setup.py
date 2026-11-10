@@ -253,7 +253,8 @@ class RealSetup:
         if man is None:
             ui.step("Search models", "failed", "the engine has no models list: reinstall with the install line")
             return False
-        names = [n for n in man["models"] if n not in models.OPTIONAL or shutil.disk_usage(home()).free >= SENSE_DISK]
+        names = [n for n in man["models"] if n not in models.LAZY and (n not in models.OPTIONAL
+                                                                        or shutil.disk_usage(home()).free >= SENSE_DISK)]
         total = models.total_size(man, names)
         try:
             models.download(man, names, lambda done, tot: ui.step("Search models", "running", progress=(done, tot)))
@@ -699,7 +700,8 @@ def finish_models(say):
     if man is None:
         say("The engine has no models list: reinstall with the install line.")
         return 1
-    names = [n for n in man["models"] if n not in models.OPTIONAL or shutil.disk_usage(home()).free >= SENSE_DISK]
+    names = [n for n in man["models"] if n not in models.LAZY and (n not in models.OPTIONAL
+                                                                    or shutil.disk_usage(home()).free >= SENSE_DISK)]
     todo = [n for n, s in models.check(man, names=names).items() if s != "ok"]
     if todo:
         say(f"Downloading {', '.join(todo)} ({models.total_size(man, todo) / 1e6:.0f} MB)...")

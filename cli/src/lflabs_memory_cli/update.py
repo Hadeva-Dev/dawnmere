@@ -372,7 +372,7 @@ def finish(old_version, say=print, get=fetch):
     man = models.manifest()
     if man:
         stale = [n for n, s in models.check(man).items() if s == "mismatch" or (s == "missing" and n not in
-                                                                                 models.OPTIONAL)]
+                                                                                 models.OPTIONAL + models.LAZY)]
         if stale:
             try:
                 models.download(man, stale)

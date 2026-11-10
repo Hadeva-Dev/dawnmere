@@ -1252,3 +1252,18 @@ def test_version_flag(capsys):
         cli.parser().parse_args(["--version"])
     out = capsys.readouterr().out
     assert e.value.code == 0 and re.fullmatch(r"Dawnmere \S+ \(engine \S+, connector \d+\.\d+\.\d+\)\n", out), out
+
+
+def test_setup_leaves_the_chinese_and_japanese_models_for_later(box, monkeypatch, tmp_path):
+    """0.1.10: an English user downloads nothing extra; the engine asks for embed-ml and rerank-ml on first CJK text."""
+    man = models.manifest()
+    body = b"ml weights" * 50
+    src = tmp_path / "ml.onnx"
+    src.write_bytes(body)
+    for name in ("embed-ml", "rerank-ml"):
+        man["models"][name] = [{"file": "model.onnx", "url": src.as_uri(), "size": len(body),
+                                "sha256": hashlib.sha256(body).hexdigest()}]
+    monkeypatch.setattr(models, "manifest", lambda: man)
+    code, out = run_setup()
+    assert code == 0, out
+    assert models.check(man) == {"embed": "ok", "rerank": "ok", "embed-ml": "missing", "rerank-ml": "missing"}

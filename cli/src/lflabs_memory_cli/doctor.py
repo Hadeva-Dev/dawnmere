@@ -19,7 +19,9 @@ SLOW = 1.5
 WARMING = 120  # seconds after the service starts in which a slow call is the models still loading
 IDLE = 600  # the engine reads a session once it has been quiet this long (EXTRACT_IDLE) or has ended
 LICENSES = [("embed", "bge-small-en-v1.5", "MIT"), ("rerank", "ms-marco-MiniLM-L-6-v2", "Apache-2.0"),
-            ("sense", "friday-sense-v3 (mmBERT-base fine-tune)", "MIT base, LF Labs weights")]
+            ("sense", "friday-sense-v3 (mmBERT-base fine-tune)", "MIT base, LF Labs weights"),
+            ("embed-ml", "multilingual-e5-small", "MIT"),
+            ("rerank-ml", "mmarco-mMiniLMv2-L12-H384-v1", "Apache-2.0")]
 
 
 @dataclass
@@ -105,7 +107,7 @@ def check_models():
         return Check("models", "warn", "cannot check: the engine has no models list",
                      f"update with {COMMAND} update")
     got = models.check(man)
-    bad = [n for n, s in got.items() if s != "ok" and n not in models.OPTIONAL]
+    bad = [n for n, s in got.items() if s != "ok" and n not in models.OPTIONAL + models.LAZY]
     missing_optional = [n for n, s in got.items() if s == "missing" and n in models.OPTIONAL]
     names = ", ".join(n for n, s in got.items() if s == "ok")
     if bad:
@@ -113,6 +115,16 @@ def check_models():
                      f"run {COMMAND} setup --models")
     note = f"{names}: checksums match" + (f"; {', '.join(missing_optional)} not installed (word lists decide)"
                                           if missing_optional else "")
+    lazy = [n for n in models.LAZY if n in got]
+    if lazy and any(got[n] != "ok" for n in lazy):  # Chinese and Japanese: downloaded on first use, not in setup
+        st = models.lazy_state()
+        fix = f"{COMMAND} models --get {' '.join(lazy)}"
+        if any(got[n] == "mismatch" for n in lazy) or st.get("state") == "failed":
+            why = st.get("why") or ", ".join(f"{n} {got[n]}" for n in lazy if got[n] != "ok")
+            return Check("models", "warn", f"{note}; the Chinese and Japanese models did not download ({why}): "
+                         "the word rules decide meanwhile", f"run {fix}")
+        note += ("; Chinese and Japanese models: downloading" if st.get("asked") and not st.get("state") else
+                 "; Chinese and Japanese models: not downloaded (they come with the first Chinese or Japanese text)")
     return Check("models", "ok", note)
 
 

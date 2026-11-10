@@ -18,6 +18,10 @@ from .layout import data_dir
 
 MODELS_ENV = "LFLABS_MEMORY_MODELS"  # the engine reads it first too (config.load)
 OPTIONAL = ("sense",)  # without it the word lists decide (spec 10.2)
+# Chinese and Japanese only (engine 0.1.8): never in setup or update. The engine asks for them the first time it sees
+# Chinese or Japanese text, by running `models --get` (get below) in the background; until then its CJK word rules
+# decide. Their state, for doctor and for the engine's next ask: data_dir()/models-ml.json.
+LAZY = ("embed-ml", "rerank-ml")
 
 
 def manifest():
@@ -101,6 +105,54 @@ def _get(f, part, opener, progress):
                 progress(n)
     if n != f["size"]:
         raise OSError(f"got {n} of {f['size']} bytes")
+
+
+def lazy_state():
+    try:
+        got = json.loads((data_dir() / "models-ml.json").read_text())
+        return got if isinstance(got, dict) else {}
+    except (OSError, ValueError):
+        return {}
+
+
+def _write_state(st):
+    p = data_dir() / "models-ml.json"
+    tmp = p.with_name(f"models-ml.json.{os.getpid()}.tmp")
+    tmp.write_text(json.dumps(st))
+    os.replace(tmp, p)
+
+
+def get(names, say=print, opener=None, sleep=None):
+    """`models --get`: download these models now (what the engine runs in the background for LAZY), one run at a
+    time (a lock in the data folder: a second run waits, then finds them there). Records how it went in
+    models-ml.json (state ok | failed, why, at), keeping the engine's "asked". 0 when they are all here and match."""
+    import fcntl
+    man = manifest()
+    if man is None:
+        say("The engine has no models list: reinstall with the install line.")
+        return 1
+    unknown = [n for n in names if n not in man["models"]]
+    if unknown:
+        say(f"No such model: {', '.join(unknown)}")
+        return 2
+    data_dir().mkdir(parents=True, exist_ok=True)
+    with open(data_dir() / "models-ml.lock", "w") as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        todo = [n for n, s in check(man, names=names).items() if s != "ok"]
+        st = lazy_state()
+        if todo:
+            say(f"Downloading {', '.join(todo)} ({total_size(man, todo) / 1e6:.0f} MB)...")
+            try:
+                download(man, todo, opener=opener, sleep=sleep)
+            except (ChecksumError, OSError) as e:
+                st.update(state="failed", why=str(e)[:300], at=time.time())
+                _write_state(st)
+                say(f"Not downloaded ({e}). The next Chinese or Japanese text tries again in a few hours.")
+                return 1
+        st.update(state="ok", why="", at=time.time())
+        _write_state(st)
+        say(f"{', '.join(names)}: here, checksums match")
+        return 0
 
 
 def download(man, names, progress=lambda done, total: None, where=None, opener=None, sleep=None, tries=TRIES):

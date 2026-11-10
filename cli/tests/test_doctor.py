@@ -1045,3 +1045,55 @@ def test_doctor_says_where_claude_code_points(monkeypatch):
     assert "/login" not in row.note + row.fix and "sk-" not in row.note
     row = _model_row(monkeypatch, logged_in=True)
     assert row.state == "ok" and "Claude Code itself is set to use api.moonshot.ai" in row.note
+
+
+def _lazy_manifest(tmp_path, names=("embed", "embed-ml", "rerank-ml")):
+    """A models list with the Chinese and Japanese models in it, served from file:// URLs."""
+    import hashlib
+    files = {}
+    for name in names:
+        body = f"{name} weights".encode() * 40
+        src = tmp_path / "release" / name / "model.onnx"
+        src.parent.mkdir(parents=True, exist_ok=True)
+        src.write_bytes(body)
+        files[name] = [{"file": "model.onnx", "url": src.as_uri(), "size": len(body),
+                        "sha256": hashlib.sha256(body).hexdigest()}]
+    return {"release": "models-x", "models": files}
+
+
+def test_cjk_models_are_fetched_by_models_get_and_doctor_says_where_they_are(mac, monkeypatch, tmp_path):
+    """0.1.10: embed-ml and rerank-ml are never in setup or update; the engine runs `models --get` on the first CJK
+    text. doctor: fine while not downloaded; a failed download is a warning with the command to run."""
+    import json
+    man = _lazy_manifest(tmp_path)
+    monkeypatch.setattr(models, "manifest", lambda: man)
+    models.download(man, ["embed"])
+    c = doctor.check_models()
+    assert c.state == "ok" and "not downloaded (they come with the first Chinese or Japanese text)" in c.note
+    (layout.data_dir() / "models-ml.json").write_text(json.dumps({"asked": 1, "state": "failed", "why": "offline"}))
+    c = doctor.check_models()
+    assert c.state == "warn" and "offline" in c.note and "dawnmere models --get embed-ml rerank-ml" in c.fix
+    said = []
+    assert models.get(["embed-ml", "rerank-ml"], say=said.append) == 0
+    assert models.check(man) == {"embed": "ok", "embed-ml": "ok", "rerank-ml": "ok"}
+    st = json.loads((layout.data_dir() / "models-ml.json").read_text())
+    assert st["state"] == "ok" and st["asked"] == 1, "the engine's last ask is kept"
+    assert doctor.check_models().state == "ok"
+    assert models.get(["embed-ml"], say=said.append) == 0 and said[-1].endswith("here, checksums match")
+
+
+def test_a_cjk_model_that_does_not_match_is_never_kept(mac, monkeypatch, tmp_path):
+    import json
+    man = _lazy_manifest(tmp_path)
+    man["models"]["rerank-ml"][0]["sha256"] = "0" * 64  # what the release serves is not what models.json pins
+    monkeypatch.setattr(models, "manifest", lambda: man)
+    monkeypatch.setattr(models, "TRIES", 1)
+    assert models.get(["embed-ml", "rerank-ml"], say=lambda s: None) == 1
+    assert not (models.folder() / "rerank-ml" / "model.onnx").exists()
+    assert not list((models.folder() / "rerank-ml").glob("*.part"))
+    assert json.loads((layout.data_dir() / "models-ml.json").read_text())["state"] == "failed"
+    assert models.get(["nope"], say=lambda s: None) == 2
+
+
+def test_update_leaves_cjk_models_alone_unless_they_are_there():
+    assert set(models.LAZY) == {"embed-ml", "rerank-ml"} and not set(models.LAZY) & set(models.OPTIONAL)
