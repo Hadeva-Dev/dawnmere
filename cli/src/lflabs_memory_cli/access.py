@@ -184,11 +184,17 @@ def agent_ancestor(pid=None, run=None):
     return None
 
 
+KEY_BY_ENV = "LFLABS_MEMORY_KEY_BY"  # the engine's access.KEY_BY_ENV: COMMAND keys the app here, after the gate
+
+
 def engine_widens(engine, app, level):
     """The engine's own `clients level`, on this terminal: its gate refuses an AI app's shell or a process an AI app
     started, asks for the app's name, then needs Allow clicked in a macOS dialog, and logs the change to the access
-    history. It says refusals itself, exit 0 or not, so whether the level took is read back. True when it did."""
-    subprocess.run([engine, "clients", "level", app, level], timeout=600)  # stdin, stdout, stderr: this terminal
+    history. It says refusals itself, exit 0 or not, so whether the level took is read back. True when it did.
+    KEY_BY_ENV tells it this CLI writes the key next (give_key), so it neither keys the app nor says it has no key
+    (VM run, v0.1.8-rc2: those two lines read as failures before "now sees everything"); the gate is the same."""
+    subprocess.run([engine, "clients", "level", app, level], timeout=600,  # stdin, stdout, stderr: this terminal
+                   env={**os.environ, KEY_BY_ENV: COMMAND})
     return RANK.get(current_level(app) or "", -1) >= RANK[level]
 
 
