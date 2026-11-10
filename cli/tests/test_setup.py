@@ -1227,3 +1227,12 @@ def test_other_mcp_apps_not_installed_are_left_alone(box, capsys):
     code, out = run_setup()
     assert code == 0
     assert not (box.home / ".gemini").exists() and not (box.home / ".codeium").exists()
+
+
+def test_version_flag(capsys):
+    """`--version` is the first thing many people type: it answers, with the engine and connector versions."""
+    import re
+    with pytest.raises(SystemExit) as e:
+        cli.parser().parse_args(["--version"])
+    out = capsys.readouterr().out
+    assert e.value.code == 0 and re.fullmatch(r"Dawnmere \S+ \(engine \S+, connector \d+\.\d+\.\d+\)\n", out), out
