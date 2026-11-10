@@ -47,7 +47,20 @@ The engine checkout sits next to this repo as `../lflabs-memory-engine`.
    (cd dist && shasum -a 256 dawnmere-connector.mcpb >> SHA256SUMS)
    ```
 6. **Publish.** `gh release create "v$VERSION" dist/* --title "v$VERSION" --generate-notes`
-7. **Check the install line** in a throwaway home, with a UTF-8 locale like a real Terminal:
+7. **The engine's public snapshot.** After the release is published, publish the engine tag it ships (`ENGINE_TAG`)
+   to the public engine repo as one new commit, by `dawnmere-launch/engine-public/publish-steps.md` section 9.
+   `export.sh` needs Python 3.11 or later (it reads the version with `tomllib`), so put uv's on PATH first:
+   ```bash
+   PATH="$(dirname "$(uv python find 3.12)"):$PATH" "$LAUNCH/engine-public/export.sh" "$(cat ENGINE_TAG)" /tmp/engine-"$(cat ENGINE_TAG)"
+   ```
+   The export scans its own tree. A real word the scan flags in one file only (a dictionary word, say) goes in
+   `scan.sh`'s per-line allowlist (`ALLOW_LINE`, the file and the line, with why), never in the global one.
+   Never push to the public engine repo except by those steps.
+8. **Check the install line** on a Mac that is not yours: a VM (`dawnmere-launch/vm/`) or a separate macOS user.
+   A throwaway HOME on your own Mac is not separate from launchd: setup's `launchctl bootstrap gui/$UID` replaces
+   whatever is registered as `com.lflabs.memory`, so it stops your real memory service, and the service it starts
+   then reads your real HOME's `~/.claude` and uses your real connector socket. In the VM, with a UTF-8 locale like a
+   real Terminal:
    ```bash
    H=$(mktemp -d)
    env -i HOME="$H" PATH=/usr/bin:/bin:/usr/sbin LC_ALL=en_US.UTF-8 LFLABS_MEMORY_NO_SETUP=1 \
