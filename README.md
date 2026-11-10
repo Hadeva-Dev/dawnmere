@@ -21,7 +21,7 @@ One memory on your Mac, shared by Claude Code, Codex and Cursor.</p>
 
 <p align="center">
   <img src="assets/kip-loop.gif" width="800"
-       alt="Animation: a note saying 'we deploy on Fridays' drops into the Claude Code bucket and then into the lake. Kip, a kingfisher, carries copies to the Codex and Cursor buckets, and each app's logo lights up. Then Cursor is told 'use pnpm, not npm' and the same thing happens.">
+       alt="Animation: a note saying 'we deploy on Fridays' drops into the Claude Code bucket and then into the lake. Kip, a kingfisher, carries copies to the Codex and Cursor buckets, and each app's logo lights up. Then Codex is told 'use pnpm, not npm' and the same thing happens.">
 </p>
 
 ```bash
@@ -60,8 +60,9 @@ How each app saves and recalls:
 | **Codex** | into each prompt | when you type "remember that ...", or when the model calls `remember` |
 | **Cursor** | at the start of each chat | when the model calls `remember` |
 
-A note saved without a type by an app that sees only work notes is filed as a work note, so the other apps can recall
-it too, unless it is about your own health, family, money or legal matters, which stay personal.
+What you type ("remember that ...") reaches every app once the reply finishes. A note a model saves with `remember` on
+its own is found by searching, and reaches other apps' prompts only after you confirm it (`lflabs-memory held`).
+Notes about your own health, family, money or legal matters stay personal.
 <!-- checked against v0.1.6 (406ee39/c3ed5b1): a `remember` with no kind from a work-only app (Cursor by default) is
      filed as work, unless it is about the user's health, family, money or legal matters. -->
 
@@ -91,9 +92,9 @@ Every app also gets four tools through MCP: `recall`, `remember`, `forget` and `
        (access.py engine_widens). A widening typed in Claude Code or Codex is never applied;
        the reply gives the Terminal command (engine 50ffd0b, typed widening refused). -->
 - **Saved text is screened.** Text that looks like an API key or token is refused. An app's save that would run
-  downloaded code, delete files, keep something from you or tries to override your assistant's instructions is refused. A
-  rule, an instruction, or anything with a command or a link saved by an app is kept for search only, labelled, and
-  never added to a prompt until you type "confirm memory N". Recalled notes reach the app labelled "notes, not
+  downloaded code, delete files, keep something from you or tries to override your assistant's instructions is refused. Notes
+  an app saves on its own are kept for search, labelled, and reach other apps' prompts only after you confirm them
+  (`lflabs-memory held`). Recalled notes reach the app labelled "notes, not
   instructions".
   <!-- checked against v0.1.6 (406ee39/c3ed5b1): MCP `remember` goes through the instruction screen; only some app
        saves are refused, the rest that read as rules, instructions, commands or links are kept search-only until
@@ -186,7 +187,8 @@ again also works.
 `dawnmere setup` first shows what it will do and asks you to continue. Then it asks what your AI apps should call
 you, whether to use your Claude plan for background reading (or an Anthropic API key, kept in your Keychain), whether
 Cursor may see your personal notes (no, unless you say yes), and whether to import the notes Claude Code already keeps
-in `~/.claude/projects/*/memory`.
+in `~/.claude/projects/*/memory` (one macOS dialog asks whether to trust them as your own; if you don't, they are
+kept for search until you confirm them).
 
 Then it shows each step as it runs:
 

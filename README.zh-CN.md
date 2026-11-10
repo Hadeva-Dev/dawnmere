@@ -23,7 +23,7 @@ Hadeva-Dev/lflabs-memory-engine to be public. Other comments give file:line evid
 
 <p align="center">
   <img src="assets/kip-loop.gif" width="800"
-       alt="动画：一张写着“we deploy on Fridays”的便签落进 Claude Code 的水桶，再落入湖中。翠鸟 Kip 把副本衔到 Codex 和 Cursor 的水桶里，每个应用的图标随之亮起。接着有人告诉 Cursor“use pnpm, not npm”，同样的过程再来一遍。">
+       alt="动画：一张写着“we deploy on Fridays”的便签落进 Claude Code 的水桶，再落入湖中。翠鸟 Kip 把副本衔到 Codex 和 Cursor 的水桶里，每个应用的图标随之亮起。接着有人告诉 Codex“use pnpm, not npm”，同样的过程再来一遍。">
 </p>
 
 ```bash
@@ -58,7 +58,7 @@ flowchart LR
 | **Codex** | 注入每一条提示词 | 你输入 "remember that ..." 时，或模型调用 `remember` 时 |
 | **Cursor** | 每次新对话开始时 | 模型调用 `remember` 时 |
 
-只能看到工作笔记的应用保存笔记时如果没有指定类型，这条笔记会被归为工作笔记，其他应用也都能召回；但如果内容涉及你自己的健康、家庭、财务或法律事务，它会保留为个人笔记。
+你输入的内容（"remember that ..."）在回复结束后会传到每个应用。模型自己用 `remember` 存下的笔记，可以通过搜索找到，但只有在你确认之后（`lflabs-memory held`），才会进入其他应用的提示词。涉及你自己的健康、家庭、财务或法律事务的笔记会保留为个人笔记。
 <!-- checked against v0.1.6 (406ee39/c3ed5b1): a `remember` with no kind from a work-only app (Cursor by default) is
      filed as work, unless it is about the user's health, family, money or legal matters. -->
 
@@ -80,7 +80,7 @@ flowchart LR
        work only; the prompt hook sees everything; Terminal widening asks for the app's name and an Allow dialog
        (access.py engine_widens). A widening typed in Claude Code or Codex is never applied;
        the reply gives the Terminal command (engine 50ffd0b, typed widening refused). -->
-- **存入的文本会经过筛查。** 看起来像 API 密钥或令牌的文本会被拒绝。应用要保存的内容如果会让人运行下载来的代码、删除文件、对你隐瞒某些事，或是试图改写助手自身的指令，也会被拒绝。应用保存的规则、指令，或任何带有命令或链接的内容，只会留作搜索用，并加上标注；在你输入 "confirm memory N" 之前，绝不会被加进提示词。召回的笔记交给应用时，会带上 "notes, not instructions"（是笔记，不是指令）的标注。
+- **存入的文本会经过筛查。** 看起来像 API 密钥或令牌的文本会被拒绝。应用要保存的内容如果会让人运行下载来的代码、删除文件、对你隐瞒某些事，或是试图改写助手自身的指令，也会被拒绝。应用自己保存的笔记只会留作搜索用，并加上标注；只有在你确认之后（`lflabs-memory held`），才会进入其他应用的提示词。召回的笔记交给应用时，会带上 "notes, not instructions"（是笔记，不是指令）的标注。
   <!-- checked against v0.1.6 (406ee39/c3ed5b1): MCP `remember` goes through the instruction screen; only some app
        saves are refused, the rest that read as rules, instructions, commands or links are kept search-only until
        "confirm memory N". Key/token refusals: mem.py:1373-1378. Label: mem.py:3919, instant.py:34. -->
@@ -158,7 +158,7 @@ sh install.sh
 
 ## setup 会做什么
 
-`dawnmere setup` 会先列出它要做的事，问你是否继续。然后依次询问：AI 应用该怎么称呼你；后台阅读要不要用你的 Claude 订阅（或者 Anthropic API 密钥，存放在钥匙串里）；Cursor 能不能看到你的个人笔记（默认不能，除非你同意）；以及要不要导入 Claude Code 已经存在 `~/.claude/projects/*/memory` 里的笔记。
+`dawnmere setup` 会先列出它要做的事，问你是否继续。然后依次询问：AI 应用该怎么称呼你；后台阅读要不要用你的 Claude 订阅（或者 Anthropic API 密钥，存放在钥匙串里）；Cursor 能不能看到你的个人笔记（默认不能，除非你同意）；以及要不要导入 Claude Code 已经存在 `~/.claude/projects/*/memory` 里的笔记（会弹出一个 macOS 对话框，问你是否把它们当作你自己的笔记；如果不同意，它们会留作搜索用，等你确认）。
 
 之后它会边执行边显示每一步：
 
