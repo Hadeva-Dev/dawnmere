@@ -1022,3 +1022,25 @@ def test_rerun_keeps_what_the_questions_do_not_ask(box):
     got = tomllib.loads(cfg.read_text())
     assert got["llm"]["daily_calls"] == 50 and got["privacy"]["chat_index"] is True
     assert got["models"] == f"{box.data}/shared-models" and got["llm"]["backend"] == "claude-cli"
+
+
+def test_self_check_confirms_its_typed_save_like_the_next_prompt(box, monkeypatch, capsys):
+    """Other apps see a typed save only once memory finds it as the user's turn in the session's transcript: the check
+    writes that turn where Claude Code would and sends the next prompt, then removes the folder it made."""
+    seen = []
+    real = setup._hook
+
+    def hook(engine, sub, payload, client=None):
+        if sub == "hook-prompt":
+            path = Path(payload["transcript_path"])
+            seen.append((payload["prompt"], path.parent.parent == box.home / ".claude" / "projects", path.exists()))
+        return real(engine, sub, payload, client)
+    monkeypatch.setattr(setup, "_hook", hook)
+    code, out = run_setup()
+    assert code == 0, out + capsys.readouterr().out
+    typed = [x for x in seen if x[0].startswith("remember that ")]
+    assert typed and typed[0][1] and not typed[0][2]  # under ~/.claude/projects, not yet written (as Claude Code)
+    after = seen[seen.index(typed[0]) + 1]
+    assert after[0] == "ok" and after[2]  # the next prompt, with the turn in the transcript
+    assert not list((box.home / ".claude" / "projects").glob("-*-self-check-*")), "nothing of the check stays"
+

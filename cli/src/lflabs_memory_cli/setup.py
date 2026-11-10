@@ -459,10 +459,27 @@ def self_check(engine):
         fact = check_phrase()
         word = fact.split()[-1]
         before = _max_id()
-        ok, _, out = _hook(engine, "hook-prompt", {**base, "session_id": sid + "b", "prompt": f"remember that {fact}"})
-        saved = re.search(r"\(#(\d+)\)", _context(out))
-        if not ok or not saved or fact not in _context(out):
-            return False, took, "a typed \"remember that\" was not saved"
+        typed = {**base, "session_id": sid + "b", "prompt": f"remember that {fact}"}
+        made = _typed_transcript(typed)  # where Claude Code would write this session's transcript
+        try:
+            ok, _, out = _hook(engine, "hook-prompt", typed)
+            saved = re.search(r"\(#(\d+)\)", _context(out))
+            if not ok or not saved or fact not in _context(out):
+                return False, took, "a typed \"remember that\" was not saved"
+            # Other apps get a typed save once memory finds it as the user's own turn in the transcript (at the reply's
+            # end, or the session's next prompt): the turn is written there and the next prompt sent, as Claude Code
+            # would.
+            Path(typed["transcript_path"]).write_text(json.dumps({
+                "type": "user", "timestamp": time.strftime("%Y-%m-%dT%H:%M:%S.000Z", time.gmtime()),
+                "sessionId": typed["session_id"], "uuid": secrets.token_hex(16),
+                "message": {"role": "user", "content": typed["prompt"]}}) + "\n")
+            _hook(engine, "hook-prompt", {**typed, "prompt": "ok"})
+        finally:
+            for i, x in enumerate(made):  # what this made, newest first: its own folder, then any parent it had to
+                try:  # make, only if still empty (Claude Code may have started meanwhile)
+                    shutil.rmtree(x) if i == 0 else x.rmdir()
+                except OSError:
+                    pass
         mid = saved.group(1)
         new = before is not None and int(mid) > before  # made by this check, not an older memory it merged into
         try:
@@ -480,6 +497,18 @@ def self_check(engine):
     if not new:
         return True, took, f"{KEPT}{mid}"
     return True, took, "" if git else NO_GIT
+
+
+def _typed_transcript(typed):
+    """Sets typed["transcript_path"] to a new session folder under ~/.claude/projects, as Claude Code names its
+    transcripts, and makes it: the folders it made, newest first, for the caller to remove."""
+    made, d = [], home() / ".claude" / "projects" / f"-{COMMAND}-self-check-{secrets.token_hex(4)}"
+    for x in (d.parent.parent, d.parent, d):
+        if not x.exists():
+            x.mkdir(mode=0o700)
+            made.insert(0, x)
+    typed["transcript_path"] = str(d / f"{typed['session_id']}.jsonl")
+    return made
 
 
 KEPT = "kept #"  # self_check's why when the save landed in a memory that was there before: not purged
