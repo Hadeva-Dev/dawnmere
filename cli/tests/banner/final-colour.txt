@@ -15,7 +15,7 @@
        \e[38;5;252m⢀⣴⣶⣾⣿⡇ ⣠⣶⣶⣶⣶⢠⣶⡆⢠⣶⡄⣰⣶⡄⣶⣶⣴⣶⣦ ⢰⣶⣶⣶⣦⣴⣶⣦⡀ ⣠⣶⣶⣶⣄ ⣶⣶⣶⣶⠄⢀⣴⣶⣶⣦⡀\e[0m
        \e[38;5;252m⣿⣿⡋⣻⣿⡇⢸⣿⣟⢙⣿⣿ ⢿⣿⣿⣿⣿⣿⡿ ⣿⣿⠉⢹⣿⡇⢸⣿⡏⢹⣿⡏⢹⣿⡇⢸⣿⣿⠿⠿⠟ ⣿⣿⠉⠉ ⣿⣿⡿⠿⠿⠃\e[0m
        \e[38;5;252m⠙⢿⣿⣿⣿⡇⠈⠻⣿⣿⣿⣿ ⠈⢿⡿⠉⢿⡿⠁ ⣿⣿ ⢸⣿⡇⢸⣿⡇⢸⣿⡇⢸⣿⡇⠈⠻⣿⣿⣿⠗ ⣿⣿   ⠙⢿⣿⣿⡿⠂\e[0m
-                 \e[38;5;245mone memory for every AI app you use\e[0m
+            \e[38;5;245mone memory for Claude Code, Codex and Cursor\e[0m
 
   \e[38;5;114m✓\e[0m \e[38;5;245mClaude Code     found, logged in\e[0m
   \e[38;5;114m✓\e[0m \e[38;5;245mSearch models   57 MB, checked\e[0m

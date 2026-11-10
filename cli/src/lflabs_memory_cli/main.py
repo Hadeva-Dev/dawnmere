@@ -88,7 +88,7 @@ COMMANDS = {
 
 
 def parser():
-    p = argparse.ArgumentParser(prog=COMMAND, description=f"{PRODUCT}: one memory for every AI app you use.")
+    p = argparse.ArgumentParser(prog=COMMAND, description=f"{PRODUCT}: one memory for Claude Code, Codex and Cursor.")
     sub = p.add_subparsers(dest="command", required=True, metavar="command")
     for name, (_, help_text) in COMMANDS.items():
         sp = sub.add_parser(name, help=help_text, description=help_text)

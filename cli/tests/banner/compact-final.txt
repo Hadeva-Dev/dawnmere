@@ -1,5 +1,5 @@
   dawnmere
-  one memory for every AI app you use
+  one memory for Claude Code, Codex and Cursor
 
   ✓ Claude Code     found, logged in
   ✓ Search models   57 MB, checked
