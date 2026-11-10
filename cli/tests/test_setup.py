@@ -804,7 +804,8 @@ def test_self_check_waits_for_the_service_and_tries_again(box, monkeypatch, caps
     code, out = run_setup()
     assert code == 0, out + capsys.readouterr().out
     assert events.index(("ask", "recall")) < events.index(("check", None)), "a real recall answers first"
-    assert [e for e in events if e[0] == "check"] == [("check", None)] * 3 and waits == [2.0, 2.0]
+    # only the waits between checks: time.sleep is patched for every caller, and a short poll elsewhere can land here
+    assert [e for e in events if e[0] == "check"] == [("check", None)] * 3 and [w for w in waits if w >= 1] == [2.0, 2.0]
     results = iter([(False, 0.3, "a new Cursor chat would not see it")] * 3)
     events.clear()
     code, out = run_setup()
