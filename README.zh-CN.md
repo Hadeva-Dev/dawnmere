@@ -23,7 +23,7 @@ curl -fsSL https://dawnmere.app/install | sh
 ```
 
 **环境要求：** 搭载 Apple 芯片的 Mac，macOS 14 或更高版本，1 GB 可用磁盘空间，Node.js 18 或更高版本。免费，无需注册账号。<br>
-**注意：** 目前英文效果最好，中文的记忆和提问还很难被可靠地找到（[#27](https://github.com/Hadeva-Dev/dawnmere/issues/27)）。<br>
+**注意：** 中文笔记在提问用到相同词语时能被找到；换一种说法常常找不到（[#27](https://github.com/Hadeva-Dev/dawnmere/issues/27)）。<br>
 **状态：** 早期测试版（0.1.x）。客户端采用 MIT 许可，引擎源码可见（FSL，两年后转为 MIT）。由 [LF Labs](#who-makes-it-and-the-lf-labs-names) 开发。
 
 <!-- Apple silicon and macOS 14: install.sh:35-38 refuses anything else, and setup.py:73-74 checks macOS again.
@@ -269,7 +269,7 @@ Dawnmere 由 LF Labs（GitHub 上的 [Hadeva-Dev](https://github.com/Hadeva-Dev)
 
 - **只支持 Mac**：Apple 芯片，macOS 14 或更高版本。引擎用的 ONNX 运行时没有 Intel Mac 版本，也没有 Linux 或 Windows 版。
 - **只限一台 Mac。** 不在多台机器之间同步，也没有团队共享记忆。
-- **英文效果最好。** 搜索用的是英文模型，所以中文（以及其他语言）的记忆和提问，目前很难被可靠地找到。直接输入保存要用 "remember that ..."，中文可以写 "记住：..."。想要效果好，暂时请用英文写记忆、用英文提问。
+- **中文和日文的召回靠词语匹配。** 用中文或日文保存的笔记，只有在提问用到部分相同的词时才会自动加入提示；换一种说法提问常常找不到，但应用仍可主动搜索。如果设置了模型，中文或日文的问题也会用英文再搜一次，每次一个小的模型调用。直接输入保存要用 "remember that ..."，中文可以写 "记住：..."。
 - **从 Claude Code 保存效果最好。** 在 Codex 里要说 "remember that ..."；在 Cursor 里得由模型调用 `remember`。只有运行 `dawnmere setup --codex-sessions` 之后，才会读取 Codex 自己的会话文件。
 - **筛查是自动的，也会有漏网之鱼。** 用 `dawnmere export` 检查一下应用都存了什么。
 - **早期测试版。** 版本靠手动发布，更新也很频繁；更新前请先看 [release notes](https://github.com/Hadeva-Dev/dawnmere/releases)。
