@@ -23,8 +23,8 @@ from pathlib import Path
 from . import (access, apps, backend, claude_settings, edits, install_record, keychain, launchd, layout, models,
                prompt, screen, settings, sockets)
 from .brand import COMMAND, PRODUCT, REPO
-from .layout import (CLI_DIST, CONNECTOR_VERSION, ENGINE, ENGINE_DIST, MARKETPLACE, SERVER, data_dir,
-                     engine_bin, engine_record, find_claude, git_available, home, lf_labs_dir, on_shell_path, path_advice, short, uv_bin)
+from .layout import (CLI_DIST, CONNECTOR_VERSION, ENGINE, ENGINE_DIST, MARKETPLACE, OLD_MARKETPLACE, OLD_SERVER,
+                     SERVER, data_dir, engine_bin, engine_record, find_claude, git_available, home, lf_labs_dir, on_shell_path, path_advice, short, uv_bin)
 from .run import run
 from .screen import AppResult, Memory, Step, pick_memory, self_check_row
 
@@ -325,7 +325,11 @@ class RealSetup:
             _, fine = self._apply(apps.file_plans("claude-code", self.engine))
             return "hooks", NO_CLAUDE, fine
         listed = run(["claude", "plugin", "list"], timeout=30)
-        if listed.ok and SERVER in listed.out:
+        if listed.ok and claude_settings.OLD_PLUGIN_ID in listed.out:  # before 0.1.10 the plugin had another name:
+            # the old one goes with its marketplace, so Claude Code never runs both
+            self._cmd(["claude", "plugin", "uninstall", claude_settings.OLD_PLUGIN_ID, "--scope", "user"])
+            self._cmd(["claude", "plugin", "marketplace", "remove", OLD_MARKETPLACE])
+        if listed.ok and claude_settings.PLUGIN_ID in listed.out:
             if apps.marketplace_pinned():
                 self._drop_fallback()
                 return "plugin", None, True
@@ -335,10 +339,12 @@ class RealSetup:
         if os.path.isabs(self.engine):  # the plugin's hooks run this path (plugin/scripts/engine), never PATH's
             engine_record().write_text(self.engine + "\n")
         if self._cmd(["claude", "plugin", "marketplace", "add", apps.marketplace_source(), "--scope", "user"]).ok and \
-                self._cmd(["claude", "plugin", "install", f"{SERVER}@{MARKETPLACE}", "--scope", "user", "-y"]).ok:
+                self._cmd(["claude", "plugin", "install", claude_settings.PLUGIN_ID, "--scope", "user", "-y"]).ok:
             self._drop_fallback()
             return "plugin", None, True
         # fallback: the MCP entry by claude mcp add, the hooks in settings.json
+        if apps.old_claude_mcp():  # renamed: the old entry goes, the new one is added below
+            self._cmd(["claude", "mcp", "remove", "--scope", "user", OLD_SERVER])
         if run(["claude", "mcp", "get", SERVER], timeout=30).ok:
             mcp_ok = True
         else:
@@ -358,6 +364,8 @@ class RealSetup:
         added = any(c.get("ok") and c["argv"][1:3] == ["mcp", "add"] for c in self.record["commands"])
         if added and run(["claude", "mcp", "get", SERVER], timeout=30).ok:
             self._cmd(["claude", "mcp", "remove", "--scope", "user", SERVER])
+        if added and apps.old_claude_mcp():
+            self._cmd(["claude", "mcp", "remove", "--scope", "user", OLD_SERVER])
         self.save()
 
     def wire_codex(self):
@@ -585,8 +593,8 @@ def trust_imported(engine, ids, since, args, say):
                 f"now: every app may use {'them' if n > 1 else 'it'}.")
             return True
     say(f"\nThe {n} note{'s' if n > 1 else ''} imported from Claude Code {'are' if n > 1 else 'is'} kept for search "
-        f"until you confirm {'them' if n > 1 else 'it'}: `{ENGINE} held` lists {'them' if n > 1 else 'it'}, and "
-        f"`{ENGINE} trust -- {' '.join(map(str, ids[:8]))}{' ...' if n > 8 else ''}` trusts "
+        f"until you confirm {'them' if n > 1 else 'it'}: `{COMMAND} held` lists {'them' if n > 1 else 'it'}, and "
+        f"`{COMMAND} trust -- {' '.join(map(str, ids[:8]))}{' ...' if n > 8 else ''}` trusts "
         f"{'them' if n > 1 else 'it'} as yours (it asks in a dialog).")
     return False
 
@@ -624,7 +632,7 @@ def dry_run(a, say):
         say(f"\n  {apps.LABELS[app]}:")
         if app == "claude-code":
             say(f"    run: claude plugin marketplace add {apps.marketplace_source()} --scope user")
-            say(f"    run: claude plugin install {SERVER}@{MARKETPLACE} --scope user -y")
+            say(f"    run: claude plugin install {claude_settings.PLUGIN_ID} --scope user -y")
             say("    (if those fail: claude mcp add, and these hooks in ~/.claude/settings.json)")
         for p in apps.file_plans(app, eng):
             say(f"    {short(p.path)}: {p.note}")

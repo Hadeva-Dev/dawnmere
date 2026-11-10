@@ -1,12 +1,19 @@
 #!/bin/sh
 # Claude Code's hooks run the engine through this, so they never depend on PATH: the absolute path setup wrote
-# into the data folder, else uv's tool bin folder. No engine: quiet (exit 0, no output), so a broken install never
-# blocks a prompt. apps.hook_engine() in the CLI looks in the same places.
+# into the data folder, else uv's tool bin folder. apps.hook_engine() in the CLI looks in the same places.
+# Not set up on this Mac (no engine, or no config.toml: setup never ran): the engine is never started, and nothing
+# is installed from here. SessionStart says so in one line; every other hook stays quiet (exit 0, no output), so a
+# missing or broken install never blocks a prompt.
 data="${LFLABS_MEMORY_HOME:-$HOME/Library/Application Support/LF Labs/Memory}"
-recorded=$(cat "$data/engine-path" 2>/dev/null)
-for e in "$recorded" ${UV_TOOL_BIN_DIR:+"$UV_TOOL_BIN_DIR/lflabs-memory"} \
-  ${XDG_BIN_HOME:+"$XDG_BIN_HOME/lflabs-memory"} "$HOME/.local/bin/lflabs-memory"; do
-  case $e in /*) if [ -x "$e" ]; then exec "$e" "$@"; fi ;; esac
-done
+if [ -f "$data/config.toml" ]; then
+  recorded=$(cat "$data/engine-path" 2>/dev/null)
+  for e in "$recorded" ${UV_TOOL_BIN_DIR:+"$UV_TOOL_BIN_DIR/lflabs-memory"} \
+    ${XDG_BIN_HOME:+"$XDG_BIN_HOME/lflabs-memory"} "$HOME/.local/bin/lflabs-memory"; do
+    case $e in /*) if [ -x "$e" ]; then exec "$e" "$@"; fi ;; esac
+  done
+fi
 cat >/dev/null 2>&1
+if [ "${1:-}" = hook-session-start ]; then
+  printf '%s\n' '{"systemMessage": "Dawnmere isn'"'"'t set up on this Mac yet: run /dawnmere:setup"}'
+fi
 exit 0

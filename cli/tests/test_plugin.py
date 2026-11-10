@@ -47,7 +47,7 @@ def fake_engine(path):
 def hook(tmp_path, sub, env=None):
     """Run the plugin's hook command for sub the way Claude Code does (sh -c, CLAUDE_PLUGIN_ROOT set), from a copy of
     the plugin in a folder with a space, with a PATH that has no engine on it."""
-    root = tmp_path / "plugin cache" / "lflabs-memory"
+    root = tmp_path / "plugin cache" / layout.SERVER
     if not root.exists():
         shutil.copytree(ROOT / "plugin", root)
     cmd = next(h["command"] for groups in load("plugin/hooks/hooks.json")["hooks"].values() for g in groups
@@ -66,10 +66,17 @@ def test_plugin_hooks_run_the_launcher():
     assert hooks == want
 
 
+def set_up(tmp_path):
+    """The data folder as setup leaves it: config.toml is what tells the launcher setup has run."""
+    data = tmp_path / "home/Library/Application Support/LF Labs/Memory"
+    data.mkdir(parents=True, exist_ok=True)
+    (data / "config.toml").write_text("")
+    return data
+
+
 def test_hook_runs_the_engine_setup_recorded(tmp_path):
     eng = fake_engine(tmp_path / "Somewhere Else/bin/lflabs-memory")
-    record = tmp_path / "home/Library/Application Support/LF Labs/Memory/engine-path"
-    record.parent.mkdir(parents=True)
+    record = set_up(tmp_path) / "engine-path"
     record.write_text(f"{eng}\n")
     for _, sub, _ in apps.CLAUDE_HOOKS:
         r = hook(tmp_path, sub)
@@ -77,6 +84,7 @@ def test_hook_runs_the_engine_setup_recorded(tmp_path):
 
 
 def test_hook_falls_back_to_uvs_bin_folder(tmp_path):
+    set_up(tmp_path)
     fake_engine(tmp_path / "home/.local/bin/lflabs-memory")
     assert json.loads(hook(tmp_path, "hook-prompt").stdout)[0] == ["hook-prompt"]
     fake_engine(tmp_path / "tools bin/lflabs-memory")
@@ -99,3 +107,29 @@ def test_doctor_finds_what_the_launcher_finds(tmp_path, monkeypatch):
     assert apps.hook_engine() is None
     eng = fake_engine(tmp_path / "home/.local/bin/lflabs-memory")
     assert apps.hook_engine() == str(eng)
+
+
+NOT_SET_UP = '{"systemMessage": "Dawnmere isn\'t set up on this Mac yet: run /dawnmere:setup"}\n'
+
+
+def test_session_start_without_an_engine_says_how_to_set_up(tmp_path):
+    """Only the two /plugin commands run: one line at session start, valid JSON, no error; the other hooks quiet."""
+    r = hook(tmp_path, "hook-session-start")
+    assert (r.returncode, r.stdout, r.stderr) == (0, NOT_SET_UP, "")
+    assert json.loads(r.stdout) == {"systemMessage": "Dawnmere isn't set up on this Mac yet: run /dawnmere:setup"}
+    for _, sub, _ in apps.CLAUDE_HOOKS:
+        if sub != "hook-session-start":
+            assert (hook(tmp_path, sub).stdout, hook(tmp_path, sub).stderr) == ("", "")
+
+
+def test_an_engine_before_setup_is_never_started(tmp_path):
+    """The install line ran but setup did not (no config.toml): the engine is not run, which could make a store."""
+    fake_engine(tmp_path / "home/.local/bin/lflabs-memory")
+    assert hook(tmp_path, "hook-session-start").stdout == NOT_SET_UP
+    assert hook(tmp_path, "hook-prompt").stdout == ""
+    set_up(tmp_path)
+    assert json.loads(hook(tmp_path, "hook-session-start").stdout)[0] == ["hook-session-start"]
+
+
+def test_plugin_command_files():
+    assert sorted(p.name for p in (ROOT / "plugin/commands").iterdir()) == ["setup.md"]

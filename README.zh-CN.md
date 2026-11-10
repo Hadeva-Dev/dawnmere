@@ -51,7 +51,7 @@ flowchart LR
 | **Codex** | 注入每一条提示词 | 你输入 "remember that ..." 时，或模型调用 `remember` 时 |
 | **Cursor** | 每次新对话开始时 | 模型调用 `remember` 时 |
 
-你输入的内容（"remember that ..."）在回复结束后会传到每个应用（在 Codex 里输入的，要等你在那里发下一条提示词）。模型自己用 `remember` 存下的笔记，可以通过搜索找到，但只有在你确认之后（`lflabs-memory held`），才会进入其他应用的提示词。涉及你自己的健康、家庭、财务或法律事务的笔记会保留为个人笔记。
+你输入的内容（"remember that ..."）在回复结束后会传到每个应用（在 Codex 里输入的，要等你在那里发下一条提示词）。模型自己用 `remember` 存下的笔记，可以通过搜索找到，但只有在你确认之后（`dawnmere held`），才会进入其他应用的提示词。涉及你自己的健康、家庭、财务或法律事务的笔记会保留为个人笔记。
 <!-- checked against v0.1.6 (406ee39/c3ed5b1): a `remember` with no kind from a work-only app (Cursor by default) is
      filed as work, unless it is about the user's health, family, money or legal matters. -->
 
@@ -73,7 +73,7 @@ flowchart LR
        work only; the prompt hook sees everything; Terminal widening asks for the app's name and an Allow dialog
        (access.py engine_widens). A widening typed in Claude Code or Codex is never applied;
        the reply gives the Terminal command (engine 50ffd0b, typed widening refused). -->
-- **存入的文本会经过筛查。** 看起来像 API 密钥或令牌的文本会被拒绝。应用要保存的内容如果会让人运行下载来的代码、删除文件、对你隐瞒某些事，或是试图改写助手自身的指令，也会被拒绝。应用自己保存的笔记只会留作搜索用，并加上标注；只有在你确认之后（`lflabs-memory held`），才会进入其他应用的提示词。召回的笔记交给应用时，会带上 "notes, not instructions"（是笔记，不是指令）的标注。
+- **存入的文本会经过筛查。** 看起来像 API 密钥或令牌的文本会被拒绝。应用要保存的内容如果会让人运行下载来的代码、删除文件、对你隐瞒某些事，或是试图改写助手自身的指令，也会被拒绝。应用自己保存的笔记只会留作搜索用，并加上标注；只有在你确认之后（`dawnmere held`），才会进入其他应用的提示词。召回的笔记交给应用时，会带上 "notes, not instructions"（是笔记，不是指令）的标注。
   <!-- checked against v0.1.6 (406ee39/c3ed5b1): MCP `remember` goes through the instruction screen; only some app
        saves are refused, the rest that read as rules, instructions, commands or links are kept search-only until
        "confirm memory N". Key/token refusals: mem.py:1373-1378. Label: mem.py:3919, instant.py:34. -->
@@ -111,6 +111,15 @@ flowchart LR
 ```bash
 curl -fsSL https://dawnmere.app/install | sh
 ```
+
+在用 Claude Code？两条命令，再运行 `/dawnmere:setup`：
+
+```text
+/plugin marketplace add Hadeva-Dev/dawnmere
+/plugin install dawnmere@dawnmere
+```
+
+然后在 Claude Code 里运行 `/dawnmere:setup`。它会执行上面那行安装命令（每条命令都由你批准），再请你在终端窗口里运行 `dawnmere setup`；如果你愿意，也可以直接在那里按默认设置运行。在那之前，每次新开 Claude Code 会话都只会提示 Dawnmere 还没有设置，不会做别的事。
 
 这个地址直接提供最新 [GitHub release](https://github.com/Hadeva-Dev/dawnmere/releases/latest) 里的 `install.sh`。脚本会：
 
@@ -175,17 +184,17 @@ sh install.sh
 
 ## 你的应用
 
-- **Claude Code**（2.1.301 或更高版本）：setup 会从本仓库安装 `lflabs-memory` 插件，版本与你安装的 release 一致，插件会加上这些工具和四个钩子。如果插件装不上，它会改用 `claude mcp add` 添加同样的工具，并把钩子写入 `~/.claude/settings.json`。
+- **Claude Code**（2.1.301 或更高版本）：setup 会从本仓库安装 `dawnmere` 插件，版本与你安装的 release 一致，插件会加上这些工具和四个钩子。如果插件装不上，它会改用 `claude mcp add` 添加同样的工具，并把钩子写入 `~/.claude/settings.json`。
   <!-- checked against v0.1.6 (406ee39/c3ed5b1): the plugin pins to the release tag. -->
-- **Codex**：在 `~/.codex/config.toml` 中添加 `[mcp_servers.lflabs-memory]`，并在 `~/.codex/hooks.json` 中添加一个提示词钩子。在 Codex 里输入一次 `/hooks`，信任这个钩子。
-- **Cursor**：在 `~/.cursor/mcp.json` 中添加 `lflabs-memory`，在 `~/.cursor/hooks.json` 中添加一个会话开始钩子，然后重启 Cursor。在你运行 `dawnmere access cursor everything` 之前，Cursor 只能看到工作笔记；`dawnmere access cursor work` 可以再收回来。
-- **Windsurf、Gemini CLI、VS Code（Copilot）、Qwen Code、Kimi Code、Qoder CLI、iFlow CLI 和 Cline CLI**：setup 找到其中某个应用时，会在它的 MCP 配置文件（`~/.codeium/windsurf/mcp_config.json`、`~/.gemini/settings.json`、`~/Library/Application Support/Code/User/mcp.json`、`~/.qwen/settings.json`、`~/.kimi-code/mcp.json`、`~/.qoder/settings.json`、`~/.iflow/settings.json`、`~/.cline/data/settings/cline_mcp_settings.json`）中添加 `lflabs-memory`，然后重启该应用。它们只有工具、没有钩子，所以只在调用工具时才会回忆，并且只能看到工作笔记。
+- **Codex**：在 `~/.codex/config.toml` 中添加 `[mcp_servers.dawnmere]`，并在 `~/.codex/hooks.json` 中添加一个提示词钩子。在 Codex 里输入一次 `/hooks`，信任这个钩子。
+- **Cursor**：在 `~/.cursor/mcp.json` 中添加 `dawnmere`，在 `~/.cursor/hooks.json` 中添加一个会话开始钩子，然后重启 Cursor。在你运行 `dawnmere access cursor everything` 之前，Cursor 只能看到工作笔记；`dawnmere access cursor work` 可以再收回来。
+- **Windsurf、Gemini CLI、VS Code（Copilot）、Qwen Code、Kimi Code、Qoder CLI、iFlow CLI 和 Cline CLI**：setup 找到其中某个应用时，会在它的 MCP 配置文件（`~/.codeium/windsurf/mcp_config.json`、`~/.gemini/settings.json`、`~/Library/Application Support/Code/User/mcp.json`、`~/.qwen/settings.json`、`~/.kimi-code/mcp.json`、`~/.qoder/settings.json`、`~/.iflow/settings.json`、`~/.cline/data/settings/cline_mcp_settings.json`）中添加 `dawnmere`，然后重启该应用。它们只有工具、没有钩子，所以只在调用工具时才会回忆，并且只能看到工作笔记。
 - **Claude Desktop 和其他 MCP 应用**：setup 不会连接它们。Claude Desktop 可以打开 [最新 release](https://github.com/Hadeva-Dev/dawnmere/releases/latest) 里的 `dawnmere-connector.mcpb`，或者把下面这段加到 `~/Library/Application Support/Claude/claude_desktop_config.json`：
 
   ```json
   {
     "mcpServers": {
-      "lflabs-memory": {
+      "dawnmere": {
         "command": "npx",
         "args": ["-y", "dawnmere-connector@0.1.1"]
       }
@@ -195,6 +204,8 @@ sh install.sh
 
   <!-- checked against v0.1.6 (406ee39/c3ed5b1): connector 0.1.1 matches layout.py CONNECTOR_VERSION. -->
   Windsurf、Gemini CLI 等应用的配置写在 [连接器的 README](connector/README.md) 里。
+
+0.1.10 之前，这个条目和插件叫 `lflabs-memory`（插件为 `lflabs-memory@lflabs`）。setup、安装命令和 `dawnmere update` 会在每个应用里把它们改名为 `dawnmere`，所以不会有哪个应用把记忆列出两次；`dawnmere uninstall` 两个名字都会移除。
 
 <!-- MIN_CLAUDE layout.py:20. Plugin then fallback: setup.py:294-313. Codex: apps.py:100-116, 146-153; hint
      apps.py:27. Cursor: apps.py:156-163, access.py:18-21, 124-126. The .mcpb is a release asset. -->
@@ -210,6 +221,12 @@ sh install.sh
 | `dawnmere access APP [LEVEL]` | 查看或修改某个应用能看到的范围：`everything`、`nothing-personal`、`work` 或 `nothing`（在这里只能放宽 Cursor 和 Codex） |
 | `dawnmere update` | 安装最新 release，并用它的校验值校验 |
 | `dawnmere uninstall` | 移除 setup 添加的一切 |
+| `dawnmere held` | 列出在你确认之前不会进入提示词的应用保存，以及确认每一条要用的那行命令 |
+| `dawnmere trust -- ID...` | 在你于 macOS 对话框里点了“允许”之后，把这些记忆算作你自己的话 |
+| `dawnmere search QUERY` | 搜索你的记忆 |
+| `dawnmere add TEXT` | 保存一条记忆 |
+| `dawnmere forget ID` | 彻底删除一条记忆 |
+| `dawnmere restore ID` | 找回应用在最近一天内遗忘的记忆 |
 
 <!-- checked against v0.1.6 (406ee39/c3ed5b1): doctor checks Node. Commands: main.py:76-131. Export path:
      export.py:79. Import skips duplicates: export.py:112-134. Levels and widening: access.py:18, 124-126. -->
@@ -219,7 +236,7 @@ sh install.sh
 
 ## 遗忘
 
-你自己遗忘一条记忆时（在 Claude Code 或 Codex 里输入 "forget memory 12"，或在终端里运行 `lflabs-memory forget 12`），它的文本、搜索条目、旧版本以及从中提取出的事实，会在回复结束时从记忆文件及其备份中删除（在 Codex 里输入的，要等你在那里发下一条提示词），无法找回。如果开启了后台阅读，这些文字最多会保留 24 小时，好让后台任务找到提到它们的其他笔记，之后就会被抹掉。应用自己调用 `forget` 时，这条记忆会立即隐藏，24 小时后彻底删除；在那之前，`lflabs-memory restore 12` 可以把它找回。会留下一个不含任何文字的指纹，这样同一件事就不会从旧对话里再被存一次。`dawnmere uninstall` 也可以删除全部记忆（会先问你）。
+你自己遗忘一条记忆时（在 Claude Code 或 Codex 里输入 "forget memory 12"，或在终端里运行 `dawnmere forget 12`），它的文本、搜索条目、旧版本以及从中提取出的事实，会在回复结束时从记忆文件及其备份中删除（在 Codex 里输入的，要等你在那里发下一条提示词），无法找回。如果开启了后台阅读，这些文字最多会保留 24 小时，好让后台任务找到提到它们的其他笔记，之后就会被抹掉。应用自己调用 `forget` 时，这条记忆会立即隐藏，24 小时后彻底删除；在那之前，`dawnmere restore 12` 可以把它找回。会留下一个不含任何文字的指纹，这样同一件事就不会从旧对话里再被存一次。`dawnmere uninstall` 也可以删除全部记忆（会先问你）。
 
 Claude Code 自己也会保存记忆文件（在 `~/.claude/projects/` 下）；在 Dawnmere 里遗忘一条笔记不会删除它们。请在那里也删除这条笔记，或者让 Claude Code 把它忘掉。
 <!-- checked against v0.1.6 (406ee39/c3ed5b1): your own forget is a real delete (words kept up to 24 h when a model
@@ -262,8 +279,7 @@ Dawnmere 由 LF Labs（GitHub 上的 [Hadeva-Dev](https://github.com/Hadeva-Dev)
 | 你的记忆、设置和模型 | `~/Library/Application Support/LF Labs/Memory/`（只有你能读取） |
 | 服务日志 | `~/Library/Logs/LF Labs/memory.log` |
 | 后台服务 | `~/Library/LaunchAgents/com.lflabs.memory.plist` |
-| MCP 服务器 id 和 Claude Code 插件 | `lflabs-memory`（插件 `lflabs-memory@lflabs`） |
-| 程序 | `~/.local/share/uv/tools/lflabs-memory-cli/`，链接为 `~/.local/bin/dawnmere` 和 `lflabs-memory` |
+| 程序 | `~/.local/share/uv/tools/lflabs-memory-cli/`，链接为 `~/.local/bin/dawnmere` 和 `lflabs-memory`（钩子运行的引擎命令） |
 | Anthropic API 密钥（如果你提供了） | 你的登录钥匙串，名称为 "LF Labs Memory" |
 
 <!-- layout.py:9-16, 33-56; setup.py:462-463 (0700 data folder). -->

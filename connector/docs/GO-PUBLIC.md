@@ -16,8 +16,9 @@ In order. Nothing is published yet.
 
 The npm package carries the product name (`dawnmere-connector`, with the registry name, the bundle name and the
 `bin` to match; decided 2026-11-07, before the first publish, because the `npx` line in every app's config is the
-most visible identifier after the install line). The server id, plugin name, settings, socket and protocol names
-stay neutral (`lflabs-memory-*`). The repo is named after the product. The product name appears only in:
+most visible identifier after the install line). Since 0.1.10 the server id, the plugin and its marketplace are
+`dawnmere` too (the CLI renames an older install's `lflabs-memory` entries); settings, socket and protocol names stay
+neutral (`lflabs-memory-*`). The repo is named after the product. The product name appears only in:
 
 - `src/brand.ts` (`PRODUCT`, `COMMAND`, `PACKAGE`) and the usage comment in `src/index.ts`
 - `README.md`, `docs/LISTING.md`, `docs/DESIGN.md` and this file (the repo's URL and the package name)

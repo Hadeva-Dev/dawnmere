@@ -53,7 +53,7 @@ How each app saves and recalls:
 | **Cursor** | at the start of each chat | when the model calls `remember` |
 
 What you type ("remember that ...") reaches every app once the reply finishes (from Codex, at your next prompt there).
-A note a model saves with `remember` on its own is found by searching, and reaches other apps' prompts only after you confirm it (`lflabs-memory held`).
+A note a model saves with `remember` on its own is found by searching, and reaches other apps' prompts only after you confirm it (`dawnmere held`).
 Notes about your own health, family, money or legal matters stay personal.
 <!-- checked against v0.1.6 (406ee39/c3ed5b1): a `remember` with no kind from a work-only app (Cursor by default) is
      filed as work, unless it is about the user's health, family, money or legal matters. -->
@@ -86,7 +86,7 @@ Every app also gets four tools through MCP: `recall`, `remember`, `forget` and `
 - **Saved text is screened.** Text that looks like an API key or token is refused. An app's save that would run
   downloaded code, delete files, keep something from you or tries to override your assistant's instructions is refused. Notes
   an app saves on its own are kept for search, labelled, and reach other apps' prompts only after you confirm them
-  (`lflabs-memory held`). Recalled notes reach the app labelled "notes, not
+  (`dawnmere held`). Recalled notes reach the app labelled "notes, not
   instructions".
   <!-- checked against v0.1.6 (406ee39/c3ed5b1): MCP `remember` goes through the instruction screen; only some app
        saves are refused, the rest that read as rules, instructions, commands or links are kept search-only until
@@ -143,6 +143,19 @@ dawnmere setup
 
 Homebrew brings Node.js with it. Update with `brew upgrade hadeva-dev/tap/dawnmere`, then run `dawnmere setup`
 again. To remove it, run `dawnmere uninstall` before `brew uninstall dawnmere`.
+
+In Claude Code? Two commands, then `/dawnmere:setup`:
+
+```text
+/plugin marketplace add Hadeva-Dev/dawnmere
+/plugin install dawnmere@dawnmere
+```
+
+Then run `/dawnmere:setup` in Claude Code. It runs the install line above (you approve each command), then has you
+run `dawnmere setup` in a Terminal window, or runs it with the defaults if you say so. Until then, each new Claude Code
+session says Dawnmere isn't set up yet, and nothing else happens.
+<!-- plugin/commands/setup.md; plugin/scripts/engine prints the one line at SessionStart when there is no engine or
+     no config.toml, and never runs the installer. -->
 
 That address serves `install.sh` from the latest
 [GitHub release](https://github.com/Hadeva-Dev/dawnmere/releases/latest). The script:
@@ -220,17 +233,17 @@ time, for example to add a model later.
 
 ## Your apps
 
-- **Claude Code** (2.1.301 or later): setup installs the `lflabs-memory` plugin from this repo, at the release you
+- **Claude Code** (2.1.301 or later): setup installs the `dawnmere` plugin from this repo, at the release you
   installed, which adds the tools and four hooks. If the plugin cannot be installed, it adds the same tools with
   `claude mcp add` and the hooks to `~/.claude/settings.json`.
   <!-- checked against v0.1.6 (406ee39/c3ed5b1): the plugin pins to the release tag. -->
-- **Codex**: adds `[mcp_servers.lflabs-memory]` to `~/.codex/config.toml` and a prompt hook to `~/.codex/hooks.json`.
+- **Codex**: adds `[mcp_servers.dawnmere]` to `~/.codex/config.toml` and a prompt hook to `~/.codex/hooks.json`.
   Type `/hooks` once in Codex to trust the hook.
-- **Cursor**: adds `lflabs-memory` to `~/.cursor/mcp.json` and a session-start hook to `~/.cursor/hooks.json`, then
+- **Cursor**: adds `dawnmere` to `~/.cursor/mcp.json` and a session-start hook to `~/.cursor/hooks.json`, then
   restart Cursor. Cursor sees work notes only until you run `dawnmere access cursor everything`;
   `dawnmere access cursor work` takes that back.
 - **Windsurf, Gemini CLI, VS Code (Copilot), Qwen Code, Kimi Code, Qoder CLI, iFlow CLI and Cline CLI**: when setup
-  finds one, it adds `lflabs-memory` to its MCP file (`~/.codeium/windsurf/mcp_config.json`,
+  finds one, it adds `dawnmere` to its MCP file (`~/.codeium/windsurf/mcp_config.json`,
   `~/.gemini/settings.json`, `~/Library/Application Support/Code/User/mcp.json`, `~/.qwen/settings.json`,
   `~/.kimi-code/mcp.json`, `~/.qoder/settings.json`, `~/.iflow/settings.json`,
   `~/.cline/data/settings/cline_mcp_settings.json`); restart the app. They get the tools and no hook, so they recall
@@ -242,7 +255,7 @@ time, for example to add a model later.
   ```json
   {
     "mcpServers": {
-      "lflabs-memory": {
+      "dawnmere": {
         "command": "npx",
         "args": ["-y", "dawnmere-connector@0.1.1"]
       }
@@ -252,6 +265,10 @@ time, for example to add a model later.
 
   <!-- checked against v0.1.6 (406ee39/c3ed5b1): connector 0.1.1 matches layout.py CONNECTOR_VERSION. -->
   The [connector's README](connector/README.md) has the lines for Windsurf, Gemini CLI and others.
+
+Before 0.1.10 the entry and the plugin were called `lflabs-memory` (plugin `lflabs-memory@lflabs`). Setup, the install
+line and `dawnmere update` rename them to `dawnmere` in every app, so none lists memory twice; `dawnmere uninstall`
+removes either name.
 
 <!-- MIN_CLAUDE layout.py:20. Plugin then fallback: setup.py:294-313. Codex: apps.py:100-116, 146-153; hint
      apps.py:27. Cursor: apps.py:156-163, access.py:18-21, 124-126. The .mcpb is a release asset. -->
@@ -267,6 +284,12 @@ time, for example to add a model later.
 | `dawnmere access APP [LEVEL]` | show what an app may see, or change it: `everything`, `nothing-personal`, `work` or `nothing` (only Cursor and Codex can be widened from here) |
 | `dawnmere update` | install the newest release, checked against its checksums |
 | `dawnmere uninstall` | remove everything setup added |
+| `dawnmere held` | app saves kept out of your prompts until you confirm them, with the line that confirms each |
+| `dawnmere trust -- ID...` | make memories your own words, after you click Allow in a macOS dialog |
+| `dawnmere search QUERY` | search your memory |
+| `dawnmere add TEXT` | save one memory |
+| `dawnmere forget ID` | delete a memory for good |
+| `dawnmere restore ID` | bring back a memory an app forgot in the last day |
 
 <!-- checked against v0.1.6 (406ee39/c3ed5b1): doctor checks Node. Commands: main.py:76-131. Export path:
      export.py:79. Import skips duplicates: export.py:112-134. Levels and widening: access.py:18, 124-126. -->
@@ -276,11 +299,11 @@ time, for example to add a model later.
 
 ## Forgetting
 
-When you forget a memory yourself (type "forget memory 12" in Claude Code or Codex, or run `lflabs-memory forget 12`
+When you forget a memory yourself (type "forget memory 12" in Claude Code or Codex, or run `dawnmere forget 12`
 in Terminal), its text, search entries, older versions and the facts drawn from it are deleted from the memory file
 and its backups when the reply finishes (typed in Codex, at your next prompt there). It cannot be brought back. If background reading is on, the words are kept for up to 24 hours so the
 background job can find other notes that mention them, then erased. When an app calls `forget` on its own, the memory
-is hidden at once and deleted for good after 24 hours; until then `lflabs-memory restore 12` brings it back. A
+is hidden at once and deleted for good after 24 hours; until then `dawnmere restore 12` brings it back. A
 fingerprint with no words stays, so the same thing is not saved again from an old chat. `dawnmere uninstall` can also
 delete the whole memory (it asks first).
 
@@ -346,8 +369,7 @@ programs use the LF Labs name, so these are all Dawnmere:
 | your memory, settings and models | `~/Library/Application Support/LF Labs/Memory/` (only you can read it) |
 | the service's log | `~/Library/Logs/LF Labs/memory.log` |
 | the background service | `~/Library/LaunchAgents/com.lflabs.memory.plist` |
-| the MCP server id and Claude Code plugin | `lflabs-memory` (plugin `lflabs-memory@lflabs`) |
-| the programs | `~/.local/share/uv/tools/lflabs-memory-cli/`, linked as `~/.local/bin/dawnmere` and `lflabs-memory` |
+| the programs | `~/.local/share/uv/tools/lflabs-memory-cli/`, linked as `~/.local/bin/dawnmere` and `lflabs-memory` (the engine's command, which the hooks run) |
 | an Anthropic API key, if you gave one | your login Keychain, as "LF Labs Memory" |
 
 <!-- layout.py:9-16, 33-56; setup.py:462-463 (0700 data folder). -->

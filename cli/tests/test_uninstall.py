@@ -40,7 +40,7 @@ def test_uninstall_reverses_setup(mac, monkeypatch):
     home = mac.home
     seed(home)
     fake_setup(home)
-    assert "lflabs-memory" in (home / ".codex/config.toml").read_text()
+    assert "[mcp_servers.dawnmere]" in (home / ".codex/config.toml").read_text()
     out = []
     assert uninstall.main(out=out.append) == 0
     assert (home / ".codex/config.toml").read_bytes() == CODEX_TOML.encode(), "CRLF file back byte for byte"
@@ -81,7 +81,7 @@ def test_uninstall_partial_state(mac):
     import shutil
     shutil.rmtree(layout.data_dir())
     cursor = json.loads((home / ".cursor/mcp.json").read_text())
-    del cursor["mcpServers"]["lflabs-memory"]
+    del cursor["mcpServers"]["dawnmere"]
     (home / ".cursor/mcp.json").write_text(json.dumps(cursor))
     mac.remove("uv")
     mac.on("security", ["delete-generic-password"], 44, "")
@@ -89,9 +89,9 @@ def test_uninstall_partial_state(mac):
     assert uninstall.main(out=out.append) == 0
     text = "\n".join(out)
     assert "no install record" in text
-    assert "no lflabs-memory entry (already removed)" in text
+    assert "no dawnmere entry (already removed)" in text
     assert "uv not found" in text and "none in the Keychain" in text
-    assert "lflabs-memory" not in (home / ".codex/config.toml").read_text()
+    assert "mcp_servers.dawnmere" not in (home / ".codex/config.toml").read_text()
     assert "lflabs-memory" not in (home / ".codex/hooks.json").read_text()
     assert "lflabs-memory" not in (home / ".claude/settings.json").read_text()
     assert "say done" in (home / ".claude/settings.json").read_text(), "the user's own hook stays"
@@ -116,7 +116,7 @@ def test_uninstall_without_install_record(mac):
     (home / ".codex/config.toml").write_text(toml + '\n[mcp_servers.later]\ncommand = "x"\n')
     assert uninstall.main(out=lambda s: None) == 0
     left = (home / ".codex/config.toml").read_text()
-    assert "lflabs-memory" not in left and "[mcp_servers.github]" in left and "[mcp_servers.later]" in left
+    assert "mcp_servers.dawnmere" not in left and "[mcp_servers.github]" in left and "[mcp_servers.later]" in left
     assert json.loads((home / ".cursor/mcp.json").read_text()) == {"mcpServers": {"github": {"command": "gh-mcp"}}}
 
 
@@ -207,7 +207,7 @@ def test_a_file_setup_created_goes_when_only_empty_structure_is_left(mac):
         apps.apply(p, record)
     install_record.save(record)
     data = json.loads((home / ".cursor/mcp.json").read_text())
-    data["mcpServers"]["lflabs-memory"]["env"] = {"JARVIS_MEMORY_CLIENT": "cursor"}
+    data["mcpServers"]["dawnmere"]["env"] = {"JARVIS_MEMORY_CLIENT": "cursor"}
     (home / ".cursor/mcp.json").write_text(json.dumps(data))
     assert uninstall.main(keep_data=True, out=lambda s: None) == 0
     assert not (home / ".cursor/mcp.json").exists() and not (home / ".cursor/hooks.json").exists()

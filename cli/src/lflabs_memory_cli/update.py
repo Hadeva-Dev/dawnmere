@@ -23,10 +23,10 @@ import urllib.request
 from importlib import metadata
 from pathlib import Path
 
-from . import apps, edits, install_record, launchd, layout, models, prompt
+from . import apps, claude_settings, edits, install_record, launchd, layout, models, prompt
 from .brand import COMMAND, PRODUCT, REPO
-from .layout import (CLI_DIST, CONNECTOR, CONNECTOR_VERSION, ENGINE_DIST, LABEL, MARKETPLACE, SERVER, data_dir,
-                     developer_tools, engine_bin, engine_record, home, short, uv_bin)
+from .layout import (CLI_DIST, CONNECTOR, CONNECTOR_VERSION, ENGINE_DIST, LABEL, MARKETPLACE, OLD_MARKETPLACE,
+                     OLD_SERVER, SERVER, data_dir, developer_tools, engine_bin, engine_record, home, short, uv_bin)
 from .run import Result, run
 
 API = f"https://api.github.com/repos/{REPO}/releases"
@@ -253,6 +253,34 @@ def put_back(snap):
         b.close()
 
 
+def rename_entries(say):
+    """Our MCP entry under its name from before 0.1.10, in every app's file and in Claude Code's fallback (`claude mcp
+    add`), renamed to SERVER; each file change recorded in install.json, as setup records its own."""
+    rec = install_record.load()
+    for app in ("codex", "cursor", *apps.MCP_ONLY):
+        plan = apps.plan_rename(app)
+        if plan is None:
+            continue
+        if plan.state != "add":
+            say(f"{short(plan.path)}: {plan.note}")
+            continue
+        try:
+            apps.apply(plan, rec if rec is not None else install_record.empty())
+            say(f"{short(plan.path)}: {plan.note}")
+        except edits.Skip as e:
+            say(f"{short(plan.path)}: {e}")
+    if rec is not None:
+        install_record.save(rec)
+    if shutil.which("claude") and apps.old_claude_mcp():
+        add = ["claude", "mcp", "add", "--scope", "user", "--transport", "stdio", SERVER, "--", "npx",
+               *apps.connector_args()]
+        if run(["claude", "mcp", "remove", "--scope", "user", OLD_SERVER], timeout=30).ok and run(add, timeout=30).ok:
+            if rec is not None:
+                install_record.add_command(rec, add, True)
+                install_record.save(rec)
+            say(f"Claude Code: MCP entry {OLD_SERVER} renamed to {SERVER}")
+
+
 def bump_pins(say, record=None):
     """Point Codex's and Cursor's entries at this version of the connector, each change recorded in install.json (so
     uninstall still puts the user's file back). record: the one setup holds; else install.json is loaded and saved."""
@@ -282,13 +310,19 @@ def bump_pins(say, record=None):
         install_record.save(rec)
 
 
-def move_plugin(say):
+def move_plugin(say, listed=""):
     """The marketplace was added at the old release's tag, and a marketplace's ref cannot be changed in place: remove
-    it (that uninstalls the plugin too), add it at this release's tag, install the plugin from it again."""
+    it (that uninstalls the plugin too), add it at this release's tag, install the plugin from it again. A plugin
+    under its name from before 0.1.10 (listed: `claude plugin list`) goes with its marketplace the same way."""
     v = installed_version()
-    steps = [["claude", "plugin", "marketplace", "remove", MARKETPLACE],
-             ["claude", "plugin", "marketplace", "add", apps.marketplace_source(v), "--scope", "user"],
-             ["claude", "plugin", "install", f"{SERVER}@{MARKETPLACE}", "--scope", "user", "-y"]]
+    gone = [["claude", "plugin", "uninstall", claude_settings.OLD_PLUGIN_ID, "--scope", "user"],
+            ["claude", "plugin", "marketplace", "remove", OLD_MARKETPLACE]] \
+        if claude_settings.OLD_PLUGIN_ID in listed else []
+    gone += [["claude", "plugin", "marketplace", "remove", MARKETPLACE]] if claude_settings.PLUGIN_ID in listed else []
+    for argv in gone:
+        run(argv, timeout=120)
+    steps = [["claude", "plugin", "marketplace", "add", apps.marketplace_source(v), "--scope", "user"],
+             ["claude", "plugin", "install", claude_settings.PLUGIN_ID, "--scope", "user", "-y"]]
     if all(run(argv, timeout=120).ok for argv in steps):
         say(f"Claude Code's plugin: now v{v} (restart Claude Code to load it)")
     else:
@@ -364,8 +398,10 @@ def finish(old_version, say=print, get=fetch):
     run(["launchctl", "kickstart", "-k", f"{launchd.domain()}/{LABEL}"], timeout=30)
     if eng and os.path.isabs(eng) and data_dir().is_dir():  # what the plugin's hooks run (plugin/scripts/engine)
         engine_record().write_text(eng + "\n")
-    if apps.installed("claude-code") and SERVER in run(["claude", "plugin", "list"], timeout=30).out:
-        move_plugin(say)
+    listed = run(["claude", "plugin", "list"], timeout=30).out if apps.installed("claude-code") else ""
+    if claude_settings.PLUGIN_ID in listed or claude_settings.OLD_PLUGIN_ID in listed:
+        move_plugin(say, listed)
+    rename_entries(say)
     bump_pins(say)
     say(f"{PRODUCT} is updated ({old_version} to {installed_version()}).")
     return 0

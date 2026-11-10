@@ -12,10 +12,12 @@ import os
 import shutil
 
 from . import apps, edits
-from .layout import MARKETPLACE, REPO_DIR, SERVER, data_dir, home
+from .layout import MARKETPLACE, OLD_MARKETPLACE, OLD_SERVER, REPO_DIR, SERVER, data_dir, home
 
 PLUGIN_ID = f"{SERVER}@{MARKETPLACE}"
-OURS = (("enabledPlugins", PLUGIN_ID), ("extraKnownMarketplaces", MARKETPLACE))
+OLD_PLUGIN_ID = f"{OLD_SERVER}@{OLD_MARKETPLACE}"  # before 0.1.10: setup and update move it to PLUGIN_ID
+OURS = (("enabledPlugins", PLUGIN_ID), ("extraKnownMarketplaces", MARKETPLACE),
+        ("enabledPlugins", OLD_PLUGIN_ID), ("extraKnownMarketplaces", OLD_MARKETPLACE))
 
 
 def path():
@@ -40,7 +42,7 @@ def snapshot():
         text = edits.read(path())
     except edits.Skip:
         return
-    ours = text is not None and (PLUGIN_ID in text or f'"{MARKETPLACE}"' in text or "hook-prompt" in text)
+    ours = text is not None and (any(f'"{name}"' in text for _, name in OURS) or "hook-prompt" in text)
     doc = {"existed": text is not None, "text": None if ours else text, "plugins_dir": plugins_dir().exists()}
     snap.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
     with os.fdopen(os.open(snap, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600), "w") as f:
@@ -114,8 +116,9 @@ def _drop_plugin_files(snap):
     """The plugin's cached copy and its marketplace's checkout, which `claude plugin uninstall` and `marketplace remove`
     leave behind; and ~/.claude/plugins itself when setup made it and only Claude Code's empty bookkeeping is left."""
     pd = plugins_dir()
-    for pattern in (f"cache/{MARKETPLACE}", f"cache/{MARKETPLACE}-*", f"marketplaces/{MARKETPLACE}",
-                    f"marketplaces/{MARKETPLACE}-*", f"marketplaces/{REPO_DIR}", f"marketplaces/{REPO_DIR}-*"):
+    for pattern in [p for m in (MARKETPLACE, OLD_MARKETPLACE) for p in (f"cache/{m}", f"cache/{m}-*",
+                                                                         f"marketplaces/{m}", f"marketplaces/{m}-*")] + \
+            [f"marketplaces/{REPO_DIR}", f"marketplaces/{REPO_DIR}-*"]:
         for p in pd.glob(pattern):
             shutil.rmtree(p, ignore_errors=True)
     if not snap or snap.get("plugins_dir") or not pd.is_dir():

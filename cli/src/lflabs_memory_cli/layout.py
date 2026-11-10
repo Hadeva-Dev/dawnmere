@@ -7,12 +7,14 @@ from pathlib import Path
 from .brand import COMMAND, REPO
 from .run import run
 
-SERVER = "lflabs-memory"                 # our MCP entry in every app's config, and the Claude Code plugin's name
-ENGINE = "lflabs-memory"                 # the engine's console script
+SERVER = COMMAND                         # our MCP entry in every app's config, and the Claude Code plugin's name
+OLD_SERVER = "lflabs-memory"             # SERVER before 0.1.10: setup and update rename it, uninstall and doctor know it
+ENGINE = "lflabs-memory"                 # the engine's console script (what hooks run: kept, so they keep working)
 CONNECTOR = f"{COMMAND}-connector"       # the npm package apps run to reach the engine: the one branded identifier
 CONNECTOR_VERSION = "0.1.1"
 CLIENT_ENV = "LFLABS_MEMORY_CLIENT"
-MARKETPLACE = "lflabs"                   # .claude-plugin/marketplace.json's name
+MARKETPLACE = COMMAND                    # .claude-plugin/marketplace.json's name
+OLD_MARKETPLACE = "lflabs"               # MARKETPLACE before 0.1.10
 REPO_DIR = REPO.replace("/", "-")        # the folder Claude Code clones the marketplace's repo into
 LABEL = "com.lflabs.memory"              # the LaunchAgent
 KEYCHAIN = ("LF Labs Memory", "anthropic-api-key")   # (service, account)

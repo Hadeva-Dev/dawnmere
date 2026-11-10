@@ -6,7 +6,8 @@ Each app file gets a plan first: what would change, as exact text, before anythi
 Ours, wherever it appears:
 - an MCP entry is ours when it runs the connector package (args hold layout.CONNECTOR followed by "@<version>");
 - a hook is ours when its command runs the engine's console script (lflabs-memory) with one of our subcommands.
-An entry named lflabs-memory that is not ours (another tool's) is left alone and reported.
+An entry named SERVER that is not ours (another tool's) is left alone and reported. Ours under OLD_SERVER (the name
+before 0.1.10) is renamed to SERVER, or dropped when SERVER already holds ours: an app never ends up with two.
 """
 import json
 import os
@@ -20,8 +21,8 @@ from importlib import metadata
 from . import edits
 from .brand import REPO
 from .edits import Skip
-from .layout import (CLI_DIST, CLIENT_ENV, CONNECTOR, CONNECTOR_VERSION, ENGINE, MARKETPLACE, SERVER, engine_record,
-                     home)
+from .layout import (CLI_DIST, CLIENT_ENV, CONNECTOR, CONNECTOR_VERSION, ENGINE, MARKETPLACE, OLD_SERVER, SERVER,
+                     engine_record, home)
 from .run import run
 
 KEY_ENV = "LFLABS_MEMORY_CLIENT_KEY"  # an app trusted with more than work only carries its key (access.py)
@@ -64,6 +65,7 @@ class Plan:
     new: str | None = None
     old: str | None = None
     added: str = ""      # exactly what was added (install.json): the TOML block, or the JSON entry
+    rename: bool = False # it moves our entry from OLD_SERVER to SERVER (apply renames install.json's "added" too)
 
 
 def node_status():
@@ -116,6 +118,12 @@ def hook_engine():
         if os.path.isabs(e) and os.access(e, os.X_OK):
             return e
     return None
+
+
+def old_claude_mcp():
+    """Whether Claude Code has setup's fallback MCP entry under OLD_SERVER (`claude mcp get` shows our connector)."""
+    r = run(["claude", "mcp", "get", OLD_SERVER], timeout=30)
+    return r.ok and CONNECTOR in r.out
 
 
 def connector_on_npm():
@@ -208,6 +216,9 @@ def plan_mcp_json(app, client, path, key="mcpServers", client_key=None):
         servers = data.get(key, {})
         if not isinstance(servers, dict):
             raise Skip(f'its "{key}" is not an object: left alone; add this by hand')
+        moved = rename_json(app, path, key, old, data)
+        if moved:
+            return moved
         if any(ours_server(v) for v in servers.values()):
             return Plan(app, "mcp-json", path, "done", f"already has {SERVER}")
         if SERVER in servers:
@@ -219,6 +230,42 @@ def plan_mcp_json(app, client, path, key="mcpServers", client_key=None):
                     added)
     except Skip as e:
         return Plan(app, "mcp-json", path, "error", str(e), json.dumps({SERVER: _mcp_entry(client, under=key)}, indent=2))
+
+
+def rename_json(app, path, key, old, data):
+    """The plan that moves our entry from OLD_SERVER to SERVER in place (its env, a key too, kept), or drops it when
+    SERVER already holds ours; None when there is no old entry of ours."""
+    servers = data.get(key) if isinstance(data.get(key), dict) else {}
+    if not ours_server(servers.get(OLD_SERVER)):
+        return None
+    new = json.loads(json.dumps(data))
+    if ours_server(servers.get(SERVER)):
+        del new[key][OLD_SERVER]
+        note = f'remove the old {key}."{OLD_SERVER}" ({SERVER} is there)'
+    elif SERVER in servers:
+        return Plan(app, "mcp-json", path, "stale", f"has another {SERVER} entry: its old {OLD_SERVER} entry is left "
+                    "alone (remove one and rerun)")
+    else:
+        new[key] = {(SERVER if k == OLD_SERVER else k): v for k, v in new[key].items()}
+        note = f'rename {key}."{OLD_SERVER}" to "{SERVER}"'
+    return Plan(app, "mcp-json", path, "add", note, "", edits.dump_json(new, old), old, rename=True)
+
+
+def plan_rename(app, h=None):
+    """The rename plans for one app's MCP file (update runs these alone: it never adds an entry)."""
+    h = h or home()
+    path, key = {"codex": (h / ".codex/config.toml", None), "cursor": (h / ".cursor/mcp.json", "mcpServers"),
+                 **{a: (h / v[2], v[3]) for a, v in MCP_ONLY.items()}}[app]
+    try:
+        old = edits.read(path)
+        if old is None:
+            return None
+        if key is None:
+            return rename_toml(path, old, edits.load_toml(old).get("mcp_servers") or {})
+        data = edits.load_json(old)
+        return rename_json(app, path, key, old, data) if isinstance(data, dict) else None
+    except Skip:
+        return None
 
 
 def codex_block(client="codex", key=None):
@@ -235,6 +282,9 @@ def plan_codex_toml(path, client_key=None):
         servers = edits.load_toml(old).get("mcp_servers") or {}
         if not isinstance(servers, dict):
             raise Skip("its mcp_servers is not a table: left alone; add these lines by hand")
+        moved = rename_toml(path, old, servers)
+        if moved:
+            return moved
         if any(ours_server(v) for v in servers.values()):
             return Plan("codex", "codex-toml", path, "done", f"already has {SERVER}")
         if SERVER in servers:
@@ -243,6 +293,43 @@ def plan_codex_toml(path, client_key=None):
         return Plan("codex", "codex-toml", path, "add", f"add [mcp_servers.{SERVER}]", block, new, old, block)
     except Skip as e:
         return Plan("codex", "codex-toml", path, "error", str(e), codex_block())
+
+
+def _toml_heads(name):
+    """[mcp_servers.NAME] and [mcp_servers.NAME.env] (and any other sub-table) headers, the name bare or quoted."""
+    s = re.escape(name)
+    return re.compile(rf'(?m)^([ \t]*\[[ \t]*mcp_servers\.)(?:{s}|"{s}")((?:\.[^\]\r\n]*)?[ \t]*\])')
+
+
+def rename_toml(path, old, servers):
+    """Codex's config.toml with our [mcp_servers.OLD_SERVER] tables (the .env one, with any key, too) renamed to
+    SERVER, or taken out when SERVER already holds ours; None when there is no old table of ours."""
+    if not isinstance(servers, dict) or not ours_server(servers.get(OLD_SERVER)):
+        return None
+    if ours_server(servers.get(SERVER)):
+        new, note = _drop_toml(old, None, (OLD_SERVER,))[0], f"remove the old [mcp_servers.{OLD_SERVER}] ({SERVER} is there)"
+    elif SERVER in servers:
+        return Plan("codex", "codex-toml", path, "stale", f"has another [mcp_servers.{SERVER}]: its old "
+                    f"[mcp_servers.{OLD_SERVER}] is left alone (remove one and rerun)")
+    else:
+        new, note = _toml_heads(OLD_SERVER).sub(rf"\g<1>{SERVER}\g<2>", old), \
+            f"rename [mcp_servers.{OLD_SERVER}] to [mcp_servers.{SERVER}]"
+    try:
+        after = edits.load_toml(new).get("mcp_servers") or {}
+    except Skip:
+        after = {}
+    if OLD_SERVER in after or not ours_server(after.get(SERVER)) or \
+            (servers[OLD_SERVER].get("env") != after[SERVER].get("env") and not ours_server(servers.get(SERVER))):
+        return Plan("codex", "codex-toml", path, "error", f"its [mcp_servers.{OLD_SERVER}] is not in plain tables: left "
+                    f"alone; rename it to {SERVER} by hand")
+    return Plan("codex", "codex-toml", path, "add", note, "", new, old, rename=True)
+
+
+def renamed_added(added):
+    """install.json's record of what setup added, with our entry's old name changed to SERVER (uninstall looks for
+    exactly that text)."""
+    return _toml_heads(OLD_SERVER).sub(rf"\g<1>{SERVER}\g<2>", added or "").replace(
+        json.dumps(OLD_SERVER) + ":", json.dumps(SERVER) + ":")
 
 
 def _hooks_add(app, kind, path, data, old, adds, note):
@@ -359,21 +446,23 @@ def _drop_hooks(data):
     return new, n
 
 
-def _drop_toml(text, block):
-    """text without our [mcp_servers.lflabs-memory] tables: the exact block setup appended when it is still there,
-    else the tables found by their headers. (new text, removed?)"""
+def _drop_toml(text, block, names=(SERVER, OLD_SERVER)):
+    """text without our tables (each of names: [mcp_servers.NAME] and its .env): the exact block setup appended when
+    it is still there, else the tables found by their headers. (new text, removed?)"""
+    out, removed = text, False
     if block:
         e = edits.eol(text)
         for cand in (e + block.replace("\n", e), block.replace("\n", e)):
-            if text.count(cand) == 1:
-                return text.replace(cand, "", 1), True
-    s = re.escape(SERVER)
-    head = re.compile(rf'(?m)^[ \t]*\[[ \t]*mcp_servers\.(?:{s}|"{s}")(?:\.env)?[ \t]*\][ \t]*\r?\n?')
-    out, removed = text, False
-    while (m := head.search(out)):
-        nxt = re.compile(r"(?m)^[ \t]*\[").search(out, m.end())
-        out = out[:m.start()] + (out[nxt.start():] if nxt else "")
-        removed = True
+            if out.count(cand) == 1:
+                out, removed = out.replace(cand, "", 1), True
+                break
+    for name in names:
+        s = re.escape(name)
+        head = re.compile(rf'(?m)^[ \t]*\[[ \t]*mcp_servers\.(?:{s}|"{s}")(?:\.env)?[ \t]*\][ \t]*\r?\n?')
+        while (m := head.search(out)):
+            nxt = re.compile(r"(?m)^[ \t]*\[").search(out, m.end())
+            out = out[:m.start()] + (out[nxt.start():] if nxt else "")
+            removed = True
     return out, removed
 
 
@@ -399,7 +488,8 @@ def unplan(entry, h=None):
             servers = edits.load_toml(old).get("mcp_servers") or {}
             if not any(ours_server(v) for v in servers.values()):
                 return Plan(app, kind, path, "gone", f"no {SERVER} table (already removed)")
-            new, removed = _drop_toml(old, entry.get("added"))
+            new, removed = _drop_toml(old, entry.get("added"), [n for n in (SERVER, OLD_SERVER)
+                                                                if ours_server(servers.get(n))])
             if entry.get("created") and empty_structure(edits.load_toml(new)) and not new.strip(" \t\r\n#"):
                 return Plan(app, kind, path, "remove", "remove config.toml (setup created it)", new=None, old=old)
             edits.load_toml(new)
@@ -444,7 +534,10 @@ def apply(plan, record):
     Only the first change to a file is backed up (the user's original: the one uninstall puts back), and never a
     file that already holds a key."""
     from . import install_record
-    first = install_record.file_entry(record, plan) is None
+    prev = install_record.file_entry(record, plan)
+    first = prev is None
+    if plan.rename:
+        plan.added = renamed_added(prev.get("added")) if prev else ""
     backup = edits.write(plan.path, plan.new, plan.old, secret=KEY_ENV in (plan.new or ""),
                          backup=first and KEY_ENV not in (plan.old or ""))
     install_record.add_file(record, plan, backup, edits.sha256(plan.new))

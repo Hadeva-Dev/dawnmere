@@ -110,7 +110,7 @@ def test_setup_end_to_end(box, capsys):
     assert code == 0, out + shown
     assert "[ok] Self-check: recall in" in shown and "Dawnmere is on." in shown
     assert "Background reading: your Claude plan (Haiku), up to 200 calls a day" in out
-    assert ["plugin", "install", "lflabs-memory@lflabs", "--scope", "user", "-y"] in box.calls("claude")
+    assert ["plugin", "install", "dawnmere@dawnmere", "--scope", "user", "-y"] in box.calls("claude")
     version = importlib.metadata.version("lflabs-memory-cli")
     assert ["plugin", "marketplace", "add", f"Hadeva-Dev/dawnmere#v{version}", "--scope", "user"] in \
         box.calls("claude"), "the plugin at the release tag the wheels come from, never main's head"
@@ -133,8 +133,8 @@ def test_setup_dry_run_lists_changes(box):
     assert code == 0
     assert tree(box.home) == before and not (layout.data_dir() / "config.toml").exists()
     assert box.calls("launchctl") == [] and not [c for c in box.calls("claude") if c[:1] == ["plugin"]]
-    for line in ("~/.codex/config.toml: add [mcp_servers.lflabs-memory]", 'args = ["-y", "dawnmere-connector@0.1.1"]',
-                 "~/.cursor/mcp.json: add mcpServers.\"lflabs-memory\"", "claude plugin install lflabs-memory@lflabs",
+    for line in ("~/.codex/config.toml: add [mcp_servers.dawnmere]", 'args = ["-y", "dawnmere-connector@0.1.1"]',
+                 "~/.cursor/mcp.json: add mcpServers.\"dawnmere\"", "claude plugin install dawnmere@dawnmere",
                  'LFLABS_MEMORY_CLIENT = "codex"', "hook-cursor-start"):
         assert line in out, line
 
@@ -143,7 +143,7 @@ def test_setup_idempotent(box, capsys):
     assert run_setup()[0] == 0
     first = tree(box.home)
     record = json.loads(layout.install_json().read_text())
-    box.on("claude", ["plugin", "list"], 0, "lflabs-memory@lflabs 0.1.0\n")
+    box.on("claude", ["plugin", "list"], 0, "dawnmere@dawnmere 0.1.0\n")
     assert run_setup()[0] == 0
     assert tree(box.home) == first, "a second run adds nothing and makes no new backups"
     assert json.loads(layout.install_json().read_text())["files"] == record["files"]
@@ -163,7 +163,7 @@ def test_plugin_fallback_when_plugin_cli_fails(box, capsys):
     box.on("claude", ["plugin", "marketplace"], 1, "")
     assert run_setup()[0] == 0
     calls = box.calls("claude")
-    assert ["mcp", "add", "--scope", "user", "--transport", "stdio", "lflabs-memory", "--", "npx", "-y",
+    assert ["mcp", "add", "--scope", "user", "--transport", "stdio", "dawnmere", "--", "npx", "-y",
             "dawnmere-connector@0.1.1"] in calls
     hooks = json.loads((box.home / ".claude/settings.json").read_text())["hooks"]
     assert set(hooks) == {"UserPromptSubmit", "SessionStart", "Stop", "SessionEnd"}
@@ -255,7 +255,7 @@ def test_setup_then_uninstall_leaves_nothing(box, capsys, monkeypatch):
     after = {k: v for k, v in tree(box.home).items() if ".lflabs-backup-" not in k}
     assert after == before
     assert not layout.data_dir().exists() and not layout.plist_path().exists()
-    assert ["mcp", "remove", "--scope", "user", "lflabs-memory"] in box.calls("claude")
+    assert ["mcp", "remove", "--scope", "user", "dawnmere"] in box.calls("claude")
 
 
 def answering(monkeypatch, answers):
@@ -275,7 +275,7 @@ def answering(monkeypatch, answers):
 
 def test_cursor_starts_at_work_only(box, capsys):
     assert run_setup()[0] == 0
-    entry = json.loads((box.home / ".cursor/mcp.json").read_text())["mcpServers"]["lflabs-memory"]
+    entry = json.loads((box.home / ".cursor/mcp.json").read_text())["mcpServers"]["dawnmere"]
     assert entry["env"] == {"LFLABS_MEMORY_CLIENT": "cursor"}, "no key: held to work only"
     hook = json.loads((box.home / ".cursor/hooks.json").read_text())["hooks"]["sessionStart"][0]["command"]
     assert hook.startswith("LFLABS_MEMORY_CLIENT=cursor "), "its start block is filtered as Cursor's"
@@ -290,7 +290,7 @@ def test_cursor_personal_notes_when_asked(box, monkeypatch, capsys):
     shown = capsys.readouterr().out
     assert code == 0, out + shown
     assert any("Let Cursor see your personal notes too?" in q for q in asked)
-    entry = json.loads((box.home / ".cursor/mcp.json").read_text())["mcpServers"]["lflabs-memory"]
+    entry = json.loads((box.home / ".cursor/mcp.json").read_text())["mcpServers"]["dawnmere"]
     key = entry["env"]["LFLABS_MEMORY_CLIENT_KEY"]
     assert len(key) >= 24
     hook = json.loads((box.home / ".cursor/hooks.json").read_text())["hooks"]["sessionStart"][0]["command"]
@@ -340,7 +340,7 @@ def test_access_command(box, monkeypatch, capsys):
     at_a_terminal(monkeypatch, "cursor")
     assert access.main("cursor", "everything", eng, say=out.append) == 0
     assert out[-1] == "Cursor now sees everything, personal notes too. Restart Cursor to load it."
-    entry = json.loads((box.home / ".cursor/mcp.json").read_text())["mcpServers"]["lflabs-memory"]
+    entry = json.loads((box.home / ".cursor/mcp.json").read_text())["mcpServers"]["dawnmere"]
     assert "LFLABS_MEMORY_CLIENT_KEY" in entry["env"]
     assert access.main("cursor", "work", eng, say=out.append) == 0 and out[-1] == "Cursor now sees work notes only."
     assert access.main("windsurf", "everything", eng, say=out.append) == 1
@@ -514,7 +514,7 @@ def test_access_widens_codex_as_it_widens_cursor(box, monkeypatch, capsys):
     assert access.main("codex", "everything", eng, say=out.append) == 0
     assert out[-1] == ("Codex now sees everything, personal notes too. Restart Codex to load it. Its prompts still get work "
                        "notes only; the rest it finds when it searches memory.")
-    env = tomllib.loads(toml.read_text())["mcp_servers"]["lflabs-memory"]["env"]
+    env = tomllib.loads(toml.read_text())["mcp_servers"]["dawnmere"]["env"]
     key = env["LFLABS_MEMORY_CLIENT_KEY"]
     assert len(key) >= 24 and env["LFLABS_MEMORY_CLIENT"] == "codex"
     assert tomllib.loads(toml.read_text())["mcp_servers"]["gh"] == {"command": "gh-mcp"} and 'model = "o5"' in \
@@ -528,7 +528,7 @@ def test_access_widens_codex_as_it_widens_cursor(box, monkeypatch, capsys):
     for b in box.home.rglob("*.lflabs-backup-*"):
         assert key not in b.read_text(), f"{b} holds Codex's key"
     assert access.main("codex", "everything", eng, say=out.append) == 0  # again: the key is replaced, not added twice
-    again = tomllib.loads(toml.read_text())["mcp_servers"]["lflabs-memory"]["env"]["LFLABS_MEMORY_CLIENT_KEY"]
+    again = tomllib.loads(toml.read_text())["mcp_servers"]["dawnmere"]["env"]["LFLABS_MEMORY_CLIENT_KEY"]
     assert again != key and toml.read_text().count("LFLABS_MEMORY_CLIENT_KEY") == 1
     assert uninstall.main(keep_data=True, out=lambda s: None) == 0
     assert toml.read_text() == mine
@@ -540,7 +540,7 @@ def test_codex_key_when_its_entry_has_another_shape(box, monkeypatch):
     from lflabs_memory_cli import access
     assert run_setup()[0] == 0
     toml = box.home / ".codex/config.toml"
-    inline = ('[mcp_servers.lflabs-memory]\ncommand = "npx"\nargs = ["-y", "dawnmere-connector@0.1.0"]\n'
+    inline = ('[mcp_servers.dawnmere]\ncommand = "npx"\nargs = ["-y", "dawnmere-connector@0.1.0"]\n'
               'env = { LFLABS_MEMORY_CLIENT = "codex" }\n')
     toml.write_text(inline)
     at_a_terminal(monkeypatch, "codex")
@@ -597,10 +597,10 @@ def claude_plugin_rewrites(home):
     s = dict(reversed(list(s.items())))
     if s.get("model") == "opus":
         s["model"] = "opus[1m]"
-    s["extraKnownMarketplaces"] = {"lflabs": {"source": {"source": "github", "repo": "Hadeva-Dev/dawnmere"}}}
-    s["enabledPlugins"] = {"lflabs-memory@lflabs": True}
+    s["extraKnownMarketplaces"] = {"dawnmere": {"source": {"source": "github", "repo": "Hadeva-Dev/dawnmere"}}}
+    s["enabledPlugins"] = {"dawnmere@dawnmere": True}
     (home / ".claude/settings.json").write_text(json.dumps(s, indent=2) + "\n")
-    cache = home / ".claude/plugins/cache/lflabs/lflabs-memory/0.1.6"
+    cache = home / ".claude/plugins/cache/dawnmere/dawnmere/0.1.10"
     cache.mkdir(parents=True)
     (cache / ".orphaned_at").write_text("1")
     (home / ".claude/plugins/known_marketplaces.json").write_text("{}")
@@ -618,7 +618,7 @@ def engine_connect(home):
     mcp = home / ".cursor/mcp.json"
     (mcp.parent / "mcp.json.lflabs-backup-20261101T000000Z").write_text(mcp.read_text())
     m = json.loads(mcp.read_text())
-    m["mcpServers"]["lflabs-memory"]["env"] = {"JARVIS_MEMORY_CLIENT": "cursor", "JARVIS_MEMORY_CLIENT_KEY": "k3y"}
+    m["mcpServers"]["dawnmere"]["env"] = {"JARVIS_MEMORY_CLIENT": "cursor", "JARVIS_MEMORY_CLIENT_KEY": "k3y"}
     m["mcpServers"]["lflabs-memory-2"] = {"command": "/u/bin/python", "args": ["/u/bin/lflabs-memory", "serve",
                                                                                "--client", "cursor"]}
     mcp.write_text(json.dumps(m, indent=2))
@@ -633,7 +633,7 @@ def test_uninstall_after_access_and_the_engines_connect_leaves_the_users_files(b
     claude_plugin_rewrites(box.home)
     at_a_terminal(monkeypatch, "cursor")
     assert access.main("cursor", "everything", layout.engine_bin(), say=lambda s: None) == 0
-    key = json.loads((box.home / ".cursor/mcp.json").read_text())["mcpServers"]["lflabs-memory"]["env"][
+    key = json.loads((box.home / ".cursor/mcp.json").read_text())["mcpServers"]["dawnmere"]["env"][
         "LFLABS_MEMORY_CLIENT_KEY"]
     for b in box.home.rglob("*.lflabs-backup-*"):
         assert key not in b.read_text(), f"{b} holds Cursor's key"
@@ -872,9 +872,9 @@ def test_self_check_waits_for_the_service_and_tries_again(box, monkeypatch, caps
 
 
 def marketplace_at(box, ref):
-    entry = {"name": "lflabs", "source": "github", "repo": "Hadeva-Dev/dawnmere", **({"ref": ref} if ref else {})}
+    entry = {"name": "dawnmere", "source": "github", "repo": "Hadeva-Dev/dawnmere", **({"ref": ref} if ref else {})}
     box.on("claude", ["plugin", "marketplace", "list", "--json"], 0, json.dumps([entry]))
-    box.on("claude", ["plugin", "list"], 0, "  lflabs-memory@lflabs  0.1.0  enabled\n")
+    box.on("claude", ["plugin", "list"], 0, "  dawnmere@dawnmere  0.1.0  enabled\n")
 
 
 @pytest.mark.parametrize("ref", [None, "v0.1.5"])
@@ -886,9 +886,9 @@ def test_rerun_pins_an_unpinned_marketplace(box, capsys, ref):
     version = importlib.metadata.version("lflabs-memory-cli")
     calls = [c for c in box.calls("claude") if c[:2] == ["plugin", "marketplace"] and c[2] != "list"]
     calls += [c for c in box.calls("claude") if c[:2] == ["plugin", "install"]]
-    assert calls == [["plugin", "marketplace", "remove", "lflabs"],
+    assert calls == [["plugin", "marketplace", "remove", "dawnmere"],
                      ["plugin", "marketplace", "add", f"Hadeva-Dev/dawnmere#v{version}", "--scope", "user"],
-                     ["plugin", "install", "lflabs-memory@lflabs", "--scope", "user", "-y"]]
+                     ["plugin", "install", "dawnmere@dawnmere", "--scope", "user", "-y"]]
 
 
 def test_rerun_leaves_a_marketplace_at_this_tag(box):
@@ -947,7 +947,7 @@ def test_plugin_takes_over_from_the_fallback(box):
     box.save()
     assert run_setup()[0] == 0
     assert (box.home / ".claude/settings.json").read_text() == '{"theme": "dark"}\n'
-    assert ["mcp", "remove", "--scope", "user", "lflabs-memory"] in box.calls("claude")
+    assert ["mcp", "remove", "--scope", "user", "dawnmere"] in box.calls("claude")
     assert not [f for f in json.loads(layout.install_json().read_text())["files"] if f["kind"] == "claude-settings"]
 
 
@@ -1139,8 +1139,8 @@ def test_imported_notes_stay_held_on_cancel(monkeypatch):
     _trust_env(monkeypatch, answer="not trusted (it needs Allow in the dialog)")
     out = []
     assert not setup.trust_imported("lflabs-memory", [5, 6], 1.0, _Args(False), out.append)
-    assert "kept for search until you confirm them" in out[0] and "lflabs-memory held" in out[0]
-    assert "lflabs-memory trust -- 5 6" in out[0]
+    assert "kept for search until you confirm them" in out[0] and "`dawnmere held`" in out[0]
+    assert "`dawnmere trust -- 5 6`" in out[0]
 
 
 def test_imported_notes_get_no_dialog_with_yes_no_terminal_or_an_agent(monkeypatch):
@@ -1213,7 +1213,7 @@ def test_other_mcp_apps_are_connected_when_found(box, capsys):
     code, out = run_setup()
     assert code == 0, out + capsys.readouterr().out
     for app, (_, _, path, key) in apps.MCP_ONLY.items():
-        entry = json.loads((box.home / path).read_text())[key]["lflabs-memory"]
+        entry = json.loads((box.home / path).read_text())[key]["dawnmere"]
         assert entry["args"] == ["-y", "dawnmere-connector@0.1.1"] and entry["env"] == {"LFLABS_MEMORY_CLIENT": app}
         assert ("type" in entry) == (key == "servers"), "VS Code's file names the transport"
     assert json.loads((box.home / ".gemini/settings.json").read_text())["theme"] == "dark"

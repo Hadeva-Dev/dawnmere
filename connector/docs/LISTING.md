@@ -45,12 +45,12 @@ Local server, published as the `.mcpb` from the GitHub release.
 
 ## Claude plugin directory (claude.ai/directory/manage)
 
-- **Plugin name:** lflabs-memory
+- **Plugin name:** dawnmere
 - **Source:** https://github.com/Hadeva-Dev/dawnmere (`plugin/.claude-plugin/plugin.json`, listed by the root `.claude-plugin/marketplace.json`)
 - **Short description:** One memory shared across your AI apps, kept on your Mac.
 - **Long description:** Dawnmere gives Claude Code the same memory as your other AI apps. It adds four tools (recall, remember, forget, access_status) that talk to Dawnmere on your Mac. The plugin stores nothing and sends nothing over the network. Early beta: it needs Dawnmere running on the same Mac.
 - **Category:** Productivity
-- **Install snippet:** `/plugin marketplace add Hadeva-Dev/dawnmere` then `/plugin install lflabs-memory@lflabs`
+- **Install snippet:** `/plugin marketplace add Hadeva-Dev/dawnmere` then `/plugin install dawnmere@dawnmere`, then `/dawnmere:setup`
 
 ## mcp.so (mcp.so/submit)
 
@@ -74,7 +74,7 @@ the description comes from the README's first paragraph.
 ```json
 {
   "mcpServers": {
-    "lflabs-memory": {
+    "dawnmere": {
       "command": "npx",
       "args": ["-y", "dawnmere-connector"]
     }
