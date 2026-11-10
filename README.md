@@ -335,8 +335,8 @@ programs use the LF Labs name, so these are all Dawnmere:
   Linux or Windows version.
 - **One Mac.** There is no sync between machines and no team memory.
 - **English works best.** Search runs on English models, so memories and questions in other languages, Chinese and
-  Japanese in particular, are found much less reliably for now. The typed save needs the English words
-  "remember that". Write memories and ask in English for the best results.
+  Japanese in particular, are found much less reliably for now. A typed save needs "remember that ..." (in
+  Chinese "记住：...", in Japanese "覚えておいて：..."). Write memories and ask in English for the best results.
 - **Saving is strongest from Claude Code.** In Codex, say "remember that ..."; in Cursor, the model has to call
   `remember`. Codex's own session files are read only if you run `dawnmere setup --codex-sessions`.
 - **Screening is automatic and can miss things.** Review what your apps save with `dawnmere export`.
