@@ -1221,7 +1221,7 @@ def test_other_mcp_apps_are_connected_when_found(box, capsys):
     assert (box.home / ".gemini/settings.json").read_text() == '{\n  "theme": "dark"\n}\n'
     for app, (_, _, path, _) in apps.MCP_ONLY.items():
         assert app == "gemini" or not (box.home / path).exists(), path
-    assert {"qwen-code", "kimi-cli", "qoder", "iflow", "cline"} <= set(apps.MCP_ONLY)
+    assert {"qwen-code", "kimi-code", "qoder", "iflow", "cline"} <= set(apps.MCP_ONLY)
 
 
 def test_other_mcp_apps_not_installed_are_left_alone(box, capsys):

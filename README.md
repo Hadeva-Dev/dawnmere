@@ -229,10 +229,10 @@ time, for example to add a model later.
 - **Cursor**: adds `lflabs-memory` to `~/.cursor/mcp.json` and a session-start hook to `~/.cursor/hooks.json`, then
   restart Cursor. Cursor sees work notes only until you run `dawnmere access cursor everything`;
   `dawnmere access cursor work` takes that back.
-- **Windsurf, Gemini CLI, VS Code (Copilot), Qwen Code, Kimi CLI, Qoder CLI, iFlow CLI and Cline CLI**: when setup
+- **Windsurf, Gemini CLI, VS Code (Copilot), Qwen Code, Kimi Code, Qoder CLI, iFlow CLI and Cline CLI**: when setup
   finds one, it adds `lflabs-memory` to its MCP file (`~/.codeium/windsurf/mcp_config.json`,
   `~/.gemini/settings.json`, `~/Library/Application Support/Code/User/mcp.json`, `~/.qwen/settings.json`,
-  `~/.kimi/mcp.json`, `~/.qoder/settings.json`, `~/.iflow/settings.json`,
+  `~/.kimi-code/mcp.json`, `~/.qoder/settings.json`, `~/.iflow/settings.json`,
   `~/.cline/data/settings/cline_mcp_settings.json`); restart the app. They get the tools and no hook, so they recall
   when they call the tool, and they see work notes only.
 - **Claude Desktop and other MCP apps**: setup does not connect them. For Claude Desktop, open

@@ -179,7 +179,7 @@ sh install.sh
   <!-- checked against v0.1.6 (406ee39/c3ed5b1): the plugin pins to the release tag. -->
 - **Codex**：`~/.codex/config.toml` に `[mcp_servers.lflabs-memory]` を、`~/.codex/hooks.json` にプロンプトフックを追加します。Codex で一度 `/hooks` と入力し、フックを信頼してください。
 - **Cursor**：`~/.cursor/mcp.json` に `lflabs-memory` を、`~/.cursor/hooks.json` にセッション開始フックを追加します。そのあと Cursor を再起動してください。`dawnmere access cursor everything` を実行するまで、Cursor は仕事用のメモしか見られません。`dawnmere access cursor work` で元に戻せます。
-- **Windsurf、Gemini CLI、VS Code（Copilot）、Qwen Code、Kimi CLI、Qoder CLI、iFlow CLI、Cline CLI**：セットアップがこれらを見つけると、それぞれの MCP 設定ファイル（`~/.codeium/windsurf/mcp_config.json`、`~/.gemini/settings.json`、`~/Library/Application Support/Code/User/mcp.json`、`~/.qwen/settings.json`、`~/.kimi/mcp.json`、`~/.qoder/settings.json`、`~/.iflow/settings.json`、`~/.cline/data/settings/cline_mcp_settings.json`）に `lflabs-memory` を追加します。そのあとアプリを再起動してください。追加されるのはツールだけでフックはないため、ツールを呼び出したときにだけ思い出し、見られるのは仕事用のメモだけです。
+- **Windsurf、Gemini CLI、VS Code（Copilot）、Qwen Code、Kimi Code、Qoder CLI、iFlow CLI、Cline CLI**：セットアップがこれらを見つけると、それぞれの MCP 設定ファイル（`~/.codeium/windsurf/mcp_config.json`、`~/.gemini/settings.json`、`~/Library/Application Support/Code/User/mcp.json`、`~/.qwen/settings.json`、`~/.kimi-code/mcp.json`、`~/.qoder/settings.json`、`~/.iflow/settings.json`、`~/.cline/data/settings/cline_mcp_settings.json`）に `lflabs-memory` を追加します。そのあとアプリを再起動してください。追加されるのはツールだけでフックはないため、ツールを呼び出したときにだけ思い出し、見られるのは仕事用のメモだけです。
 - **Claude Desktop とそのほかの MCP アプリ**：セットアップでは接続しません。Claude Desktop の場合は、[最新の release](https://github.com/Hadeva-Dev/dawnmere/releases/latest) から `dawnmere-connector.mcpb` を開くか、次の内容を `~/Library/Application Support/Claude/claude_desktop_config.json` に追加してください。
 
   ```json

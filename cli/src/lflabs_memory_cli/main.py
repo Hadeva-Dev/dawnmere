@@ -103,7 +103,7 @@ def parser():
             sp.add_argument("--backend", choices=("claude-cli", "anthropic-api", "none"))
             sp.add_argument("--model", choices=("haiku", "sonnet"),
                             help="sonnet remembers a few more of your rules, at about 10 times the usage")
-            sp.add_argument("--only", help="apps to connect: claude-code,codex,cursor,windsurf,gemini,copilot,qwen-code,kimi-cli,qoder,iflow,cline")
+            sp.add_argument("--only", help="apps to connect: claude-code,codex,cursor,windsurf,gemini,copilot,qwen-code,kimi-code,qoder,iflow,cline")
             sp.add_argument("--codex-sessions", action="store_true", help="also read Codex's saved sessions")
             sp.add_argument("--no-import", action="store_true", help="do not import Claude Code's memory files")
             sp.add_argument("--dry-run", action="store_true", help="show every change, make none")
