@@ -202,14 +202,15 @@ def plan_mcp_json(app, client, path, key="mcpServers", client_key=None):
         return Plan(app, "mcp-json", path, "error", str(e), json.dumps({SERVER: _mcp_entry(client)}, indent=2))
 
 
-def codex_block(client="codex"):
+def codex_block(client="codex", key=None):
     args = ", ".join(json.dumps(a) for a in connector_args())
     return (f"[mcp_servers.{SERVER}]\ncommand = \"npx\"\nargs = [{args}]\n\n"
-            f"[mcp_servers.{SERVER}.env]\n{CLIENT_ENV} = {json.dumps(client)}\n")
+            f"[mcp_servers.{SERVER}.env]\n{CLIENT_ENV} = {json.dumps(client)}\n"
+            + (f"{KEY_ENV} = {json.dumps(key)}\n" if key else ""))
 
 
-def plan_codex_toml(path):
-    block = codex_block()
+def plan_codex_toml(path, client_key=None):
+    block = codex_block(key=client_key)
     try:
         old = edits.read(path)
         servers = edits.load_toml(old).get("mcp_servers") or {}
@@ -222,7 +223,7 @@ def plan_codex_toml(path):
         new = edits.append_toml(old, block)
         return Plan("codex", "codex-toml", path, "add", f"add [mcp_servers.{SERVER}]", block, new, old, block)
     except Skip as e:
-        return Plan("codex", "codex-toml", path, "error", str(e), block)
+        return Plan("codex", "codex-toml", path, "error", str(e), codex_block())
 
 
 def _hooks_add(app, kind, path, data, old, adds, note):
