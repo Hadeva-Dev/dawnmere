@@ -2,6 +2,7 @@
 import json
 import os
 import re
+import shutil
 import sqlite3
 import tempfile
 import time
@@ -254,8 +255,14 @@ def check_claude():
         text = (home() / ".claude/settings.json").read_text()
     except OSError:
         text = ""
-    if "hook-prompt" in text and "lflabs-memory" in text:
-        return Check("Claude Code", "ok", "hooks in ~/.claude/settings.json")
+    if "hook-prompt" in text and "lflabs-memory" in text:  # setup's fallback: the tools come from `claude mcp add`
+        if shutil.which("claude") is None:
+            return Check("Claude Code", "warn", "hooks only, no MCP tools (the claude command was not found)",
+                         f"install Claude Code's claude command, then run {COMMAND} setup again")
+        if not run(["claude", "mcp", "get", SERVER], timeout=30).ok:
+            return Check("Claude Code", "warn", "hooks only, no MCP tools (claude mcp add failed)",
+                         f"run {COMMAND} setup again")
+        return Check("Claude Code", "ok", "MCP + hooks in ~/.claude/settings.json")
     return Check("Claude Code", "warn", "not connected", f"run {COMMAND} setup")
 
 

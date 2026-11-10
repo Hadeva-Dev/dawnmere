@@ -73,6 +73,16 @@ def engine_bin():
     return str(sibling) if sibling.exists() else None
 
 
+BREW_FORMULA = "hadeva-dev/tap/dawnmere"  # the tap's formula: its caveats give the same two commands
+
+
+def homebrew(package=None):
+    """Whether this program was installed by the Homebrew formula: the package's real path is in a Cellar (the keg's
+    own virtualenv). Homebrew then owns the programs: update and uninstall leave them to brew. Not told from the
+    Python's path: a uv tool install may run Homebrew's python@3.12, which lives in the Cellar too."""
+    return "/Cellar/" in os.path.realpath(package or __file__)
+
+
 def uv_bin():
     """uv: the one on PATH, else the one install.sh puts in ~/.local/bin (often not on PATH yet). None when neither."""
     found = shutil.which("uv")
