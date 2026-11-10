@@ -156,7 +156,8 @@ def agent_shell(env=None):
 
 # Processes an AI app runs commands under, and how they are looked up: the engine's own list (access.AGENT_PROCS),
 # /bin/ps by its absolute path with a fixed PATH, so nothing an agent put on PATH answers instead.
-AGENT_PROCS = ("claude", "codex", "cursor", "cursor helper", "node", "windsurf", "copilot", "aider", "goose")
+AGENT_PROCS = ("claude", "codex", "cursor", "cursor helper", "node", "windsurf", "copilot", "aider", "goose",
+               "gemini", "qwen", "kimi", "qoder", "qodercli", "iflow", "cline", "trae", "codebuddy", "opencode")  # the apps setup wires, and their kin
 PS, SAFE_ENV = "/bin/ps", {"PATH": "/usr/bin:/bin"}
 
 
