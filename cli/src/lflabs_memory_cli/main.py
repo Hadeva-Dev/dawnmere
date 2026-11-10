@@ -143,8 +143,9 @@ def parser():
             sp.add_argument("--backend", choices=("claude-cli", "anthropic-api", "codex-cli", "openai-api", "none"),
                             help="what reads in the background: your Claude plan, an Anthropic key, your ChatGPT "
                                  "plan through Codex, another provider's key (--provider), or nothing")
-            sp.add_argument("--provider", help="with --backend openai-api: openai, gemini, deepseek, kimi, qwen, glm, "
-                                               "doubao, openrouter or ollama (the key: asked, or $DAWNMERE_API_KEY)")
+            sp.add_argument("--provider", help="with --backend openai-api: openai, gemini, deepseek, kimi, kimi-cn, "
+                                               "qwen, qwen-intl, glm, zai, doubao, siliconflow, openrouter or ollama "
+                                               "(the key: asked, or $DAWNMERE_API_KEY)")
             sp.add_argument("--api-base", help="with --backend openai-api: any other OpenAI-compatible address")
             sp.add_argument("--api-model", help="with --backend openai-api: the model to use there")
             sp.add_argument("--model", choices=("haiku", "sonnet"),

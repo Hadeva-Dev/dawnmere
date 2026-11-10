@@ -1326,3 +1326,18 @@ def test_a_key_that_does_not_work_is_not_kept(box, monkeypatch, capsys):
     assert 'backend = "none"' in (layout.data_dir() / "config.toml").read_text()
     assert "Kimi (Moonshot) did not answer" in out and "sk-bad" not in out
     assert not [c for c in box.calls("security") if c[:1] == ["-i"]]
+
+
+def test_a_provider_without_its_own_model_needs_one_named(box, monkeypatch, capsys):
+    from lflabs_memory_cli import backend
+    box.remove("claude")
+    codex_ready(box, monkeypatch, logged="Not logged in")
+    tried = []
+    monkeypatch.setattr(backend, "provider_ping", lambda *a: tried.append(a) or (True, ""))
+    code, out = run_setup("--backend", "openai-api", "--provider", "ollama")
+    assert 'backend = "none"' in (layout.data_dir() / "config.toml").read_text() and "--api-model" in out
+    code, out = run_setup("--backend", "openai-api", "--provider", "ollama", "--api-model", "qwen3:8b")
+    cfg = (layout.data_dir() / "config.toml").read_text()
+    assert tried == [("ollama", "", "", "qwen3:8b")], "a model on this Mac: no key asked for"
+    assert 'provider = "ollama"' in cfg and 'main_model = "qwen3:8b"' in cfg and 'cheap_model = "qwen3:8b"' in cfg
+    assert "Background reading: Ollama on this Mac, up to" in out

@@ -104,6 +104,11 @@ def ask_key(a, say, yes):
     if not key and not local:
         say(f"No key given for {name}: memory will run without a model for now.")
         return
+    if a.provider in backend.NEEDS_MODEL and not a.api_model:
+        a.api_model = "" if yes else prompt.text(f"Which model at {name}? (its id, as {name} writes it)", "").strip()
+        if not a.api_model:
+            say(f"{name} needs a model named (--api-model): memory will run without a model for now.")
+            return
     ok, note = backend.provider_ping(a.provider, key, a.api_base, a.api_model)
     if not ok:
         say(f"{name} did not answer ({note}).")

@@ -72,8 +72,11 @@ def claude_endpoint(env=None, settings_files=None):
 MIN_CODEX = (0, 160, 0)  # the engine's llm.MIN_CODEX
 # OpenAI-compatible providers the engine knows (llm.PROVIDERS has their addresses and models): the names setup shows
 PROVIDERS = {"openai": "OpenAI", "gemini": "Google Gemini", "deepseek": "DeepSeek", "kimi": "Kimi (Moonshot)",
-             "qwen": "Qwen (Alibaba)", "glm": "GLM (Zhipu)", "doubao": "Doubao (Volcengine)",
-             "openrouter": "OpenRouter", "ollama": "Ollama on this Mac"}
+             "kimi-cn": "Kimi (Moonshot, moonshot.cn)", "qwen": "Qwen (Alibaba)",
+             "qwen-intl": "Qwen (Alibaba, international)", "glm": "GLM (Zhipu)", "zai": "GLM (Z.ai)",
+             "doubao": "Doubao (Volcengine)", "siliconflow": "SiliconFlow", "openrouter": "OpenRouter",
+             "ollama": "Ollama on this Mac"}
+NEEDS_MODEL = ("doubao", "siliconflow", "openrouter", "ollama")  # no model of their own in llm.PROVIDERS: ask for one
 OTHER = "openai-compatible"  # the Keychain name of a key for an address the user typed (llm.OpenAICompat.account)
 
 
