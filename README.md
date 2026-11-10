@@ -348,9 +348,11 @@ programs use the LF Labs name, so these are all Dawnmere:
 - **Mac only**, Apple silicon, macOS 14 or later. The engine's ONNX runtime has no Intel Mac build, and there is no
   Linux or Windows version.
 - **One Mac.** There is no sync between machines and no team memory.
-- **English works best.** Search runs on English models, so memories and questions in other languages, Chinese and
-  Japanese in particular, are found much less reliably for now. A typed save needs "remember that ..." (in
-  Chinese "记住：...", in Japanese "覚えておいて：..."). Write memories and ask in English for the best results.
+- **Chinese and Japanese recall matches words.** A note saved in Chinese or Japanese reaches your prompts when you ask
+  with some of the same words. A question worded differently is often missed; your app can still search for it. With
+  a model set up, a Chinese or Japanese question is also searched in English, one small model call each. A typed save
+  needs "remember that ..." (in Chinese "记住：...", in Japanese "覚えておいて：..."). Other languages are found much
+  less reliably for now.
 - **Saving is strongest from Claude Code.** In Codex, say "remember that ..."; in Cursor, the model has to call
   `remember`. Codex's own session files are read only if you run `dawnmere setup --codex-sessions`.
 - **Screening is automatic and can miss things.** Review what your apps save with `dawnmere export`.
