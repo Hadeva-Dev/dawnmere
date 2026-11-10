@@ -220,6 +220,8 @@ sh install.sh
 ## 忘れさせる（forget）
 
 自分でメモリを忘れさせた場合（Claude Code や Codex で "forget memory 12" と入力するか、ターミナルで `lflabs-memory forget 12` を実行）、その本文、検索用のエントリ、古いバージョン、そこから取り出された事実が、返答が終わるとメモリファイルとそのバックアップから削除されます（Codex で入力した場合は、そこで次のプロンプトを送ったときです）。元には戻せません。バックグラウンドでの読み取りがオンの場合は、その言葉に触れているほかのメモをバックグラウンドの処理が見つけられるよう、言葉だけが最大 24 時間残り、そのあと消去されます。アプリが自分で `forget` を呼んだ場合、そのメモリはすぐに非表示になり、24 時間後に完全に削除されます。それまでは `lflabs-memory restore 12` で元に戻せます。言葉を含まないフィンガープリントだけは残るので、古いチャットから同じことがもう一度保存されることはありません。`dawnmere uninstall` でメモリ全体を削除することもできます（先に確認します）。
+
+Claude Code も独自のメモリファイル（`~/.claude/projects/` 以下）を保存しています。Dawnmere でメモを忘れさせても、それらは削除されません。そちらのメモも削除するか、Claude Code に忘れるよう頼んでください。
 <!-- checked against v0.1.6 (406ee39/c3ed5b1): your own forget is a real delete (words kept up to 24 h when a model
      is on); an app's forget hides the memory, deletes it after 24 h, and `restore` brings it back until then. Before
      v0.1.6 every forget was a soft delete with `lflabs-memory purge` and `restore` (mem.py:1787-1790, 1954-1973). -->

@@ -220,6 +220,8 @@ sh install.sh
 ## 遗忘
 
 你自己遗忘一条记忆时（在 Claude Code 或 Codex 里输入 "forget memory 12"，或在终端里运行 `lflabs-memory forget 12`），它的文本、搜索条目、旧版本以及从中提取出的事实，会在回复结束时从记忆文件及其备份中删除（在 Codex 里输入的，要等你在那里发下一条提示词），无法找回。如果开启了后台阅读，这些文字最多会保留 24 小时，好让后台任务找到提到它们的其他笔记，之后就会被抹掉。应用自己调用 `forget` 时，这条记忆会立即隐藏，24 小时后彻底删除；在那之前，`lflabs-memory restore 12` 可以把它找回。会留下一个不含任何文字的指纹，这样同一件事就不会从旧对话里再被存一次。`dawnmere uninstall` 也可以删除全部记忆（会先问你）。
+
+Claude Code 自己也会保存记忆文件（在 `~/.claude/projects/` 下）；在 Dawnmere 里遗忘一条笔记不会删除它们。请在那里也删除这条笔记，或者让 Claude Code 把它忘掉。
 <!-- checked against v0.1.6 (406ee39/c3ed5b1): your own forget is a real delete (words kept up to 24 h when a model
      is on); an app's forget hides the memory, deletes it after 24 h, and `restore` brings it back until then. Before
      v0.1.6 every forget was a soft delete with `lflabs-memory purge` and `restore` (mem.py:1787-1790, 1954-1973). -->
