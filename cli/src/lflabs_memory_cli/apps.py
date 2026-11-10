@@ -26,12 +26,21 @@ from .run import run
 
 KEY_ENV = "LFLABS_MEMORY_CLIENT_KEY"  # an app trusted with more than work only carries its key (access.py)
 
-LABELS = {"claude-code": "Claude Code", "codex": "Codex", "cursor": "Cursor"}
-DEFAULT = ("claude-code", "codex", "cursor")
+# Apps that get the MCP entry and nothing else (no hook: they recall when they call the tool). Each: its label, the
+# folder that shows it is installed, its MCP file and the key our entry goes under there. The client names are the
+# engine's (connect_apps.APPS). An app named only by its config is held to work notes, like Cursor.
+LIB = "Library/Application Support"
+MCP_ONLY = {"windsurf": ("Windsurf", ".codeium/windsurf", ".codeium/windsurf/mcp_config.json", "mcpServers"),
+            "gemini": ("Gemini CLI", ".gemini", ".gemini/settings.json", "mcpServers"),
+            "copilot": ("VS Code", f"{LIB}/Code/User", f"{LIB}/Code/User/mcp.json", "servers")}
+LABELS = {"claude-code": "Claude Code", "codex": "Codex", "cursor": "Cursor",
+          **{app: v[0] for app, v in MCP_ONLY.items()}}
+DEFAULT = ("claude-code", "codex", "cursor", *MCP_ONLY)
 # Claude Code's hooks (the plugin's hooks/hooks.json, and the fallback in ~/.claude/settings.json)
 CLAUDE_HOOKS = (("UserPromptSubmit", "hook-prompt", 10), ("SessionStart", "hook-session-start", 120),
                 ("Stop", "hook-activity", 10), ("SessionEnd", "hook-session-end", 10))
-HINTS = {"codex": "type /hooks once", "cursor": "restart Cursor"}
+HINTS = {"codex": "type /hooks once", "cursor": "restart Cursor", "windsurf": "restart Windsurf",
+         "gemini": "restart Gemini CLI", "copilot": "restart VS Code"}
 MIN_NODE = 18                # the connector's package.json engines
 NODE_FIX = "install Node.js 18 or later from nodejs.org"
 
@@ -177,8 +186,10 @@ def engine_cmd(engine, sub, client=None):
 
 # ---------- plans: what setup adds ----------
 
-def _mcp_entry(client, key=None):
-    return {"command": "npx", "args": connector_args(), "env": {CLIENT_ENV: client, **({KEY_ENV: key} if key else {})}}
+def _mcp_entry(client, key=None, under="mcpServers"):
+    entry = {"command": "npx", "args": connector_args(),
+             "env": {CLIENT_ENV: client, **({KEY_ENV: key} if key else {})}}
+    return {"type": "stdio", **entry} if under == "servers" else entry  # VS Code's mcp.json names the transport
 
 
 def plan_mcp_json(app, client, path, key="mcpServers", client_key=None):
@@ -194,12 +205,12 @@ def plan_mcp_json(app, client, path, key="mcpServers", client_key=None):
         if SERVER in servers:
             return Plan(app, "mcp-json", path, "stale", f"has another {SERVER} entry: left alone (remove it and rerun)")
         new = json.loads(json.dumps(data))
-        new.setdefault(key, {})[SERVER] = _mcp_entry(client, client_key)
-        added = json.dumps({SERVER: _mcp_entry(client, client_key)}, indent=2)
+        new.setdefault(key, {})[SERVER] = _mcp_entry(client, client_key, key)
+        added = json.dumps({SERVER: _mcp_entry(client, client_key, key)}, indent=2)
         return Plan(app, "mcp-json", path, "add", f'add {key}."{SERVER}"', added, edits.dump_json(new, old or ""), old,
                     added)
     except Skip as e:
-        return Plan(app, "mcp-json", path, "error", str(e), json.dumps({SERVER: _mcp_entry(client)}, indent=2))
+        return Plan(app, "mcp-json", path, "error", str(e), json.dumps({SERVER: _mcp_entry(client, under=key)}, indent=2))
 
 
 def codex_block(client="codex", key=None):
@@ -296,13 +307,17 @@ def file_plans(app, engine, h=None):
                 plan_cursor_hooks(h / ".cursor/hooks.json", engine)]
     if app == "claude-code":
         return [plan_claude_settings(h / ".claude/settings.json", engine)]
+    if app in MCP_ONLY:
+        _, _, path, key = MCP_ONLY[app]
+        return [plan_mcp_json(app, app, h / path, key)]
     raise ValueError(app)
 
 
 def installed(app, h=None):
     """Whether an app is on this Mac: its folder exists (Claude Code also needs the claude command)."""
     h = h or home()
-    return (h / {"claude-code": ".claude", "codex": ".codex", "cursor": ".cursor"}[app]).is_dir()
+    folders = {"claude-code": ".claude", "codex": ".codex", "cursor": ".cursor", **{a: v[1] for a, v in MCP_ONLY.items()}}
+    return (h / folders[app]).is_dir()
 
 
 # ---------- reverse plans: what uninstall takes out ----------
@@ -383,7 +398,7 @@ def unplan(entry, h=None):
             return Plan(app, kind, path, "remove", f"remove [mcp_servers.{SERVER}]", new=new, old=old)
         data = edits.load_json(old)
         if kind == "mcp-json":
-            key = entry.get("key", "mcpServers")
+            key = entry.get("key") or (MCP_ONLY[app][3] if app in MCP_ONLY else "mcpServers")
             servers = data.get(key) if isinstance(data.get(key), dict) else {}
             mine = [k for k, v in servers.items() if ours_server(v)]
             if not mine:
@@ -412,7 +427,8 @@ def discover(h=None):
             {"app": "codex", "kind": "codex-hooks", "path": str(h / ".codex/hooks.json")},
             {"app": "cursor", "kind": "mcp-json", "path": str(h / ".cursor/mcp.json")},
             {"app": "cursor", "kind": "cursor-hooks", "path": str(h / ".cursor/hooks.json")},
-            {"app": "claude-code", "kind": "claude-settings", "path": str(h / ".claude/settings.json")}]
+            {"app": "claude-code", "kind": "claude-settings", "path": str(h / ".claude/settings.json")},
+            *({"app": a, "kind": "mcp-json", "path": str(h / v[2])} for a, v in MCP_ONLY.items())]
 
 
 def apply(plan, record):
