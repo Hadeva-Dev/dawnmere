@@ -282,7 +282,7 @@ class RealSetup:
         for app, row in zip(order, shown):
             row.status = "running"
             ui.apps(shown)
-            how, hint, ok = getattr(self, f"wire_{app.replace('-', '_')}", lambda app=app: self.wire_mcp_only(app))()
+            how, hint, ok = getattr(self, f"wire_{app.replace('-', '_')}")()
             row.how, row.hint, row.status = how, hint, "ok" if ok else "failed"
             if ok:
                 self.connected.append(row.name)
@@ -364,10 +364,6 @@ class RealSetup:
     def wire_cursor(self):  # work only: a yes to personal notes is confirmed after the screen (access.main)
         changed, fine = self._apply(apps.file_plans("cursor", self.engine))
         return "MCP", apps.HINTS["cursor"] if changed else None, fine
-
-    def wire_mcp_only(self, app):  # Windsurf, Gemini CLI, VS Code: the MCP entry, held to work notes
-        changed, fine = self._apply(apps.file_plans(app, self.engine))
-        return "MCP", apps.HINTS[app] if changed else None, fine
 
     def step_notes(self, ui):
         ui.step("Your notes", "running")

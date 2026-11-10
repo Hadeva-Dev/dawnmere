@@ -508,7 +508,7 @@ def cut(text, limit):
 
 
 def _try_lines(width, names):
-    first = next((n for n in ("Claude Code", "Codex") if n in names), names[0])
+    first = "Claude Code" if "Claude Code" in names else names[0]
     others = [n for n in names if n != first]
     other = "Cursor" if "Cursor" in others else others[0] if others else "it"
     head, tail = f"Try it: in {first}, say “remember that …”,", f"then ask {other} in a new chat."
@@ -563,10 +563,7 @@ def _memory_lines(state, names):
     if not mem:
         # Cursor has no prompt hook: a note told to Cursor is its model's own save and waits for the user's confirmation,
         # so the line names only the apps whose typed notes do reach the others
-        # (the same holds for Windsurf, Gemini CLI and VS Code, which get the tools and no hook)
-        told = [n for n in names if n in ("Claude Code", "Codex")]
-        if not told:
-            return [IND + paint(GREY, "Your apps now share one memory.")]
+        told = [n for n in names if n != "Cursor"] or names
         return [IND + paint(GREY, f"What you tell {' or '.join(told)} now reaches the others.")]
     tail = "  is now in both" if len(names) == 2 else f"  is now in all {len(names)}"
     return [IND + paint(NAME, f"“{cut(mem, room - 2 - len(tail))}”") + paint(GREY, tail)]
