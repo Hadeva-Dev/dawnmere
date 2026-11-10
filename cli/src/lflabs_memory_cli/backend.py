@@ -4,11 +4,14 @@ The engine's own llm.status() decides once setup has run; until then (and as a f
 checks: the claude version against MIN_CLAUDE, and a one-token ping that also tells whether it is logged in.
 """
 import json
+import os
 import re
 import urllib.error
+import urllib.parse
 import urllib.request
 from dataclasses import dataclass
 
+from . import layout
 from .layout import MIN_CLAUDE
 from .run import run
 
@@ -18,6 +21,52 @@ NONE_LOSES = "recall and remember work; automatic saving, claims, handoffs and t
 # claude -p with nothing of the user's loaded: no hooks (ours would recall into the ping), no MCP, no tools
 QUIET = ["--no-session-persistence", "--strict-mcp-config", "--tools", "", "--setting-sources", "",
          "--disable-slash-commands"]
+
+
+# What points Claude Code at another endpoint or provider (the engine's llm.routed, kept the same): never passed to our
+# own claude runs, so a ping says whether the user's Claude plan works, not another provider's endpoint.
+ROUTING_PREFIXES = ("ANTHROPIC_", "VERTEX_REGION_CLAUDE_")
+ROUTING_VARS = {"CLAUDE_CODE_USE_BEDROCK", "CLAUDE_CODE_USE_VERTEX", "CLAUDE_CODE_USE_FOUNDRY",
+                "CLAUDE_CODE_SKIP_BEDROCK_AUTH", "CLAUDE_CODE_SKIP_VERTEX_AUTH", "CLAUDE_CODE_SKIP_FOUNDRY_AUTH",
+                "AWS_BEARER_TOKEN_BEDROCK", "CLOUD_ML_REGION"}
+ENDPOINT_NOTE = "Claude Code is set to use {host}: background reading needs a Claude login for now"
+
+
+def plain_env(env=None):
+    """This environment less what reroutes Claude Code (ROUTING_PREFIXES, ROUTING_VARS)."""
+    return {k: v for k, v in (os.environ if env is None else env).items()
+            if not (k.startswith(ROUTING_PREFIXES) or k in ROUTING_VARS)}
+
+
+def claude_endpoint(env=None, settings_files=None):
+    """The host Claude Code is set to use instead of Anthropic: ANTHROPIC_BASE_URL in Claude Code's settings.json "env"
+    (~/.claude, or CLAUDE_CONFIG_DIR's), which Claude Code applies over the shell's, else in this environment; None
+    when it is Anthropic's own or unset, or a file cannot be read. The host only, never a path, token or key."""
+    env = os.environ if env is None else env
+    if settings_files is None:
+        settings_files = [layout.home() / ".claude" / "settings.json"]
+        if env.get("CLAUDE_CONFIG_DIR"):
+            settings_files.insert(0, os.path.join(os.path.expanduser(env["CLAUDE_CONFIG_DIR"]), "settings.json"))
+    urls = []
+    for f in settings_files:
+        try:
+            data = json.loads(open(f, encoding="utf-8").read())
+        except (OSError, ValueError):
+            continue  # missing or malformed: it says nothing
+        if isinstance(data, dict) and isinstance(data.get("env"), dict):
+            urls.append(data["env"].get("ANTHROPIC_BASE_URL"))
+    urls.append(env.get("ANTHROPIC_BASE_URL"))
+    for url in urls:
+        if not isinstance(url, str) or not url.strip():
+            continue
+        url = url.strip()
+        try:
+            host = urllib.parse.urlsplit(url if "//" in url else "//" + url).hostname
+        except ValueError:
+            continue
+        if host and host != "api.anthropic.com":
+            return host
+    return None
 
 
 @dataclass
@@ -59,7 +108,7 @@ def claude_version():
 def claude_ping(model="haiku"):
     """(logged in, note): one tiny call through the user's own plan."""
     r = run(["claude", "-p", "--model", model, *QUIET, "--output-format", "json", "Reply with the word ok."],
-            timeout=90)
+            timeout=90, env=plain_env())  # the user's Claude plan, never an endpoint Claude Code was pointed at
     text = (r.out + r.err).lower()
     if "/login" in text or "not logged in" in text or "invalid api key" in text:
         return False, "Claude Code is not logged in: run claude, then /login"

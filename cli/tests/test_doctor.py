@@ -975,3 +975,73 @@ def test_doctor_rows_for_other_mcp_apps(mac, monkeypatch, tmp_path, connector):
     (mac.home / ".gemini/settings.json").write_text(
         '{"mcpServers": {"lflabs-memory": {"command": "npx", "args": ["-y", "dawnmere-connector@0.1.1"]}}}')
     assert re.search(r"Gemini CLI\s+ok\s+MCP, work only", run_doctor()[1])
+
+
+# ---------- Claude Code pointed at another provider (0.1.9) ----------
+
+ENDPOINT = "https://api.moonshot.ai/anthropic"
+
+
+def test_endpoint_from_the_environment():
+    assert backend.claude_endpoint({"ANTHROPIC_BASE_URL": ENDPOINT, "ANTHROPIC_AUTH_TOKEN": "sk-secret"},
+                                   settings_files=[]) == "api.moonshot.ai"
+    assert backend.claude_endpoint({"ANTHROPIC_BASE_URL": "open.bigmodel.cn/api/anthropic"},
+                                   settings_files=[]) == "open.bigmodel.cn"  # no scheme
+
+
+def test_endpoint_from_claude_codes_settings(tmp_path):
+    f = tmp_path / "settings.json"
+    f.write_text(json.dumps({"theme": "dark", "env": {"ANTHROPIC_BASE_URL": "https://api.deepseek.com/anthropic",
+                                                      "ANTHROPIC_AUTH_TOKEN": "sk-secret"}}))
+    assert backend.claude_endpoint({}, settings_files=[f]) == "api.deepseek.com"
+
+
+def test_settings_win_over_the_shells_anthropic_url(tmp_path):
+    f = tmp_path / "settings.json"
+    f.write_text(json.dumps({"env": {"ANTHROPIC_BASE_URL": "https://api.deepseek.com/anthropic"}}))
+    assert backend.claude_endpoint({"ANTHROPIC_BASE_URL": "https://api.anthropic.com"}, settings_files=[f]) \
+        == "api.deepseek.com"
+
+
+def test_no_endpoint_and_anthropics_own(tmp_path):
+    f = tmp_path / "settings.json"
+    f.write_text(json.dumps({"env": {"DISABLE_TELEMETRY": "1"}}))
+    assert backend.claude_endpoint({}, settings_files=[f]) is None
+    assert backend.claude_endpoint({}, settings_files=[tmp_path / "missing.json"]) is None
+    assert backend.claude_endpoint({"ANTHROPIC_BASE_URL": "https://api.anthropic.com"}, settings_files=[]) is None
+
+
+def test_a_malformed_settings_file_says_nothing(tmp_path):
+    for text in ("{not json", '["a list"]', '{"env": "a string"}', '{"env": {"ANTHROPIC_BASE_URL": 5}}'):
+        f = tmp_path / "settings.json"
+        f.write_text(text)
+        assert backend.claude_endpoint({}, settings_files=[f]) is None, text
+
+
+def test_the_ping_never_goes_to_the_endpoint(monkeypatch):
+    from lflabs_memory_cli.run import Result
+    seen = []
+    monkeypatch.setattr(backend, "run", lambda argv, timeout=60, env=None, **k: seen.append(env) or Result(0, '{"is_error": false}', ""))
+    monkeypatch.setenv("ANTHROPIC_BASE_URL", ENDPOINT)
+    monkeypatch.setenv("ANTHROPIC_AUTH_TOKEN", "sk-secret")
+    monkeypatch.setenv("CLAUDE_CODE_USE_BEDROCK", "1")
+    backend.claude_ping()
+    assert seen and not [k for k in seen[0] if k.startswith("ANTHROPIC_") or k == "CLAUDE_CODE_USE_BEDROCK"]
+    assert seen[0]["PATH"] == os.environ["PATH"]
+
+
+def _model_row(monkeypatch, logged_in):
+    monkeypatch.setattr(backend, "claude_endpoint", lambda *a, **k: "api.moonshot.ai")
+    monkeypatch.setattr(backend, "engine_status", lambda ping=False: backend.Status(
+        "claude-cli", bool(logged_in), "2.1.301", logged_in, "" if logged_in else "Claude Code is not logged in"))
+    monkeypatch.setattr(layout, "find_claude", lambda: "/usr/local/bin/claude")
+    return doctor.check_model({"llm": {"backend": "claude-cli", "main_model": "haiku"}})
+
+
+def test_doctor_says_where_claude_code_points(monkeypatch):
+    row = _model_row(monkeypatch, logged_in=False)
+    assert row.state == "warn"
+    assert row.note.startswith("Claude Code is set to use api.moonshot.ai: background reading needs a Claude login")
+    assert "/login" not in row.note + row.fix and "sk-" not in row.note
+    row = _model_row(monkeypatch, logged_in=True)
+    assert row.state == "ok" and "Claude Code itself is set to use api.moonshot.ai" in row.note

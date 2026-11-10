@@ -190,6 +190,12 @@ def check_model(cfg, ping=True):
             return Check("model", "warn", "Claude Code is not installed",
                          f"install Claude Code, then run {COMMAND} setup again")
     s = backend.engine_status(ping) or (backend.claude_status(llm["main_model"], ping) if name == "claude-cli" else None)
+    host = backend.claude_endpoint() if name == "claude-cli" else None
+    if host:  # Claude Code itself uses another provider: memory's own reading needs a Claude login (engine 0.1.7)
+        if s is not None and s.ok and s.logged_in:
+            return Check("model", "ok", f"Claude Code {s.version}, logged in, {model}; Claude Code itself is set to use "
+                                        f"{host}, background reading uses your Claude login")
+        return Check("model", "warn", backend.ENDPOINT_NOTE.format(host=host) + " (recall and remember still work)")
     if name == "anthropic-api" and s is None:
         from . import keychain
         if not keychain.present():  # warn, not fail: background reading waits; recall and remember still work

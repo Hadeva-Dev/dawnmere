@@ -136,7 +136,9 @@ def ask(args, say):
         else:
             say(f"That key did not work ({note}).")
     if a.backend == "claude-cli" and a.claude.logged_in is False:
-        say("Claude Code is not logged in yet: run claude, then /login. Memory starts reading once you do.")
+        host = backend.claude_endpoint()
+        say(backend.ENDPOINT_NOTE.format(host=host) + "." if host else
+            "Claude Code is not logged in yet: run claude, then /login. Memory starts reading once you do.")
     if a.backend == "none":
         say(f"Memory will run without a model: {backend.NONE_LOSES}. `{COMMAND} setup` again to add one later.")
     if args.only:
@@ -232,7 +234,8 @@ class RealSetup:
         ui.step("Claude Code", "running")
         c = self.a.claude
         if self.a.backend == "claude-cli" and c.logged_in is False:
-            ui.step("Claude Code", "warn", "found; log in to start: claude, then /login")
+            host = backend.claude_endpoint()
+            ui.step("Claude Code", "warn", f"found; set to use {host}" if host else "found; log in to start: claude, then /login")
             return
         if self.a.backend == "claude-cli":
             note = "found, logged in"
@@ -762,7 +765,12 @@ def main(args, say=print):
             say(textwrap.indent(snippet.rstrip("\n"), "    "))
     if code == 0:
         model = backend.MODELS.get(a.model, a.model)
-        say({"claude-cli": f"Background reading: your Claude plan ({model}), up to {settings.DEFAULTS['llm']['daily_calls']} calls a day",
+        host = backend.claude_endpoint() if a.backend == "claude-cli" else None
+        plan = f"Background reading: your Claude plan ({model}), up to {settings.DEFAULTS['llm']['daily_calls']} calls a day"
+        if host:  # Claude Code itself goes to another provider: say so, not "log in" as if they forgot to
+            plan = (plan + f" (Claude Code itself is set to use {host})" if a.claude.logged_in else
+                    f"Background reading: {backend.ENDPOINT_NOTE.format(host=host)}")
+        say({"claude-cli": plan,
              "anthropic-api": f"Background reading: your Anthropic API key ({model}), up to "
                               f"{settings.DEFAULTS['llm']['daily_calls']} calls a day",
              "none": f"Background reading: off ({backend.NONE_LOSES})"}[a.backend])
