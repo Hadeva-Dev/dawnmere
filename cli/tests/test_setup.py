@@ -1044,3 +1044,62 @@ def test_self_check_confirms_its_typed_save_like_the_next_prompt(box, monkeypatc
     assert after[0] == "ok" and after[2]  # the next prompt, with the turn in the transcript
     assert not list((box.home / ".claude" / "projects").glob("-*-self-check-*")), "nothing of the check stays"
 
+
+
+class _Args:
+    def __init__(self, yes):
+        self.yes = yes
+
+
+def _trust_env(monkeypatch, tty=True, agent=None, answer="trusted 2 as your own words"):
+    from lflabs_memory_cli.run import Result
+    calls = []
+    monkeypatch.setattr(sys.stdin, "isatty", lambda: tty)
+    monkeypatch.setattr(sys.stdout, "isatty", lambda: tty)
+    monkeypatch.setattr(setup.access, "agent_shell", lambda: agent)
+    monkeypatch.setattr(setup.access, "agent_ancestor", lambda: None)
+
+    def run(argv, timeout=60, **k):
+        calls.append(argv)
+        return Result(0, answer, "")
+    monkeypatch.setattr(setup, "run", run)
+    return calls
+
+
+def test_imported_notes_are_trusted_on_allow(monkeypatch):
+    """Decision 2026-11-09: in person, one dialog (the engine's `trust`) for the notes setup imported from Claude Code;
+    only those ids, since this import began."""
+    calls = _trust_env(monkeypatch)
+    out = []
+    assert setup.trust_imported("lflabs-memory", [5, 6], 1700000000.5, _Args(False), out.append)
+    assert calls == [["lflabs-memory", "trust", "--claude-import-since", "1700000000.5", "--", "5", "6"]]
+    assert "yours now" in out[0]
+
+
+def test_imported_notes_stay_held_on_cancel(monkeypatch):
+    _trust_env(monkeypatch, answer="not trusted (it needs Allow in the dialog)")
+    out = []
+    assert not setup.trust_imported("lflabs-memory", [5, 6], 1.0, _Args(False), out.append)
+    assert "kept for search until you confirm them" in out[0] and "lflabs-memory held" in out[0]
+    assert "lflabs-memory trust -- 5 6" in out[0]
+
+
+def test_imported_notes_get_no_dialog_with_yes_no_terminal_or_an_agent(monkeypatch):
+    for yes, tty, agent in ((True, True, None), (False, False, None), (False, True, "CLAUDECODE")):
+        calls = _trust_env(monkeypatch, tty=tty, agent=agent)
+        out = []
+        assert not setup.trust_imported("lflabs-memory", [5], 1.0, _Args(yes), out.append)
+        assert calls == [], (yes, tty, agent)
+        assert "kept for search until you confirm it" in out[0]
+
+
+def test_setup_yes_never_asks_to_trust_imported_notes(box, monkeypatch, capsys):
+    notes = box.home / ".claude/projects/-p/memory"
+    notes.mkdir(parents=True)
+    (notes / "a.md").write_text("---\ntype: project\n---\nOrchard deploys from main\n")
+    monkeypatch.setattr(setup, "_imported_ids", lambda before: [3])
+    code, out = run_setup()
+    assert code == 0, out + capsys.readouterr().out
+    log = [json.loads(x) for x in Path(os.environ["FAKE_LOG"]).read_text().splitlines()]
+    assert not any(x.get("argv", [""])[0] == "trust" for x in log if x.get("prog") == "lflabs-memory")
+    assert "kept for search until you confirm it" in out
