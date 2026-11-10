@@ -58,7 +58,7 @@ flowchart LR
 | **Codex** | 注入每一条提示词 | 你输入 "remember that ..." 时，或模型调用 `remember` 时 |
 | **Cursor** | 每次新对话开始时 | 模型调用 `remember` 时 |
 
-你输入的内容（"remember that ..."）在回复结束后会传到每个应用。模型自己用 `remember` 存下的笔记，可以通过搜索找到，但只有在你确认之后（`lflabs-memory held`），才会进入其他应用的提示词。涉及你自己的健康、家庭、财务或法律事务的笔记会保留为个人笔记。
+你输入的内容（"remember that ..."）在回复结束后会传到每个应用（在 Codex 里输入的，要等你在那里发下一条提示词）。模型自己用 `remember` 存下的笔记，可以通过搜索找到，但只有在你确认之后（`lflabs-memory held`），才会进入其他应用的提示词。涉及你自己的健康、家庭、财务或法律事务的笔记会保留为个人笔记。
 <!-- checked against v0.1.6 (406ee39/c3ed5b1): a `remember` with no kind from a work-only app (Cursor by default) is
      filed as work, unless it is about the user's health, family, money or legal matters. -->
 

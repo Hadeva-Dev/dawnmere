@@ -60,8 +60,8 @@ How each app saves and recalls:
 | **Codex** | into each prompt | when you type "remember that ...", or when the model calls `remember` |
 | **Cursor** | at the start of each chat | when the model calls `remember` |
 
-What you type ("remember that ...") reaches every app once the reply finishes. A note a model saves with `remember` on
-its own is found by searching, and reaches other apps' prompts only after you confirm it (`lflabs-memory held`).
+What you type ("remember that ...") reaches every app once the reply finishes (from Codex, at your next prompt there).
+A note a model saves with `remember` on its own is found by searching, and reaches other apps' prompts only after you confirm it (`lflabs-memory held`).
 Notes about your own health, family, money or legal matters stay personal.
 <!-- checked against v0.1.6 (406ee39/c3ed5b1): a `remember` with no kind from a work-only app (Cursor by default) is
      filed as work, unless it is about the user's health, family, money or legal matters. -->
