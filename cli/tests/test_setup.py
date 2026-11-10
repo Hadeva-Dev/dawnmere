@@ -512,7 +512,8 @@ def test_access_widens_codex_as_it_widens_cursor(box, monkeypatch, capsys):
     assert "LFLABS_MEMORY_CLIENT_KEY" not in toml.read_text(), "no key before the gate"
     at_a_terminal(monkeypatch, "codex")
     assert access.main("codex", "everything", eng, say=out.append) == 0
-    assert out[-1] == "Codex now sees everything, personal notes too. Restart Codex to load it."
+    assert out[-1] == ("Codex now sees everything, personal notes too. Restart Codex to load it. Its prompts still get work "
+                       "notes only; the rest it finds when it searches memory.")
     env = tomllib.loads(toml.read_text())["mcp_servers"]["lflabs-memory"]["env"]
     key = env["LFLABS_MEMORY_CLIENT_KEY"]
     assert len(key) >= 24 and env["LFLABS_MEMORY_CLIENT"] == "codex"
@@ -558,7 +559,10 @@ def test_the_gate_is_the_engines_command_on_this_terminal(monkeypatch):
     monkeypatch.setattr(access, "current_level", lambda app: next(levels))
     assert access.engine_widens("/e/lflabs-memory", "cursor", "everything") is False
     assert access.engine_widens("/e/lflabs-memory", "cursor", "everything") is True
-    assert calls[0] == (["/e/lflabs-memory", "clients", "level", "cursor", "everything"], {"timeout": 600})
+    argv, kw = calls[0]
+    assert argv == ["/e/lflabs-memory", "clients", "level", "cursor", "everything"] and kw["timeout"] == 600
+    assert kw["env"][access.KEY_BY_ENV] == access.COMMAND  # this CLI keys the app next: the engine says nothing of keys
+    assert kw["env"]["PATH"] == os.environ["PATH"]  # the rest of the environment as it was
 
 
 @pytest.mark.parametrize("marker", ["CLAUDECODE", "CLAUDE_CODE_ENTRYPOINT", "CODEX_SANDBOX", "CODEX_THREAD_ID",
