@@ -203,7 +203,7 @@ Then it shows each step as it runs:
 | Claude Code | checks that `claude` is there and logged in |
 | Search models | downloads the search models (about 310 MB) and checks each file's size and sha256 |
 | Memory service | starts a background service (a LaunchAgent) that keeps search fast |
-| Your apps | connects Claude Code, Codex and Cursor, if they are installed |
+| Your apps | connects Claude Code, Codex, Cursor and the other apps listed below, if they are installed |
 | Your notes | imports your Claude Code notes |
 | Self-check | saves a test memory, finds it the way Codex and Cursor would, then deletes it |
 
@@ -229,6 +229,10 @@ time, for example to add a model later.
 - **Cursor**: adds `lflabs-memory` to `~/.cursor/mcp.json` and a session-start hook to `~/.cursor/hooks.json`, then
   restart Cursor. Cursor sees work notes only until you run `dawnmere access cursor everything`;
   `dawnmere access cursor work` takes that back.
+- **Windsurf, Gemini CLI and VS Code (Copilot)**: when setup finds one, it adds `lflabs-memory` to its MCP file
+  (`~/.codeium/windsurf/mcp_config.json`, `~/.gemini/settings.json`,
+  `~/Library/Application Support/Code/User/mcp.json`); restart the app. They get the tools and no hook, so they recall
+  when they call the tool, and they see work notes only.
 - **Claude Desktop and other MCP apps**: setup does not connect them. For Claude Desktop, open
   `dawnmere-connector.mcpb` from the [latest release](https://github.com/Hadeva-Dev/dawnmere/releases/latest), or add
   this to `~/Library/Application Support/Claude/claude_desktop_config.json`:
