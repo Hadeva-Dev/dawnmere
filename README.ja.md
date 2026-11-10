@@ -1,11 +1,3 @@
-<!--
-README for v0.1.6. Merge only after the v0.1.6 changes have landed and been released.
-Every sentence that describes v0.1.6 behaviour is followed by a comment starting "checked against v0.1.6
-(406ee39/c3ed5b1):" (CLI 406ee39, engine c3ed5b1); one marked "not yet in 406ee39/c3ed5b1" still needs checking
-against the released code before merging. "ENGINE-PUBLIC:" marks links that need
-Hadeva-Dev/lflabs-memory-engine to be public. Other comments give file:line evidence in this repo at 1c817d5 (CLI
-0.1.5) or in the engine wheel lflabs_memory_engine-0.1.3 (paths under lflabs_memory/).
--->
 <!-- Japanese translation of README.md (6fa4b8b). Change it together with README.md and README.zh-CN.md; the comments
      are copied from README.md unchanged. -->
 
