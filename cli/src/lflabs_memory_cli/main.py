@@ -87,8 +87,23 @@ COMMANDS = {
 }
 
 
+def version_line():
+    """What --version prints: the release, and the engine and connector that go with it."""
+    from importlib import metadata
+
+    from .layout import CLI_DIST, CONNECTOR_VERSION, ENGINE_DIST
+
+    def v(dist):
+        try:
+            return metadata.version(dist)
+        except metadata.PackageNotFoundError:
+            return "?"
+    return f"{PRODUCT} {v(CLI_DIST)} (engine {v(ENGINE_DIST)}, connector {CONNECTOR_VERSION})"
+
+
 def parser():
     p = argparse.ArgumentParser(prog=COMMAND, description=f"{PRODUCT}: one memory for Claude Code, Codex and Cursor.")
+    p.add_argument("--version", action="version", version=version_line())
     sub = p.add_subparsers(dest="command", required=True, metavar="command")
     for name, (_, help_text) in COMMANDS.items():
         sp = sub.add_parser(name, help=help_text, description=help_text)

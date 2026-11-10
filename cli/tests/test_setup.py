@@ -1243,3 +1243,12 @@ def test_setup_says_where_claude_code_points_instead_of_asking_for_a_login(box, 
     assert code == 0, shown
     assert "Background reading: Claude Code is set to use api.moonshot.ai: background reading needs a Claude login" in out
     assert "/login" not in out and "sk-secret" not in shown
+
+
+def test_version_flag(capsys):
+    """`--version` is the first thing many people type: it answers, with the engine and connector versions."""
+    import re
+    with pytest.raises(SystemExit) as e:
+        cli.parser().parse_args(["--version"])
+    out = capsys.readouterr().out
+    assert e.value.code == 0 and re.fullmatch(r"Dawnmere \S+ \(engine \S+, connector \d+\.\d+\.\d+\)\n", out), out
