@@ -177,7 +177,7 @@ def test_memory_pick():
 def test_no_memory_gives_the_empty_travel_line():
     state = scripted(memory=None)
     lines = body_lines(state, done_at(state))
-    assert "  Anything you tell one of them now reaches the others." in lines
+    assert "  What you tell Claude Code or Codex now reaches the others." in lines
     assert not any("“" in x for x in lines if "Try it" not in x)
 
 
