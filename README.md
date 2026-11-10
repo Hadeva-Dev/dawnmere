@@ -141,8 +141,8 @@ brew install hadeva-dev/tap/dawnmere
 dawnmere setup
 ```
 
-Homebrew brings Node.js with it. Update with `brew upgrade hadeva-dev/tap/dawnmere`, and run `dawnmere uninstall`
-before `brew uninstall dawnmere`.
+Homebrew brings Node.js with it. Update with `brew upgrade hadeva-dev/tap/dawnmere`, then run `dawnmere setup`
+again. To remove it, run `dawnmere uninstall` before `brew uninstall dawnmere`.
 
 That address serves `install.sh` from the latest
 [GitHub release](https://github.com/Hadeva-Dev/dawnmere/releases/latest). The script:
@@ -258,7 +258,7 @@ time, for example to add a model later.
 | `dawnmere doctor` | check that everything works, Node.js included, one line per check, with what to do about each problem |
 | `dawnmere export` | save your memory to `~/Downloads/dawnmere-export-<date>.json` (`--format md` for Markdown) |
 | `dawnmere import FILE` | add the memories from an export file, skipping any already there; they count as app saves until you confirm them in one macOS dialog |
-| `dawnmere access APP [LEVEL]` | show what an app may see, or change it: `everything`, `nothing-personal`, `work` or `nothing` (only Cursor can be widened from here) |
+| `dawnmere access APP [LEVEL]` | show what an app may see, or change it: `everything`, `nothing-personal`, `work` or `nothing` (only Cursor and Codex can be widened from here) |
 | `dawnmere update` | install the newest release, checked against its checksums |
 | `dawnmere uninstall` | remove everything setup added |
 
