@@ -4,7 +4,7 @@ import shutil
 import time
 from pathlib import Path
 
-from . import apps, claude_settings, edits, install_record, keychain, launchd, prompt, sockets
+from . import apps, claude_settings, edits, install_record, keychain, launchd, layout, prompt, sockets
 from .brand import COMMAND
 from .layout import (BACKUP_TAG, CLI_DIST, MARKETPLACE, SERVER, connector_sock, data_dir, engine_sock, home, logs_dir,
                      short, uv_bin)
@@ -140,6 +140,7 @@ def _stale_sockets(rep, wait=5.0):
 
 def main(keep_data=False, out=print):
     record = install_record.load()
+    brewed = layout.homebrew()
     rep = Report(out)
     out(f"Removing memory from this Mac{'' if record else ' (no install record: looking for what is there)'}.\n")
 
@@ -187,7 +188,9 @@ def main(keep_data=False, out=print):
         out(f"{'Your memory':<21}kept in {short(data)} (delete the folder yourself if you change your mind)")
 
     uv = uv_bin()
-    if uv:
+    if brewed:
+        pass  # the programs are Homebrew's: said at the end
+    elif uv:
         r = run([uv, "tool", "uninstall", CLI_DIST], timeout=120)
         rep.row("Programs", "removed" if r.ok else "gone",
                 f"{CLI_DIST} and the engine removed" if r.ok else f"{CLI_DIST} was not installed with uv")
@@ -206,7 +209,10 @@ def main(keep_data=False, out=print):
         for b in dict.fromkeys(rep.backups):
             out(f"  {short(b)}")
     local = home() / ".local/bin/uv"
-    if os.access(local, os.X_OK):  # where install.sh puts uv (Homebrew's or another uv: not ours to mention)
+    if brewed:
+        out(f"The {COMMAND} command itself came from Homebrew. To remove it:")
+        out(f"  brew uninstall {COMMAND}")
+    elif os.access(local, os.X_OK):  # where install.sh puts uv (Homebrew's or another uv: not ours to mention)
         u = short(local)  # it stays: other tools may use it. uv's own steps, but never its tool folder (theirs)
         out("uv and the Python it downloaded stay on this Mac (other tools may use them). If nothing else needs them:")
         out(f'  {u} cache clean && rm -rf "$({u} python dir)" {u} {u}x')

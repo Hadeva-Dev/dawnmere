@@ -206,7 +206,7 @@ sh install.sh
 | `dawnmere doctor` | Node.js も含めて、すべてが動くか確認する。1 項目 1 行で、問題ごとに対処法も表示 |
 | `dawnmere export` | メモリを `~/Downloads/dawnmere-export-<date>.json` に保存する（Markdown なら `--format md`） |
 | `dawnmere import FILE` | エクスポートファイルからメモリを追加する。すでにあるものはスキップ。macOS のダイアログで一度確認するまでは、アプリが保存したものとして扱われる |
-| `dawnmere access APP [LEVEL]` | アプリが見られる範囲を表示・変更する：`everything`、`nothing-personal`、`work`、`nothing`（ここから広げられるのは Cursor だけ） |
+| `dawnmere access APP [LEVEL]` | アプリが見られる範囲を表示・変更する：`everything`、`nothing-personal`、`work`、`nothing`（ここから広げられるのは Cursor と Codex だけ） |
 | `dawnmere update` | 最新の release をインストールし、チェックサムで照合する |
 | `dawnmere uninstall` | セットアップが追加したものをすべて削除する |
 
