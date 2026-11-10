@@ -23,7 +23,7 @@ curl -fsSL https://dawnmere.app/install | sh
 ```
 
 **必要なもの：** Apple シリコン搭載の Mac、macOS 14 以降、1 GB の空きディスク容量、Node.js 18 以降。無料で、アカウントは不要です。<br>
-**ご注意：** 今は英語がいちばん確実です。日本語のメモリや質問は、まだうまく見つからないことが多いです（[#27](https://github.com/Hadeva-Dev/dawnmere/issues/27)）。<br>
+**ご注意：** 日本語のメモは、同じ言葉を使って質問すると見つかります。言い換えた質問はまだ見つからないことが多いです（[#27](https://github.com/Hadeva-Dev/dawnmere/issues/27)）。<br>
 **ステータス：** 初期ベータ（0.1.x）。クライアントは MIT、エンジンはソース公開（source-available、FSL。2 年後に MIT へ移行）。開発は [LF Labs](#who-makes-it-and-the-lf-labs-names) です。
 
 <!-- Apple silicon and macOS 14: install.sh:35-38 refuses anything else, and setup.py:73-74 checks macOS again.
@@ -269,7 +269,7 @@ Dawnmere は LF Labs（GitHub の [Hadeva-Dev](https://github.com/Hadeva-Dev) or
 
 - **Mac 専用**です。Apple シリコン、macOS 14 以降が必要です。エンジンの ONNX ランタイムには Intel Mac 版がなく、Linux 版や Windows 版もありません。
 - **Mac 1 台だけ。** マシン間の同期や、チームで共有するメモリはありません。
-- **英語がいちばん確実です。** 検索には英語のモデルを使っているため、日本語（ほかの言語も）のメモリや質問は、今のところうまく見つからないことが多いです。入力して保存するには "remember that ..." と書きます。日本語なら "覚えておいて：..." でも保存できます。今は、メモリも質問も英語で書くのがおすすめです。
+- **中国語と日本語の想起は言葉の一致で行います。** 中国語や日本語で保存したメモは、同じ言葉を一部使って質問したときにプロンプトへ追加されます。言い換えた質問は見つからないことがよくありますが、アプリから検索はできます。モデルを設定している場合、中国語や日本語の質問は英語でも検索されます（1回につき小さなモデル呼び出し1回）。入力して保存するには "remember that ..." と書きます。日本語なら "覚えておいて：..." でも保存できます。
 - **保存がいちばん確実なのは Claude Code です。** Codex では "remember that ..." と言ってください。Cursor ではモデルが `remember` を呼ぶ必要があります。Codex 自身のセッションファイルは、`dawnmere setup --codex-sessions` を実行した場合だけ読み取ります。
 - **チェックは自動なので、見逃すこともあります。** アプリが何を保存したかは `dawnmere export` で確認してください。
 - **初期ベータです。** リリースは手作業で、頻繁に出ます。アップデートの前に [リリースノート](https://github.com/Hadeva-Dev/dawnmere/releases) を読んでください。
