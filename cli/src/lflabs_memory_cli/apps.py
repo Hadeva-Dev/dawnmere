@@ -32,7 +32,13 @@ KEY_ENV = "LFLABS_MEMORY_CLIENT_KEY"  # an app trusted with more than work only 
 LIB = "Library/Application Support"
 MCP_ONLY = {"windsurf": ("Windsurf", ".codeium/windsurf", ".codeium/windsurf/mcp_config.json", "mcpServers"),
             "gemini": ("Gemini CLI", ".gemini", ".gemini/settings.json", "mcpServers"),
-            "copilot": ("VS Code", f"{LIB}/Code/User", f"{LIB}/Code/User/mcp.json", "servers")}
+            "copilot": ("VS Code", f"{LIB}/Code/User", f"{LIB}/Code/User/mcp.json", "servers"),
+            # From each app's own docs (2026-11-10), the same {"mcpServers": {name: {command, args, env}}} shape:
+            "qwen-code": ("Qwen Code", ".qwen", ".qwen/settings.json", "mcpServers"),
+            "kimi-cli": ("Kimi CLI", ".kimi", ".kimi/mcp.json", "mcpServers"),
+            "qoder": ("Qoder CLI", ".qoder", ".qoder/settings.json", "mcpServers"),
+            "iflow": ("iFlow CLI", ".iflow", ".iflow/settings.json", "mcpServers"),
+            "cline": ("Cline CLI", ".cline", ".cline/data/settings/cline_mcp_settings.json", "mcpServers")}
 LABELS = {"claude-code": "Claude Code", "codex": "Codex", "cursor": "Cursor",
           **{app: v[0] for app, v in MCP_ONLY.items()}}
 DEFAULT = ("claude-code", "codex", "cursor", *MCP_ONLY)
@@ -40,7 +46,9 @@ DEFAULT = ("claude-code", "codex", "cursor", *MCP_ONLY)
 CLAUDE_HOOKS = (("UserPromptSubmit", "hook-prompt", 10), ("SessionStart", "hook-session-start", 120),
                 ("Stop", "hook-activity", 10), ("SessionEnd", "hook-session-end", 10))
 HINTS = {"codex": "type /hooks once", "cursor": "restart Cursor", "windsurf": "restart Windsurf",
-         "gemini": "restart Gemini CLI", "copilot": "restart VS Code"}
+         "gemini": "restart Gemini CLI", "copilot": "restart VS Code", "qwen-code": "restart Qwen Code",
+         "kimi-cli": "restart Kimi CLI", "qoder": "restart Qoder CLI", "iflow": "restart iFlow CLI",
+         "cline": "restart Cline"}
 MIN_NODE = 18                # the connector's package.json engines
 NODE_FIX = "install Node.js 18 or later from nodejs.org"
 

@@ -1219,8 +1219,9 @@ def test_other_mcp_apps_are_connected_when_found(box, capsys):
     assert json.loads((box.home / ".gemini/settings.json").read_text())["theme"] == "dark"
     assert uninstall.main(keep_data=True, out=lambda s: None) == 0
     assert (box.home / ".gemini/settings.json").read_text() == '{\n  "theme": "dark"\n}\n'
-    assert not (box.home / ".codeium/windsurf/mcp_config.json").exists()
-    assert not (box.home / "Library/Application Support/Code/User/mcp.json").exists()
+    for app, (_, _, path, _) in apps.MCP_ONLY.items():
+        assert app == "gemini" or not (box.home / path).exists(), path
+    assert {"qwen-code", "kimi-cli", "qoder", "iflow", "cline"} <= set(apps.MCP_ONLY)
 
 
 def test_other_mcp_apps_not_installed_are_left_alone(box, capsys):
