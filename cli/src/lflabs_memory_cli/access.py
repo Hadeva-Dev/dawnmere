@@ -268,6 +268,10 @@ def main(app, level, engine, say=print):
         say(f"The memory service did not take the change; {COMMAND} doctor says why.")
         return 1
     say(f"{label} now sees {SAYS[level]}." +
-        (f" Restart {label} to load it." if level in WIDER else ""))
+        (f" Restart {label} to load it." if level in WIDER else "") +
+        # Codex's prompt hook carries no key (a key never goes on a command line), so it stays at work only: the wider
+        # level reaches Codex through its memory tools, when it searches
+        (" Its prompts still get work notes only; the rest it finds when it searches memory."
+         if app == "codex" and level in WIDER else ""))
     return 0
 
