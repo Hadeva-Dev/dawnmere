@@ -1202,3 +1202,28 @@ def test_claude_folder_without_the_claude_command_is_hooks_not_a_failure(box, ca
     assert "of 1 connected" not in shown and "of 3 connected" not in shown
     hooks = json.loads((box.home / ".claude/settings.json").read_text())["hooks"]
     assert set(hooks) == {"UserPromptSubmit", "SessionStart", "Stop", "SessionEnd"}
+
+
+def test_other_mcp_apps_are_connected_when_found(box, capsys):
+    """Windsurf, Gemini CLI and VS Code get the MCP entry (no key: work notes only), and uninstall takes it out."""
+    from lflabs_memory_cli import apps, uninstall
+    for app, (_, folder, _, _) in apps.MCP_ONLY.items():
+        (box.home / folder).mkdir(parents=True)
+    (box.home / ".gemini/settings.json").write_text('{\n  "theme": "dark"\n}\n')
+    code, out = run_setup()
+    assert code == 0, out + capsys.readouterr().out
+    for app, (_, _, path, key) in apps.MCP_ONLY.items():
+        entry = json.loads((box.home / path).read_text())[key]["lflabs-memory"]
+        assert entry["args"] == ["-y", "dawnmere-connector@0.1.1"] and entry["env"] == {"LFLABS_MEMORY_CLIENT": app}
+        assert ("type" in entry) == (key == "servers"), "VS Code's file names the transport"
+    assert json.loads((box.home / ".gemini/settings.json").read_text())["theme"] == "dark"
+    assert uninstall.main(keep_data=True, out=lambda s: None) == 0
+    assert (box.home / ".gemini/settings.json").read_text() == '{\n  "theme": "dark"\n}\n'
+    assert not (box.home / ".codeium/windsurf/mcp_config.json").exists()
+    assert not (box.home / "Library/Application Support/Code/User/mcp.json").exists()
+
+
+def test_other_mcp_apps_not_installed_are_left_alone(box, capsys):
+    code, out = run_setup()
+    assert code == 0
+    assert not (box.home / ".gemini").exists() and not (box.home / ".codeium").exists()
