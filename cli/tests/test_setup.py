@@ -112,7 +112,7 @@ def test_setup_end_to_end(box, capsys):
     assert "Background reading: your Claude plan (Haiku), up to 200 calls a day" in out
     assert ["plugin", "install", "dawnmere@dawnmere", "--scope", "user", "-y"] in box.calls("claude")
     version = importlib.metadata.version("lflabs-memory-cli")
-    assert ["plugin", "marketplace", "add", f"Hadeva-Dev/dawnmere#v{version}", "--scope", "user"] in \
+    assert ["plugin", "marketplace", "add", f"LF-Labs-Inc/dawnmere#v{version}", "--scope", "user"] in \
         box.calls("claude"), "the plugin at the release tag the wheels come from, never main's head"
     assert "dawnmere-connector@0.1.1" in (box.home / ".codex/config.toml").read_text()
     assert "hook-cursor-start" in (box.home / ".cursor/hooks.json").read_text()
@@ -433,7 +433,7 @@ def test_marketplace_override_for_testing(box, monkeypatch, tmp_path):
 
 def test_dry_run_names_the_tag(box):
     version = importlib.metadata.version("lflabs-memory-cli")
-    assert f"claude plugin marketplace add Hadeva-Dev/dawnmere#v{version} --scope user" in run_setup("--dry-run")[1]
+    assert f"claude plugin marketplace add LF-Labs-Inc/dawnmere#v{version} --scope user" in run_setup("--dry-run")[1]
 
 
 def test_no_terminal_needs_yes(box, monkeypatch, capsys):
@@ -597,7 +597,7 @@ def claude_plugin_rewrites(home):
     s = dict(reversed(list(s.items())))
     if s.get("model") == "opus":
         s["model"] = "opus[1m]"
-    s["extraKnownMarketplaces"] = {"dawnmere": {"source": {"source": "github", "repo": "Hadeva-Dev/dawnmere"}}}
+    s["extraKnownMarketplaces"] = {"dawnmere": {"source": {"source": "github", "repo": "LF-Labs-Inc/dawnmere"}}}
     s["enabledPlugins"] = {"dawnmere@dawnmere": True}
     (home / ".claude/settings.json").write_text(json.dumps(s, indent=2) + "\n")
     cache = home / ".claude/plugins/cache/dawnmere/dawnmere/0.1.10"
@@ -765,7 +765,7 @@ def test_setup_stores_where_claude_is(box, tmp_path):
         "else the claude on PATH"
 
 
-STAR = "If Dawnmere helps, a star helps others find it: github.com/Hadeva-Dev/dawnmere"
+STAR = "If Dawnmere helps, a star lets others find it: github.com/LF-Labs-Inc/dawnmere"
 
 
 def interactive(monkeypatch):
@@ -872,7 +872,7 @@ def test_self_check_waits_for_the_service_and_tries_again(box, monkeypatch, caps
 
 
 def marketplace_at(box, ref):
-    entry = {"name": "dawnmere", "source": "github", "repo": "Hadeva-Dev/dawnmere", **({"ref": ref} if ref else {})}
+    entry = {"name": "dawnmere", "source": "github", "repo": "LF-Labs-Inc/dawnmere", **({"ref": ref} if ref else {})}
     box.on("claude", ["plugin", "marketplace", "list", "--json"], 0, json.dumps([entry]))
     box.on("claude", ["plugin", "list"], 0, "  dawnmere@dawnmere  0.1.0  enabled\n")
 
@@ -887,7 +887,7 @@ def test_rerun_pins_an_unpinned_marketplace(box, capsys, ref):
     calls = [c for c in box.calls("claude") if c[:2] == ["plugin", "marketplace"] and c[2] != "list"]
     calls += [c for c in box.calls("claude") if c[:2] == ["plugin", "install"]]
     assert calls == [["plugin", "marketplace", "remove", "dawnmere"],
-                     ["plugin", "marketplace", "add", f"Hadeva-Dev/dawnmere#v{version}", "--scope", "user"],
+                     ["plugin", "marketplace", "add", f"LF-Labs-Inc/dawnmere#v{version}", "--scope", "user"],
                      ["plugin", "install", "dawnmere@dawnmere", "--scope", "user", "-y"]]
 
 

@@ -240,10 +240,10 @@ class GitHub:
                     return self.send_error(504)
                 if self.path.startswith("/dl/"):
                     return self.reply((outer.rel / self.path[4:]).read_bytes())
-                if self.path == "/api/repos/Hadeva-Dev/dawnmere/releases/tags/v0.2.0":
+                if self.path == "/api/repos/LF-Labs-Inc/dawnmere/releases/tags/v0.2.0":
                     return self.reply(json.dumps({"assets": [{"name": n, "id": i} for n, i in outer.ids.items()]})
                                       .encode())
-                if self.path.startswith("/api/repos/Hadeva-Dev/dawnmere/releases/assets/"):
+                if self.path.startswith("/api/repos/LF-Labs-Inc/dawnmere/releases/assets/"):
                     if self.headers.get("Accept") != "application/octet-stream":
                         return self.reply(b'{"json": "metadata, not the file"}')
                     i = int(self.path.rsplit("/", 1)[1])

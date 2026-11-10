@@ -1,8 +1,8 @@
 blank_issues_enabled: true
 contact_links:
   - name: Questions and setup help
-    url: https://github.com/Hadeva-Dev/dawnmere/discussions
+    url: https://github.com/LF-Labs-Inc/dawnmere/discussions
     about: Ask how something works, or share how you use Dawnmere. Anything else, email hello@dawnmere.app.
   - name: Report a security problem
-    url: https://github.com/Hadeva-Dev/dawnmere/security/advisories/new
+    url: https://github.com/LF-Labs-Inc/dawnmere/security/advisories/new
     about: Privately, so it can be fixed before it is public.

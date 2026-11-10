@@ -12,7 +12,7 @@ import os
 import shutil
 
 from . import apps, edits
-from .layout import MARKETPLACE, OLD_MARKETPLACE, OLD_SERVER, REPO_DIR, SERVER, data_dir, home
+from .layout import MARKETPLACE, OLD_MARKETPLACE, OLD_REPO_DIR, OLD_SERVER, REPO_DIR, SERVER, data_dir, home
 
 PLUGIN_ID = f"{SERVER}@{MARKETPLACE}"
 OLD_PLUGIN_ID = f"{OLD_SERVER}@{OLD_MARKETPLACE}"  # before 0.1.10: setup and update move it to PLUGIN_ID
@@ -118,7 +118,7 @@ def _drop_plugin_files(snap):
     pd = plugins_dir()
     for pattern in [p for m in (MARKETPLACE, OLD_MARKETPLACE) for p in (f"cache/{m}", f"cache/{m}-*",
                                                                          f"marketplaces/{m}", f"marketplaces/{m}-*")] + \
-            [f"marketplaces/{REPO_DIR}", f"marketplaces/{REPO_DIR}-*"]:
+            [f"marketplaces/{d}{s}" for d in (REPO_DIR, OLD_REPO_DIR) for s in ("", "-*")]:
         for p in pd.glob(pattern):
             shutil.rmtree(p, ignore_errors=True)
     if not snap or snap.get("plugins_dir") or not pd.is_dir():

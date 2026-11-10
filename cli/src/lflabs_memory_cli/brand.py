@@ -3,4 +3,4 @@ The public distribution repo is the one deliberate exception (spec 1): GitHub re
 
 PRODUCT = "Dawnmere"
 COMMAND = "dawnmere"
-REPO = "Hadeva-Dev/dawnmere"
+REPO = "LF-Labs-Inc/dawnmere"

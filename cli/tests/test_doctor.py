@@ -499,7 +499,7 @@ def test_update_under_homebrew_leaves_it_to_brew(mac, monkeypatch):
         out = []
         assert update.main(say=out.append, get=no_network, **kw) == 0
         assert out == ["Dawnmere was installed with Homebrew, so Homebrew updates it:",
-                       "  brew upgrade hadeva-dev/tap/dawnmere",
+                       "  brew upgrade lf-labs-inc/tap/dawnmere",
                        "Then run dawnmere setup again, so the memory service and your apps use the new version."]
     assert mac.calls("uv") == []
 
@@ -551,7 +551,7 @@ def test_update_that_cannot_put_the_old_release_back_leaves_nothing(mac, monkeyp
     assert len(uv_installs(mac)) == 1 and ["tool", "uninstall", "lflabs-memory-cli"] in mac.calls("uv")
     assert out[-2] == "Could not reinstall 0.1.0 (0.1.0 has no constraints.txt to check it against), so Dawnmere is " \
                       "uninstalled. Install it again with:"
-    assert out[-1] == "  curl -fsSL https://github.com/Hadeva-Dev/dawnmere/releases/latest/download/install.sh | sh"
+    assert out[-1] == "  curl -fsSL https://github.com/LF-Labs-Inc/dawnmere/releases/latest/download/install.sh | sh"
 
 
 def test_quarantine_moves_the_environment_aside_when_uv_cannot_uninstall(mac, tmp_path):
@@ -634,7 +634,7 @@ def test_update_moves_the_plugin_to_the_new_tag(mac, monkeypatch, tmp_path):
     assert update.finish("0.1.0", say=out.append, get=fake_github({"0.2.0": wheelset("0.2.0")})) == 0
     claude = mac.calls("claude")
     want = [["plugin", "marketplace", "remove", "dawnmere"],
-            ["plugin", "marketplace", "add", "Hadeva-Dev/dawnmere#v0.2.0", "--scope", "user"],
+            ["plugin", "marketplace", "add", "LF-Labs-Inc/dawnmere#v0.2.0", "--scope", "user"],
             ["plugin", "install", "dawnmere@dawnmere", "--scope", "user", "-y"]]
     assert [c for c in claude if c[:2] not in (["plugin", "list"], ["mcp", "get"])] == want
     assert "Claude Code's plugin: now v0.2.0 (restart Claude Code to load it)" in out
@@ -801,11 +801,11 @@ def test_update_falls_back_to_the_api_asset(mac, monkeypatch, tmp_path):
         asked.append(url)
         if url.startswith("https://dl/"):
             raise OSError("504")
-        if url.startswith("https://api.github.com/repos/Hadeva-Dev/dawnmere/releases/assets/"):
+        if url.startswith("https://api.github.com/repos/LF-Labs-Inc/dawnmere/releases/assets/"):
             return gh("https://dl/0.2.0/" + url.rsplit("/", 1)[1])
         doc = json.loads(gh(url))
         for a in doc["assets"]:
-            a["url"] = "https://api.github.com/repos/Hadeva-Dev/dawnmere/releases/assets/" + a["name"]
+            a["url"] = "https://api.github.com/repos/LF-Labs-Inc/dawnmere/releases/assets/" + a["name"]
         return json.dumps(doc).encode()
     rel = update.release(get=get)
     paths = update.wheels(rel, get, tmp_path)

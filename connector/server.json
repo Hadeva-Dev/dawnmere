@@ -4,7 +4,7 @@
   "title": "Dawnmere",
   "description": "One memory shared across your AI apps. Connects to Dawnmere on your Mac.",
   "repository": {
-    "url": "https://github.com/Hadeva-Dev/dawnmere",
+    "url": "https://github.com/LF-Labs-Inc/dawnmere",
     "source": "github",
     "subfolder": "connector"
   },

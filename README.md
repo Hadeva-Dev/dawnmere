@@ -137,17 +137,17 @@ curl -fsSL https://dawnmere.app/install | sh
 Prefer Homebrew?
 
 ```bash
-brew install hadeva-dev/tap/dawnmere
+brew install lf-labs-inc/tap/dawnmere
 dawnmere setup
 ```
 
-Homebrew brings Node.js with it. Update with `brew upgrade hadeva-dev/tap/dawnmere`, then run `dawnmere setup`
+Homebrew brings Node.js with it. Update with `brew upgrade lf-labs-inc/tap/dawnmere`, then run `dawnmere setup`
 again. To remove it, run `dawnmere uninstall` before `brew uninstall dawnmere`.
 
 In Claude Code? Two commands, then `/dawnmere:setup`:
 
 ```text
-/plugin marketplace add Hadeva-Dev/dawnmere
+/plugin marketplace add LF-Labs-Inc/dawnmere
 /plugin install dawnmere@dawnmere
 ```
 
@@ -158,7 +158,7 @@ session says Dawnmere isn't set up yet, and nothing else happens.
      no config.toml, and never runs the installer. -->
 
 That address serves `install.sh` from the latest
-[GitHub release](https://github.com/Hadeva-Dev/dawnmere/releases/latest). The script:
+[GitHub release](https://github.com/LF-Labs-Inc/dawnmere/releases/latest). The script:
 
 1. stops unless this is a Mac with Apple silicon and macOS 14 or later;
 2. downloads [uv](https://github.com/astral-sh/uv) 0.12.5 if you do not have a recent one, and the `dawnmere` and
@@ -249,7 +249,7 @@ time, for example to add a model later.
   `~/.cline/data/settings/cline_mcp_settings.json`); restart the app. They get the tools and no hook, so they recall
   when they call the tool, and they see work notes only.
 - **Claude Desktop and other MCP apps**: setup does not connect them. For Claude Desktop, open
-  `dawnmere-connector.mcpb` from the [latest release](https://github.com/Hadeva-Dev/dawnmere/releases/latest), or add
+  `dawnmere-connector.mcpb` from the [latest release](https://github.com/LF-Labs-Inc/dawnmere/releases/latest), or add
   this to `~/Library/Application Support/Claude/claude_desktop_config.json`:
 
   ```json
@@ -361,7 +361,7 @@ remove them.
 
 ## Who makes it, and the LF Labs names
 
-Dawnmere is made by LF Labs (the [Hadeva-Dev](https://github.com/Hadeva-Dev) organization on GitHub). Inside, the
+Dawnmere is made by LF Labs (the [LF-Labs-Inc](https://github.com/LF-Labs-Inc) organization on GitHub). Inside, the
 programs use the LF Labs name, so these are all Dawnmere:
 
 | What | Where |
@@ -388,23 +388,23 @@ programs use the LF Labs name, so these are all Dawnmere:
   `remember`. Codex's own session files are read only if you run `dawnmere setup --codex-sessions`.
 - **Screening is automatic and can miss things.** Review what your apps save with `dawnmere export`.
 - **Early beta.** Releases are cut by hand and come often; read the
-  [release notes](https://github.com/Hadeva-Dev/dawnmere/releases) before updating.
+  [release notes](https://github.com/LF-Labs-Inc/dawnmere/releases) before updating.
 
 <!-- Intel: install.sh:37 comment. Releases by hand: RELEASING.md line 3. -->
 
 ## License
 
 The installer, the `dawnmere` command, the Claude Code plugin and the connector in this repo are MIT
-([LICENSE](LICENSE)). The [engine](https://github.com/Hadeva-Dev/lflabs-memory-engine) is source-available under the
-[Functional Source License 1.1, MIT future license](https://github.com/Hadeva-Dev/lflabs-memory-engine/blob/main/LICENSE)
+([LICENSE](LICENSE)). The [engine](https://github.com/LF-Labs-Inc/dawnmere-engine) is source-available under the
+[Functional Source License 1.1, MIT future license](https://github.com/LF-Labs-Inc/dawnmere-engine/blob/main/LICENSE)
 (FSL-1.1-MIT): each version becomes MIT two years after its release. The search models keep their own licenses
 (`dawnmere doctor --licenses`, and [THIRD_PARTY.md](THIRD_PARTY.md)).
 
 ## Related
 
-[memory-bench](https://github.com/Hadeva-Dev/memory-bench) is an open benchmark for assistant memory, built by the
+[memory-bench](https://github.com/LF-Labs-Inc/memory-bench) is an open benchmark for assistant memory, built by the
 same people. It has a Dawnmere row measured on the released engine, with its leaks shown next to its recall; the
 maintainers' other row there is a related system, and the benchmark says so.
 
-Found a bug? [Open an issue](https://github.com/Hadeva-Dev/dawnmere/issues/new/choose) with the output of
+Found a bug? [Open an issue](https://github.com/LF-Labs-Inc/dawnmere/issues/new/choose) with the output of
 `dawnmere doctor --report`. Security problems go to [SECURITY.md](SECURITY.md).

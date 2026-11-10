@@ -18,16 +18,16 @@ spend time on it. Security problems go through [SECURITY.md](SECURITY.md), never
 | `plugin/` | the Claude Code plugin: its hooks and MCP entry |
 
 The memory engine (storage, search, screening) is a separate repo,
-[lflabs-memory-engine](https://github.com/Hadeva-Dev/lflabs-memory-engine). The CLI's tests expect it checked out next
-to this repo.
+[dawnmere-engine](https://github.com/LF-Labs-Inc/dawnmere-engine). The CLI's tests expect it checked out next
+to this repo, in a folder named `lflabs-memory-engine`.
 
 ## Running the tests
 
 You need a Mac with Apple silicon, [uv](https://github.com/astral-sh/uv) and Node.js 18 or later.
 
 ```bash
-git clone https://github.com/Hadeva-Dev/dawnmere.git
-git clone https://github.com/Hadeva-Dev/lflabs-memory-engine.git
+git clone https://github.com/LF-Labs-Inc/dawnmere.git
+git clone https://github.com/LF-Labs-Inc/dawnmere-engine.git lflabs-memory-engine
 (cd dawnmere/cli && uv run pytest -q)
 (cd dawnmere/connector && npm ci && npm test)
 ```

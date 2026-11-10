@@ -313,3 +313,45 @@ def test_readme_commands_exist(name):
     assert not re.search(r"\blflabs-memory (held|trust|forget|restore|search|add|connect|clients)\b", text)
     assert f"/plugin marketplace add {layout.REPO}" in text
     assert f"/plugin install {claude_settings.PLUGIN_ID}" in text and "/dawnmere:setup" in text
+
+
+# ---------- the org: Hadeva-Dev is LF-Labs-Inc ----------
+
+OLD_ORG_REPO = "Hadeva-Dev/dawnmere"
+
+
+def test_a_marketplace_from_the_old_org_is_moved(box):  # noqa: F811
+    """Added from Hadeva-Dev/dawnmere at this very tag (the /plugin route before the org was renamed): setup moves it to
+    LF-Labs-Inc, as it moves an old tag."""
+    version = __import__("importlib").metadata.version("lflabs-memory-cli")
+    entry = {"name": "dawnmere", "source": "github", "repo": OLD_ORG_REPO, "ref": f"v{version}"}
+    box.on("claude", ["plugin", "marketplace", "list", "--json"], 0, json.dumps([entry]))
+    box.on("claude", ["plugin", "list"], 0, "  dawnmere@dawnmere  0.1.10  enabled\n")
+    assert run_setup()[0] == 0
+    assert plugin_calls(box) == [["plugin", "marketplace", "remove", "dawnmere"],
+                                 ["plugin", "marketplace", "add", f"LF-Labs-Inc/dawnmere#v{version}", "--scope", "user"],
+                                 ["plugin", "install", "dawnmere@dawnmere", "--scope", "user", "-y"]]
+
+
+def test_the_old_orgs_marketplace_checkout_is_cleaned_up(home, mac):
+    from lflabs_memory_cli import claude_settings as cs
+    for d in ("marketplaces/Hadeva-Dev-dawnmere", "marketplaces/LF-Labs-Inc-dawnmere", "cache/lflabs/lflabs-memory",
+              "cache/dawnmere/dawnmere"):
+        (cs.plugins_dir() / d).mkdir(parents=True)
+    cs._drop_plugin_files({"plugins_dir": True})
+    assert not [p for p in (cs.plugins_dir() / "marketplaces").iterdir()]
+    assert not [p for p in (cs.plugins_dir() / "cache").iterdir()]
+
+
+def test_no_old_org_url_is_left():
+    """Every link and source names LF-Labs-Inc; only the MCP Registry name (published under the new namespace at the
+    connector's next release) and the migration's own constants know the old one."""
+    allowed = {"connector/server.json", "connector/package.json", "connector/docs/GO-PUBLIC.md",
+               "cli/src/lflabs_memory_cli/layout.py", "cli/tests/test_rename.py"}
+    files = subprocess.run(["git", "ls-files"], cwd=ROOT, capture_output=True, text=True).stdout.split()
+    hits = [f for f in files if f not in allowed and (ROOT / f).is_file() and not f.endswith(("lock", ".png", ".gif"))
+            and "hadeva" in (ROOT / f).read_text(errors="ignore").lower()]
+    assert hits == []
+    for f in ("connector/server.json", "connector/package.json"):
+        text = (ROOT / f).read_text()
+        assert text.lower().count("hadeva") == 1 and '"io.github.Hadeva-Dev/dawnmere-connector"' in text

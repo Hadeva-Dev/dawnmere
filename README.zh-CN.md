@@ -23,7 +23,7 @@ curl -fsSL https://dawnmere.app/install | sh
 ```
 
 **环境要求：** 搭载 Apple 芯片的 Mac，macOS 14 或更高版本，1 GB 可用磁盘空间，Node.js 18 或更高版本。免费，无需注册账号。<br>
-**注意：** 中文笔记在提问用到相同词语时能被找到；换一种说法常常找不到（[#27](https://github.com/Hadeva-Dev/dawnmere/issues/27)）。<br>
+**注意：** 中文笔记在提问用到相同词语时能被找到；换一种说法常常找不到（[#27](https://github.com/LF-Labs-Inc/dawnmere/issues/27)）。<br>
 **状态：** 早期测试版（0.1.x）。客户端采用 MIT 许可，引擎源码可见（FSL，两年后转为 MIT）。由 [LF Labs](#who-makes-it-and-the-lf-labs-names) 开发。
 
 <!-- Apple silicon and macOS 14: install.sh:35-38 refuses anything else, and setup.py:73-74 checks macOS again.
@@ -115,13 +115,13 @@ curl -fsSL https://dawnmere.app/install | sh
 在用 Claude Code？两条命令，再运行 `/dawnmere:setup`：
 
 ```text
-/plugin marketplace add Hadeva-Dev/dawnmere
+/plugin marketplace add LF-Labs-Inc/dawnmere
 /plugin install dawnmere@dawnmere
 ```
 
 然后在 Claude Code 里运行 `/dawnmere:setup`。它会执行上面那行安装命令（每条命令都由你批准），再请你在终端窗口里运行 `dawnmere setup`；如果你愿意，也可以直接在那里按默认设置运行。在那之前，每次新开 Claude Code 会话都只会提示 Dawnmere 还没有设置，不会做别的事。
 
-这个地址直接提供最新 [GitHub release](https://github.com/Hadeva-Dev/dawnmere/releases/latest) 里的 `install.sh`。脚本会：
+这个地址直接提供最新 [GitHub release](https://github.com/LF-Labs-Inc/dawnmere/releases/latest) 里的 `install.sh`。脚本会：
 
 1. 检查这是不是一台搭载 Apple 芯片、运行 macOS 14 或更高版本的 Mac，不是就停止；
 2. 如果你没有较新的 [uv](https://github.com/astral-sh/uv)，就下载 uv 0.12.5，并从 release 下载 `dawnmere` 和引擎的安装包；
@@ -189,7 +189,7 @@ sh install.sh
 - **Codex**：在 `~/.codex/config.toml` 中添加 `[mcp_servers.dawnmere]`，并在 `~/.codex/hooks.json` 中添加一个提示词钩子。在 Codex 里输入一次 `/hooks`，信任这个钩子。
 - **Cursor**：在 `~/.cursor/mcp.json` 中添加 `dawnmere`，在 `~/.cursor/hooks.json` 中添加一个会话开始钩子，然后重启 Cursor。在你运行 `dawnmere access cursor everything` 之前，Cursor 只能看到工作笔记；`dawnmere access cursor work` 可以再收回来。
 - **Windsurf、Gemini CLI、VS Code（Copilot）、Qwen Code、Kimi Code、Qoder CLI、iFlow CLI 和 Cline CLI**：setup 找到其中某个应用时，会在它的 MCP 配置文件（`~/.codeium/windsurf/mcp_config.json`、`~/.gemini/settings.json`、`~/Library/Application Support/Code/User/mcp.json`、`~/.qwen/settings.json`、`~/.kimi-code/mcp.json`、`~/.qoder/settings.json`、`~/.iflow/settings.json`、`~/.cline/data/settings/cline_mcp_settings.json`）中添加 `dawnmere`，然后重启该应用。它们只有工具、没有钩子，所以只在调用工具时才会回忆，并且只能看到工作笔记。
-- **Claude Desktop 和其他 MCP 应用**：setup 不会连接它们。Claude Desktop 可以打开 [最新 release](https://github.com/Hadeva-Dev/dawnmere/releases/latest) 里的 `dawnmere-connector.mcpb`，或者把下面这段加到 `~/Library/Application Support/Claude/claude_desktop_config.json`：
+- **Claude Desktop 和其他 MCP 应用**：setup 不会连接它们。Claude Desktop 可以打开 [最新 release](https://github.com/LF-Labs-Inc/dawnmere/releases/latest) 里的 `dawnmere-connector.mcpb`，或者把下面这段加到 `~/Library/Application Support/Claude/claude_desktop_config.json`：
 
   ```json
   {
@@ -272,7 +272,7 @@ dawnmere uninstall
 <a id="who-makes-it-and-the-lf-labs-names"></a>
 ## 谁在做，以及 LF Labs 这个名字
 
-Dawnmere 由 LF Labs（GitHub 上的 [Hadeva-Dev](https://github.com/Hadeva-Dev) 组织）开发。程序内部使用 LF Labs 这个名字，所以下面这些都是 Dawnmere：
+Dawnmere 由 LF Labs（GitHub 上的 [LF-Labs-Inc](https://github.com/LF-Labs-Inc) 组织）开发。程序内部使用 LF Labs 这个名字，所以下面这些都是 Dawnmere：
 
 | 内容 | 位置 |
 | --- | --- |
@@ -291,16 +291,16 @@ Dawnmere 由 LF Labs（GitHub 上的 [Hadeva-Dev](https://github.com/Hadeva-Dev)
 - **中文和日文的召回靠词语匹配。** 用中文或日文保存的笔记，只有在提问用到部分相同的词时才会自动加入提示；换一种说法提问常常找不到，但应用仍可主动搜索。如果设置了模型，中文或日文的问题也会用英文再搜一次，每次一个小的模型调用。直接输入保存要用 "remember that ..."，中文可以写 "记住：..."。
 - **从 Claude Code 保存效果最好。** 在 Codex 里要说 "remember that ..."；在 Cursor 里得由模型调用 `remember`。只有运行 `dawnmere setup --codex-sessions` 之后，才会读取 Codex 自己的会话文件。
 - **筛查是自动的，也会有漏网之鱼。** 用 `dawnmere export` 检查一下应用都存了什么。
-- **早期测试版。** 版本靠手动发布，更新也很频繁；更新前请先看 [release notes](https://github.com/Hadeva-Dev/dawnmere/releases)。
+- **早期测试版。** 版本靠手动发布，更新也很频繁；更新前请先看 [release notes](https://github.com/LF-Labs-Inc/dawnmere/releases)。
 
 <!-- Intel: install.sh:37 comment. Releases by hand: RELEASING.md line 3. -->
 
 ## 许可证
 
-本仓库中的安装程序、`dawnmere` 命令、Claude Code 插件和连接器采用 MIT 许可（[LICENSE](LICENSE)）。[引擎](https://github.com/Hadeva-Dev/lflabs-memory-engine)以 [Functional Source License 1.1, MIT future license](https://github.com/Hadeva-Dev/lflabs-memory-engine/blob/main/LICENSE)（FSL-1.1-MIT）公开源码：每个版本在发布两年后转为 MIT 许可。搜索模型保留各自的许可证（见 `dawnmere doctor --licenses` 和 [THIRD_PARTY.md](THIRD_PARTY.md)）。
+本仓库中的安装程序、`dawnmere` 命令、Claude Code 插件和连接器采用 MIT 许可（[LICENSE](LICENSE)）。[引擎](https://github.com/LF-Labs-Inc/dawnmere-engine)以 [Functional Source License 1.1, MIT future license](https://github.com/LF-Labs-Inc/dawnmere-engine/blob/main/LICENSE)（FSL-1.1-MIT）公开源码：每个版本在发布两年后转为 MIT 许可。搜索模型保留各自的许可证（见 `dawnmere doctor --licenses` 和 [THIRD_PARTY.md](THIRD_PARTY.md)）。
 
 ## 相关项目
 
-[memory-bench](https://github.com/Hadeva-Dev/memory-bench) 是一个面向助手记忆的开放基准测试，出自同一批人之手。它有一行 Dawnmere 的数据，测的是已发布的引擎，泄露情况和召回结果并排列出；里面维护者的另一行是一个相关的系统，基准测试里也写明了这一点。
+[memory-bench](https://github.com/LF-Labs-Inc/memory-bench) 是一个面向助手记忆的开放基准测试，出自同一批人之手。它有一行 Dawnmere 的数据，测的是已发布的引擎，泄露情况和召回结果并排列出；里面维护者的另一行是一个相关的系统，基准测试里也写明了这一点。
 
-发现 bug？请[提交 issue](https://github.com/Hadeva-Dev/dawnmere/issues/new/choose)，并附上 `dawnmere doctor --report` 的输出。安全问题请按 [SECURITY.md](SECURITY.md) 私下报告。
+发现 bug？请[提交 issue](https://github.com/LF-Labs-Inc/dawnmere/issues/new/choose)，并附上 `dawnmere doctor --report` 的输出。安全问题请按 [SECURITY.md](SECURITY.md) 私下报告。

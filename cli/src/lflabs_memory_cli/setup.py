@@ -790,7 +790,7 @@ def main(args, say=print):
     return code
 
 
-STAR = f"If {PRODUCT} helps, a star helps others find it: github.com/{REPO}"
+STAR = f"If {PRODUCT} helps, a star lets others find it: github.com/{REPO}"
 
 
 def star_once(say):

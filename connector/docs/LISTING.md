@@ -9,7 +9,7 @@ Shared by every listing:
 - **One line:** One memory shared across your AI apps: Claude, Cursor, Codex and more, kept on your Mac.
 - **Short (100 characters max, the registry's limit):** One memory shared across your AI apps. Connects to Dawnmere on your Mac.
 - **Tags:** memory, knowledge-management, cross-app, claude, cursor, codex, local-first, macos
-- **Repo:** https://github.com/Hadeva-Dev/dawnmere
+- **Repo:** https://github.com/LF-Labs-Inc/dawnmere
 - **Install:** `npx -y dawnmere-connector`
 - **Honest status line:** Early beta, macOS only; needs Dawnmere running on the same Mac.
 
@@ -18,7 +18,7 @@ Shared by every listing:
 Nothing to paste: `connector/server.json` is the listing. After the npm package is published, from `connector/`:
 
 ```bash
-mcp-publisher login github     # as a member of Hadeva-Dev
+mcp-publisher login github     # as a member of LF-Labs-Inc
 mcp-publisher publish
 ```
 
@@ -29,7 +29,7 @@ PulseMCP picks listings up from the registry.
 Section: **Knowledge & Memory**, alphabetical. Legend: 📇 TypeScript, 🏠 local, 🍎 macOS.
 
 ```markdown
-- [Hadeva-Dev/dawnmere](https://github.com/Hadeva-Dev/dawnmere) 📇 🏠 🍎 - One memory shared across your AI apps (Claude, Cursor, Codex and more), kept on your Mac by Dawnmere. Recall, remember and forget, with per-app permissions.
+- [LF-Labs-Inc/dawnmere](https://github.com/LF-Labs-Inc/dawnmere) 📇 🏠 🍎 - One memory shared across your AI apps (Claude, Cursor, Codex and more), kept on your Mac by Dawnmere. Recall, remember and forget, with per-app permissions.
 ```
 
 Most entries now also carry a Glama score badge after the link; add it once Glama has indexed the repo. Check the
@@ -46,22 +46,22 @@ Local server, published as the `.mcpb` from the GitHub release.
 ## Claude plugin directory (claude.ai/directory/manage)
 
 - **Plugin name:** dawnmere
-- **Source:** https://github.com/Hadeva-Dev/dawnmere (`plugin/.claude-plugin/plugin.json`, listed by the root `.claude-plugin/marketplace.json`)
+- **Source:** https://github.com/LF-Labs-Inc/dawnmere (`plugin/.claude-plugin/plugin.json`, listed by the root `.claude-plugin/marketplace.json`)
 - **Short description:** One memory shared across your AI apps, kept on your Mac.
 - **Long description:** Dawnmere gives Claude Code the same memory as your other AI apps. It adds four tools (recall, remember, forget, access_status) that talk to Dawnmere on your Mac. The plugin stores nothing and sends nothing over the network. Early beta: it needs Dawnmere running on the same Mac.
 - **Category:** Productivity
-- **Install snippet:** `/plugin marketplace add Hadeva-Dev/dawnmere` then `/plugin install dawnmere@dawnmere`, then `/dawnmere:setup`
+- **Install snippet:** `/plugin marketplace add LF-Labs-Inc/dawnmere` then `/plugin install dawnmere@dawnmere`, then `/dawnmere:setup`
 
 ## mcp.so (mcp.so/submit)
 
 - **Name:** Dawnmere
-- **URL:** https://github.com/Hadeva-Dev/dawnmere
+- **URL:** https://github.com/LF-Labs-Inc/dawnmere
 - **Description:** One memory shared across your AI apps (Claude, Cursor, Codex and more), kept on your Mac. Recall, remember and forget through Dawnmere, with per-app permissions. Early beta, macOS only.
 - **Tags:** memory, cross-app, local-first, macos
 
 ## MCP Market (mcpmarket.com/submit)
 
-- **GitHub URL:** https://github.com/Hadeva-Dev/dawnmere
+- **GitHub URL:** https://github.com/LF-Labs-Inc/dawnmere
 - **Description:** same as mcp.so.
 
 ## Glama

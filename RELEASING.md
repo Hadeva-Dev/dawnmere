@@ -7,7 +7,7 @@ The engine checkout sits next to this repo as `../lflabs-memory-engine`.
    `plugin/.claude-plugin/plugin.json` and in the plugin's entry in `.claude-plugin/marketplace.json` (a test checks
    they agree), and put the engine tag to ship in `ENGINE_TAG`. Merge that to `main`, then tag it `vX.Y.Z` and push
    the tag (`git push origin vX.Y.Z`) before anything is published: setup adds the Claude Code marketplace at
-   `Hadeva-Dev/dawnmere#vX.Y.Z`, the tag of the CLI it runs from, so the plugin and its hooks change only with a
+   `LF-Labs-Inc/dawnmere#vX.Y.Z`, the tag of the CLI it runs from, so the plugin and its hooks change only with a
    release, never with a push to `main`, and an install fails over to the settings.json hooks if the tag is missing.
    `dawnmere update` moves the plugin to the new tag (marketplace remove, add at the tag, install).
 2. **Wheels and the installer.**
@@ -64,6 +64,6 @@ The engine checkout sits next to this repo as `../lflabs-memory-engine`.
    ```bash
    H=$(mktemp -d)
    env -i HOME="$H" PATH=/usr/bin:/bin:/usr/sbin LC_ALL=en_US.UTF-8 LFLABS_MEMORY_NO_SETUP=1 \
-     sh -c 'curl -fsSL https://github.com/Hadeva-Dev/dawnmere/releases/latest/download/install.sh | sh'
+     sh -c 'curl -fsSL https://github.com/LF-Labs-Inc/dawnmere/releases/latest/download/install.sh | sh'
    PATH="$H/.local/bin:$PATH" HOME="$H" dawnmere setup --yes --plain --backend none && PATH="$H/.local/bin:$PATH" HOME="$H" dawnmere doctor
    ```
