@@ -52,8 +52,7 @@ def test_uninstall_reverses_setup(mac, monkeypatch):
     assert not (home / "Library/Application Support/LF Labs").exists() and not layout.logs_dir().exists()
     assert ["delete-generic-password", "-s", "LF Labs Memory", "-a", "anthropic-api-key"] in mac.calls("security")
     assert ["tool", "uninstall", "lflabs-memory-cli"] in mac.calls("uv")
-    backups = list((home / ".codex").glob("config.toml.lflabs-backup-*"))
-    assert backups and any(b.name in "\n".join(out) for b in backups), "backups are listed"
+    assert not list(home.rglob("*.lflabs-backup-*")), "every file put back: its backups go too"
 
 
 def test_uninstall_partial_state(mac):
@@ -145,3 +144,80 @@ def test_uv_in_local_bin_off_path(mac):
     uninstall.main(keep_data=True, out=out.append)
     assert ["tool", "uninstall", "lflabs-memory-cli"] in mac.calls("uv")
     assert any(line.startswith("Programs             lflabs-memory-cli and the engine removed") for line in out)
+
+
+def test_uv_is_said_to_stay(mac):
+    """The uv install.sh put in ~/.local/bin stays (other tools may use it): the end says how to remove it and its
+    Python, never its tool folder. A uv from anywhere else (Homebrew) is not ours to mention."""
+    import shutil
+    seed(mac.home)
+    fake_setup(mac.home)
+    out = []
+    assert uninstall.main(keep_data=True, out=out.append) == 0
+    assert not any("uv cache clean" in line for line in out), "a uv on PATH that is not the installer's"
+    local = mac.home / ".local/bin"
+    local.mkdir(parents=True)
+    shutil.copy(mac.bin / "uv", local / "uv")
+    out = []
+    uninstall.main(keep_data=True, out=out.append)
+    assert out[-2:] == ["uv and the Python it downloaded stay on this Mac (other tools may use them). If nothing else "
+                        "needs them:",
+                        '  ~/.local/bin/uv cache clean && rm -rf "$(~/.local/bin/uv python dir)" ~/.local/bin/uv '
+                        "~/.local/bin/uvx"]
+    assert not any("tool dir" in line for line in out)
+
+
+def test_engine_written_entries_are_ours():
+    """The engine's own connect wrote a python running the engine's script, and older engines JARVIS_MEMORY_* names."""
+    assert apps.ours_command("JARVIS_MEMORY_CLIENT=codex JARVIS_MEMORY_CLIENT_KEY=k /u/bin/python3.12 "
+                             "/u/bin/lflabs-memory hook-prompt")
+    assert apps.ours_command("env LFLABS_MEMORY_CLIENT=cursor /u/bin/lflabs-memory hook-cursor-start")
+    assert apps.ours_server({"command": "/u/bin/python", "args": ["/u/bin/lflabs-memory", "serve", "--client", "x"]})
+    assert apps.ours_server({"command": "lflabs-memory", "args": ["serve"]})
+    assert not apps.ours_command("/u/bin/python /u/bin/other hook-prompt")
+    assert not apps.ours_server({"command": "/u/bin/python", "args": ["/u/bin/lflabs-memory-ish", "serve"]})
+    assert not apps.ours_server({"command": "node", "args": ["server.js"]})
+
+
+def test_a_file_setup_created_goes_when_only_empty_structure_is_left(mac):
+    """A created mcp.json someone (the engine's connect) rewrote since: our entry out, nothing but {"mcpServers": {}}
+    left, so the file goes."""
+    home = mac.home
+    (home / ".cursor").mkdir()
+    record = install_record.empty()
+    for p in apps.file_plans("cursor", ENGINE, home):
+        apps.apply(p, record)
+    install_record.save(record)
+    data = json.loads((home / ".cursor/mcp.json").read_text())
+    data["mcpServers"]["lflabs-memory"]["env"] = {"JARVIS_MEMORY_CLIENT": "cursor"}
+    (home / ".cursor/mcp.json").write_text(json.dumps(data))
+    assert uninstall.main(keep_data=True, out=lambda s: None) == 0
+    assert not (home / ".cursor/mcp.json").exists() and not (home / ".cursor/hooks.json").exists()
+
+
+def zprofile(home, before, was):
+    line = 'export PATH="/u/.local/bin:$PATH"  # added by the Dawnmere installer'
+    add = ("\n" if before and not before.endswith("\n") else "") + line
+    if before is not None:
+        (home / ".zprofile").write_text(before)
+    with open(home / ".zprofile", "a") as f:
+        f.write(add + "\n")
+    layout.data_dir().mkdir(parents=True, exist_ok=True)
+    (layout.data_dir() / "zprofile-line").write_text(f"{was}\n{add}\n")
+
+
+def test_uninstall_takes_out_the_installers_zprofile_line(mac):
+    mine = 'eval "$(/opt/homebrew/bin/brew shellenv)"'
+    zprofile(mac.home, mine, "existing")
+    (mac.home / ".zprofile").write_text((mac.home / ".zprofile").read_text() + "alias ll='ls -l'\n")  # added since
+    out = []
+    assert uninstall.main(keep_data=True, out=out.append) == 0
+    assert (mac.home / ".zprofile").read_text() == mine + "\nalias ll='ls -l'\n", "exactly our line, nothing else"
+    assert any("~/.zprofile: the installer's PATH line taken out" in x for x in out)
+    assert not (layout.data_dir() / "zprofile-line").exists()
+
+
+def test_uninstall_removes_a_zprofile_the_installer_made(mac):
+    zprofile(mac.home, None, "created")
+    assert uninstall.main(keep_data=True, out=lambda s: None) == 0
+    assert not (mac.home / ".zprofile").exists()

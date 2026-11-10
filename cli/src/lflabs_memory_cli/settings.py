@@ -28,17 +28,39 @@ def load():
 
 
 def _value(v):
-    return ("true" if v else "false") if isinstance(v, bool) else str(v) if isinstance(v, int) else json.dumps(v)
+    return ("true" if v else "false") if isinstance(v, bool) else str(v) if isinstance(v, (int, float)) else \
+        json.dumps(v)
 
 
-def render(owner_name, backend, main_model="haiku", codex_sessions=False):
+def _plain(v):
+    return isinstance(v, (bool, int, float, str)) or (isinstance(v, list) and all(isinstance(x, (bool, int, float, str))
+                                                                                  for x in v))
+
+
+def render(owner_name, backend, main_model="haiku", codex_sessions=False, claude_path=None, keep=None):
+    """config.toml. keep: the file setup found (a re-run): every value it holds that setup's questions do not ask
+    about stays as the user left it (daily_calls, chat_index, a models folder, ...)."""
+    keep = keep or {}
     cfg = json.loads(json.dumps(DEFAULTS))
-    cfg["llm"].update(backend=backend, main_model=main_model)
+    for section, values in keep.items():
+        if isinstance(values, dict):
+            cfg.setdefault(section, {}).update({k: v for k, v in values.items() if _plain(v)})
+    cfg["llm"].update(backend=backend, main_model=main_model, **({"claude_path": claude_path} if claude_path else {}))
     cfg["privacy"]["codex_sessions"] = codex_sessions
     lines = ["version = 1", 'profile = "generic"'] + ([f"owner_name = {_value(owner_name)}"] if owner_name else [])
+    lines += [f"{k} = {_value(v)}" for k, v in keep.items()
+              if k not in ("version", "profile", "owner_name") and _plain(v)]
     for section, values in cfg.items():
         lines += ["", f"[{section}]"] + [f"{k} = {_value(v)}" for k, v in values.items()]
     return "\n".join(lines) + "\n"
+
+
+def raw():
+    """config.toml as it is ({} when there is none, or it does not parse)."""
+    try:
+        return tomllib.loads(path().read_text())
+    except (OSError, tomllib.TOMLDecodeError):
+        return {}
 
 
 def save(text):

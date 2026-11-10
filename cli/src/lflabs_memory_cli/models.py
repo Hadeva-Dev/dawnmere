@@ -5,8 +5,10 @@ DATA_DIR/models/<name>/ and refused when a checksum differs.
 models.json: {"release": "models-<date>", "models": {"embed": [{"file", "url", "size", "sha256"}], ...}}
 """
 import hashlib
+import http.client
 import json
 import os
+import time
 import tomllib
 import urllib.request
 from importlib import resources
@@ -68,35 +70,76 @@ class ChecksumError(RuntimeError):
     pass
 
 
+class DownloadError(OSError):
+    """Some models could not be downloaded (each file tried TRIES times): missing is {model name: why}. What was got of
+    a file is kept (<file>.part), so the next try goes on from there."""
+
+    def __init__(self, missing):
+        super().__init__(", ".join(f"{n}: {why}" for n, why in missing.items()))
+        self.missing = missing
+
+
+TRIES = 5
+
+
 def total_size(man, names):
     return sum(f["size"] for n in names for f in man["models"][n])
 
 
-def download(man, names, progress=lambda done, total: None, where=None, opener=urllib.request.urlopen):
-    """Fetch every file of `names` that is missing or wrong, checking size and sha256 while it streams. A file that
-    does not match is deleted and ChecksumError raised: nothing half-downloaded is ever left in place."""
-    where = where or folder()
+def _get(f, part, opener, progress):
+    """Append to part from where it ends (a Range request; a server that answers 200 sends it all again). Raises
+    OSError on a dropped connection or a short file."""
+    have = part.stat().st_size if part.exists() else 0
+    req = urllib.request.Request(f["url"], headers={"Range": f"bytes={have}-"} if have else {})
+    with opener(req, timeout=60) as r:
+        resumed = bool(have) and getattr(r, "status", None) == 206
+        n = have if resumed else 0
+        with open(part, "ab" if resumed else "wb") as out:
+            while chunk := r.read(1 << 16):
+                out.write(chunk)
+                n += len(chunk)
+                progress(n)
+    if n != f["size"]:
+        raise OSError(f"got {n} of {f['size']} bytes")
+
+
+def download(man, names, progress=lambda done, total: None, where=None, opener=None, sleep=None, tries=TRIES):
+    """Fetch every file of `names` that is missing or wrong: each tried `tries` times, waiting 1, 2, 4... s, and
+    resumed where it stopped. A file whose size or sha256 does not match is deleted: nothing unchecked is ever put in
+    place. After trying them all: ChecksumError if one did not match, else DownloadError if one could not be got."""
+    opener, sleep, where = opener or urllib.request.urlopen, sleep or time.sleep, where or folder()
     todo = [(n, f) for n in names for f in man["models"][n]
             if not ((where / n / f["file"]).exists() and file_sha256(where / n / f["file"]) == f["sha256"])]
     total = sum(f["size"] for _, f in todo) or 1
-    done = 0
+    done, missing, bad = 0, {}, []
     progress(0, total)
     for name, f in todo:
         dest = where / name / f["file"]
         dest.parent.mkdir(parents=True, exist_ok=True)
         part = dest.with_name(dest.name + ".part")
-        h = hashlib.sha256()
-        try:
-            with opener(f["url"], timeout=60) as r, open(part, "wb") as out:
-                while chunk := r.read(1 << 16):
-                    out.write(chunk)
-                    h.update(chunk)
-                    done += len(chunk)
-                    progress(done, total)
-            if part.stat().st_size != f["size"] or h.hexdigest() != f["sha256"]:
-                raise ChecksumError(f"{name}/{f['file']} did not match its checksum: deleted")
-            os.replace(part, dest)
-        finally:
+        if part.exists() and part.stat().st_size > f["size"]:
+            part.unlink()
+        base = done
+        for attempt in range(tries):
+            try:
+                _get(f, part, opener, lambda n: progress(base + n, total))
+                break
+            except (OSError, http.client.HTTPException) as e:
+                why = str(e) or type(e).__name__
+                if attempt + 1 < tries:
+                    sleep(2 ** attempt)
+        else:
+            missing.setdefault(name, why)
+            continue
+        if part.stat().st_size != f["size"] or file_sha256(part) != f["sha256"]:
             part.unlink(missing_ok=True)
+            bad.append(f"{name}/{f['file']}")
+            continue
+        os.replace(part, dest)
+        done = base + f["size"]
     progress(total, total)
+    if bad:
+        raise ChecksumError(f"{', '.join(bad)} did not match its checksum: deleted")
+    if missing:
+        raise DownloadError(missing)
     return done

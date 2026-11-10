@@ -46,7 +46,7 @@ def test_frames_golden():
 def test_final_frame_matches_the_design():
     """The last frame at 100 x 46 is the prototype's (research/dawnmere-kip/term/final_frame.txt), line for line.
     Two rows differ on purpose: the tree's "how" lines up with the results (spec 9.1, One result column), and the
-    self-check shows hundredths (Hao, 2026-10-28)."""
+    self-check shows hundredths (decided 2026-10-28)."""
     design = (GOLDEN / "design-final.txt").read_text().splitlines()
     state = scripted(width=100, height=46)
     real = [visible(x) for x in frame(done_at(state), state)]
@@ -387,3 +387,40 @@ def test_long_note_stays_on_one_row(final):
     state.steps[0].note = "found; background reading off (Claude Code 2.0.1 is older than 2.1.301: update it)"
     row = next(visible(x) for x in frame(end, state) if "Claude Code" in x and "found" in x)
     assert len(row) <= 68 and row.endswith("…")
+
+
+def test_a_problem_replaces_the_success_line():
+    """Setup worked but the apps cannot use memory's tools (no Node.js): the end says so, not "Dawnmere is on."."""
+    problem = "Node.js is not installed: your apps cannot use memory's tools until you install Node.js 18 or later " \
+              "from nodejs.org."
+    for display in ({}, {"plain": True}, {"intro": False}, {"width": 60}):
+        state = scripted(**display)
+        state.problem = problem
+        lines = [visible(x) for x in frame(done_at(state), state)]
+        text = " ".join(" ".join(line.split()) for line in lines)
+        assert "Dawnmere is on." not in text and TRY_PREFIX not in text and "reaches the others" not in text
+        assert problem in text.replace("! ", ""), display
+        assert state.plain or all(len(line) <= state.width for line in lines), display  # plain lines never wrap
+
+
+@pytest.mark.parametrize("backend_name,logged_in,version", [("claude-cli", False, "2.1.301"),
+                                                           ("claude-cli", True, "2.1.301"),
+                                                           ("anthropic-api", None, "2.1.301"),
+                                                           ("none", None, "2.1.301"), ("none", None, None)])
+def test_claude_code_row_fits_80_columns(final, backend_name, logged_in, version):
+    """Setup's own Claude Code notes are never cut at 80 columns ("log in to start reading (claude, then…" was)."""
+    from lflabs_memory_cli import backend, setup
+    a = setup.Answers()
+    a.backend = backend_name
+    a.claude = backend.Status("claude-cli", True, version, logged_in, usable=True)
+    got = []
+
+    class UI:
+        def step(self, label, status, note=None, **kw):
+            got.append((status, note))
+    setup.RealSetup.step_claude(type("S", (), {"a": a})(), UI())
+    status, note = got[-1]
+    state, end = final(width=80)
+    state.steps[0].status, state.steps[0].note = status, note
+    row = next(visible(x) for x in frame(end, state) if "Claude Code" in x and note in x)
+    assert len(row) <= 80 and not row.endswith("…")

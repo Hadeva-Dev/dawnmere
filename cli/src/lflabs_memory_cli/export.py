@@ -1,8 +1,11 @@
 """export / import: your memory as one file, to keep or to move Macs (spec 9.5).
 
 Secrets (memories the engine marked `secret`) never leave: they are left out and counted. Import goes through the
-engine's own remember(), so a memory already there is not added twice; imported memories are labelled "unknown"
-origin, never "your own words" (a file can say anything about where it came from).
+engine's own remember(), so a memory already there is not added twice. Every imported memory is saved as of
+"unknown" origin: a file can say anything about where it came from, and a person at a terminal can be imitated by an
+AI app. The memories this import added that the file says are the user's own are then handed to the engine's
+`trust`, which asks the user once, in a macOS dialog only they can click and whose text the engine writes itself,
+before it makes them their own (owner_vouched); never from an AI app's shell.
 """
 import json
 import os
@@ -12,7 +15,8 @@ from collections import defaultdict
 from pathlib import Path
 
 from .brand import COMMAND
-from .layout import data_dir, home, short
+from .layout import ENGINE, data_dir, engine_bin, home, short
+from .run import run
 
 FORMAT = "lflabs-memory-export/1"
 FIELDS = ("id", "content", "kind", "project", "section", "origin", "created", "updated")
@@ -92,14 +96,30 @@ def export(out_file=None, fmt="json", include_claims=False, say=print):
     return 0
 
 
+OWN = {"owner_key", "owner_typed", "owner_vouched", "owner_desk"}  # the engine's OWNER_ORIGINS: the user's own words
+
+
 def _engine_remember():
-    """remember(content, kind, project) through the engine, on its own store."""
+    """remember(content, kind, project, origin) through the engine, on its own store."""
     from lflabs_memory import mem  # noqa: the engine is installed with this CLI
     db = mem.connect()
 
-    def save(content, kind, project):
-        return mem.remember(db, content, kind, project, origin="unknown", via="import")
+    def save(content, kind, project, origin="unknown"):
+        return mem.remember(db, content, kind, project, origin=origin, via="import")
     return save
+
+
+def ask_trust(ids, since, say):
+    """The engine's `trust`: one macOS dialog, its text the engine's own, asks the user whether these memories (added
+    by this import, at or after `since`) are their own words; it says what it did. Nothing of the file (its name, its
+    words) is passed as text. Never from an AI app's shell (they stay unknown)."""
+    from .access import agent_ancestor, agent_shell
+    if agent_shell() or agent_ancestor() is not None:
+        say(f"{len(ids)} the file calls yours stay of unknown origin: an AI app ran this import. Run {COMMAND} import "
+            "yourself, in a Terminal window, to be asked.")
+        return
+    r = run([engine_bin() or ENGINE, "trust", "--import-since", repr(since), "--", *map(str, ids)], timeout=300)
+    say((r.out or r.err).strip() or "not trusted")
 
 
 def load_file(path):
@@ -117,12 +137,16 @@ def import_file(path, say=print, remember=None):
         return 1
     save = remember or _engine_remember()
     added = same = refused = 0
+    own = []
+    since = time.time()  # the engine trusts only memories made by this import (created at or after it)
     for m in doc["memories"]:
         content = m.get("content") if isinstance(m, dict) else None
         if not isinstance(content, str) or not content.strip():
             refused += 1
             continue
-        mid, action = save(content, m.get("kind") or "note", m.get("project"))
+        mid, action = save(content, m.get("kind") or "note", m.get("project"), origin="unknown")
+        if mid is not None and action == "added" and m.get("origin") in OWN:  # never one that was already here
+            own.append(mid)
         if mid is None:
             refused += 1
         elif action == "added":
@@ -131,4 +155,6 @@ def import_file(path, say=print, remember=None):
             same += 1
     say(f"Imported {added} new memor{'y' if added == 1 else 'ies'}; {same} {'was' if same == 1 else 'were'} already "
         "here" + (f"; {refused} refused" if refused else "") + ".")
+    if own:
+        ask_trust(own, since, say)
     return 0
