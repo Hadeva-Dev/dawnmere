@@ -37,7 +37,8 @@ def _plain(v):
                                                                                   for x in v))
 
 
-def render(owner_name, backend, main_model="haiku", codex_sessions=False, claude_path=None, keep=None):
+def render(owner_name, backend, main_model="haiku", codex_sessions=False, claude_path=None, keep=None, provider="",
+           api_base="", api_model="", codex_path=None):
     """config.toml. keep: the file setup found (a re-run): every value it holds that setup's questions do not ask
     about stays as the user left it (daily_calls, chat_index, a models folder, ...)."""
     keep = keep or {}
@@ -46,6 +47,14 @@ def render(owner_name, backend, main_model="haiku", codex_sessions=False, claude
         if isinstance(values, dict):
             cfg.setdefault(section, {}).update({k: v for k, v in values.items() if _plain(v)})
     cfg["llm"].update(backend=backend, main_model=main_model, **({"claude_path": claude_path} if claude_path else {}))
+    for k in ("provider", "api_base", "codex_path"):  # each backend's own settings: none of another's stay behind
+        cfg["llm"].pop(k, None)
+    if backend == "codex-cli" and codex_path:
+        cfg["llm"]["codex_path"] = codex_path
+    if backend == "openai-api":
+        cfg["llm"].update({k: v for k, v in (("provider", provider), ("api_base", api_base)) if v})
+        if api_model:
+            cfg["llm"].update(main_model=api_model, cheap_model=api_model)
     cfg["privacy"]["codex_sessions"] = codex_sessions
     lines = ["version = 1", 'profile = "generic"'] + ([f"owner_name = {_value(owner_name)}"] if owner_name else [])
     lines += [f"{k} = {_value(v)}" for k, v in keep.items()

@@ -4,7 +4,7 @@ import shutil
 import time
 from pathlib import Path
 
-from . import apps, claude_settings, edits, install_record, keychain, launchd, layout, prompt, sockets
+from . import apps, backend, claude_settings, edits, install_record, keychain, launchd, layout, prompt, sockets
 from .brand import COMMAND
 from .layout import (BACKUP_TAG, CLI_DIST, MARKETPLACE, OLD_MARKETPLACE, OLD_SERVER, SERVER, connector_sock, data_dir,
                      engine_sock, home, logs_dir, short, uv_bin)
@@ -171,7 +171,7 @@ def main(keep_data=False, out=print):
                     _file(entry, rep)
 
     _zprofile(rep)
-    rep.row("API key", *(("removed", "removed from the Keychain") if keychain.delete() else
+    rep.row("API key", *(("removed", "removed from the Keychain") if keychain.delete_all([*backend.PROVIDERS, backend.OTHER]) else
                           ("gone", "none in the Keychain")))
 
     data = data_dir()

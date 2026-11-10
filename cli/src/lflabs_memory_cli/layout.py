@@ -147,20 +147,25 @@ def developer_tools():
     return r.ok and os.path.isfile(os.path.join(r.out.strip(), "usr", "bin", "git"))
 
 
-def find_claude():
+def find_claude(name="claude"):
     """Claude Code's absolute path as a new Terminal window finds it (login and interactive zsh: its PATH, or the
     alias the old local installer made), else the claude on this PATH. The background service has launchd's fixed
     PATH, so setup stores this in config.toml ([llm] claude_path). None when there is none."""
-    r = run(["zsh", "-lic", "whence -p claude || alias claude"], timeout=15)
+    r = run(["zsh", "-lic", f"whence -p {name} || alias {name}"], timeout=15)
     for line in reversed((r.out or "").splitlines() if r.ok else []):
         line = line.strip()
-        if line.split("=", 1)[0] in ("claude", "alias claude"):
+        if line.split("=", 1)[0] in (name, f"alias {name}"):
             line = line.split("=", 1)[1].strip().strip("'\"")
         p = os.path.expanduser(line)
         if os.path.isabs(p) and os.access(p, os.X_OK):
             return p
-    found = shutil.which("claude")
+    found = shutil.which(name)
     return str(Path(found).absolute()) if found else None
+
+
+def find_codex():
+    """Codex's absolute path, found the same way ([llm] codex_path)."""
+    return find_claude("codex")
 
 
 def path_line():

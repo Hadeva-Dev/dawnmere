@@ -202,9 +202,18 @@ def check_model(cfg, ping=True):
         if not keychain.present():  # warn, not fail: background reading waits; recall and remember still work
             return Check("model", "warn", f"API key missing from the Keychain; {READING_WAITS}", f"run {COMMAND} setup")
         return Check("model", "ok", f"Anthropic API key, {model}")
+    if s is None:
+        return Check("model", "warn", f"could not ask the engine about its model; {READING_WAITS}",
+                     f"run {COMMAND} setup to choose again")
     if not s.ok:
         return Check("model", "warn", f"{s.note or 'not working'}; {READING_WAITS}",
                      s.note if "run claude" in (s.note or "") else f"run {COMMAND} setup to choose again")
+    if name == "codex-cli":
+        return Check("model", "warn" if s.note else "ok", f"Codex {s.version}, your ChatGPT plan" +
+                     (f" ({s.note})" if s.note else ""))
+    if name == "openai-api":
+        who = backend.PROVIDERS.get(llm.get("provider"), llm.get("api_base") or "another provider")
+        return Check("model", "warn" if s.note else "ok", f"{who}" + (f" ({s.note})" if s.note else ""))
     who = f"Claude Code {s.version}" if name == "claude-cli" else "Anthropic API key"
     login = ", logged in" if s.logged_in else ""
     return Check("model", "warn" if s.note else "ok", f"{who}{login}, {model}" + (f" ({s.note})" if s.note else ""))

@@ -140,7 +140,13 @@ def parser():
             sp.add_argument("--demo", nargs="?", const="default", choices=SCENARIOS, metavar="SCENARIO",
                             help=f"play the setup screen with fake steps ({', '.join(SCENARIOS)})")
             sp.add_argument("--yes", action="store_true", help="take the defaults (the screen is still shown)")
-            sp.add_argument("--backend", choices=("claude-cli", "anthropic-api", "none"))
+            sp.add_argument("--backend", choices=("claude-cli", "anthropic-api", "codex-cli", "openai-api", "none"),
+                            help="what reads in the background: your Claude plan, an Anthropic key, your ChatGPT "
+                                 "plan through Codex, another provider's key (--provider), or nothing")
+            sp.add_argument("--provider", help="with --backend openai-api: openai, gemini, deepseek, kimi, qwen, glm, "
+                                               "doubao, openrouter or ollama (the key: asked, or $DAWNMERE_API_KEY)")
+            sp.add_argument("--api-base", help="with --backend openai-api: any other OpenAI-compatible address")
+            sp.add_argument("--api-model", help="with --backend openai-api: the model to use there")
             sp.add_argument("--model", choices=("haiku", "sonnet"),
                             help="sonnet remembers a few more of your rules, at about 10 times the usage")
             sp.add_argument("--only", help="apps to connect: claude-code,codex,cursor,windsurf,gemini,copilot,qwen-code,kimi-code,qoder,iflow,cline")

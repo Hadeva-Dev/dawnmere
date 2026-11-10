@@ -69,6 +69,14 @@ def claude_endpoint(env=None, settings_files=None):
     return None
 
 
+MIN_CODEX = (0, 160, 0)  # the engine's llm.MIN_CODEX
+# OpenAI-compatible providers the engine knows (llm.PROVIDERS has their addresses and models): the names setup shows
+PROVIDERS = {"openai": "OpenAI", "gemini": "Google Gemini", "deepseek": "DeepSeek", "kimi": "Kimi (Moonshot)",
+             "qwen": "Qwen (Alibaba)", "glm": "GLM (Zhipu)", "doubao": "Doubao (Volcengine)",
+             "openrouter": "OpenRouter", "ollama": "Ollama on this Mac"}
+OTHER = "openai-compatible"  # the Keychain name of a key for an address the user typed (llm.OpenAICompat.account)
+
+
 @dataclass
 class Status:
     name: str
@@ -151,3 +159,53 @@ def api_ping(key, model="haiku"):
         return False, "the key was refused" if e.code in (401, 403) else f"the API answered {e.code}"
     except (urllib.error.URLError, OSError):
         return False, "could not reach api.anthropic.com"
+
+
+def engine_backends():
+    """The backends the installed engine has (llm.BACKENDS), so setup never offers one it cannot run."""
+    try:
+        from lflabs_memory import llm
+        return set(llm.BACKENDS)
+    except Exception:
+        return {"claude-cli", "anthropic-api", "none"}
+
+
+def codex_status():
+    """Whether the user's ChatGPT plan can read for memory, through Codex: installed, new enough, logged in."""
+    r = run(["codex", "--version"], timeout=20)
+    m = re.search(r"(\d+)\.(\d+)\.(\d+)", r.out) if r.ok else None
+    if not m:
+        return Status("codex-cli", False, note="Codex not found")
+    text = m.group(0)
+    if tuple(int(x) for x in m.groups()) < MIN_CODEX:
+        return Status("codex-cli", False, text, note=f"Codex {text} is older than {'.'.join(map(str, MIN_CODEX))}")
+    said = run(["codex", "login", "status"], timeout=20)
+    said = (said.out + said.err).lower()
+    logged = False if "not logged in" in said else True if "logged in" in said else None
+    return Status("codex-cli", logged is not False, text, logged,
+                  "" if logged is not False else "Codex is not logged in: run codex login", usable=True)
+
+
+def provider_ping(provider, key, api_base=None, model=None):
+    """(ok, note): one tiny call to an OpenAI-compatible provider with this key, through the engine's own backend
+    class so setup and the service ask the same way. Nothing is written: the key is handed to it in memory."""
+    try:
+        from dataclasses import replace
+        from lflabs_memory import config, llm
+        b = llm.OpenAICompat()
+    except Exception:
+        return False, "this version of the engine cannot use that provider"
+    b._key = key or ""
+    cfg = config.peek() if hasattr(config, "peek") else config.current()
+    patched = replace(cfg, llm=replace(cfg.llm, backend="openai-api", provider=provider or "", api_base=api_base or "",
+                                       **({"main_model": model, "cheap_model": model} if model else {})))
+    old = config.CFG if hasattr(config, "CFG") else None
+    try:
+        config.CFG = patched
+        b.json("Say ok.", {"type": "object", "required": ["ok"], "properties": {"ok": {"type": "boolean"}}},
+               "Answer ok true.", model=patched.llm.cheap_model, timeout=60)
+        return True, ""
+    except Exception as e:  # llm.Unavailable, RuntimeError: its own words, which never hold the key
+        return False, str(e)[:200]
+    finally:
+        config.CFG = old
