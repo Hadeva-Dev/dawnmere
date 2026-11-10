@@ -192,6 +192,9 @@ class RealSetup:
         self.a, self.record, self.say = answers, record, say
         self.engine = engine_bin() or ENGINE
         self.left_alone = []        # (app, path, note, snippet): printed after the screen
+        # The Claude Code notes this setup run imports (trust_imported): the service imports them too as it starts, before
+        # the notes step, so what counts is what is new since setup began.
+        self.imported, self.notes_before, self.import_since = [], None if dry else _max_id(), time.time()
         self.models_missing = []    # required models the download could not get
         self.connected = []
         self.expect_apps = sum(1 for x in self.a.apps if x in apps.LABELS and apps.installed(x))
@@ -362,6 +365,7 @@ class RealSetup:
         if not r.ok:
             ui.step("Your notes", "warn", "could not import them now; the service tries again weekly")
             return
+        self.imported = _imported_ids(self.notes_before)
         ui.memory(mem)
         ui.step("Your notes", "ok", f"{n} imported from Claude Code")
 
@@ -522,6 +526,49 @@ def check_phrase():
     "<command> self-check <hex>" was taken as a restatement and merged, then purged with it). Every word is a common
     one, so the save is never held back for review and the check sees it at once."""
     return " ".join(secrets.choice(WORDS) for _ in range(5)) + f" {secrets.randbelow(10 ** 6):06d}"
+
+
+def _imported_ids(before):
+    """The ids of the Claude Code notes an import just made: newer than before (_max_id), from a memory file, not yet
+    trusted; [] when the store cannot be read."""
+    p = data_dir() / "memory.db"
+    if before is None or not p.exists():
+        return []
+    try:
+        db = sqlite3.connect(f"file:{p}?mode=ro", uri=True, timeout=5)
+        try:
+            return [r[0] for r in db.execute(
+                "select id from memories where id > ? and status = 'active' and coalesce(origin, 'unknown') ="
+                " 'unknown' and source glob '*/.claude/projects/*/memory/*.md' order by id", (before,))]
+        finally:
+            db.close()
+    except sqlite3.Error:
+        return []
+
+
+def can_ask_in_person(args):
+    """A person at this Terminal to answer a dialog: not --yes, a real terminal both ways, and no AI app's environment or
+    process among this one's ancestors (access.agent_shell, access.agent_ancestor: unreadable counts as one)."""
+    return not args.yes and sys.stdin.isatty() and sys.stdout.isatty() and not access.agent_shell() and \
+        access.agent_ancestor() is None
+
+
+def trust_imported(engine, ids, since, args, say):
+    """After the screen: the Claude Code notes this setup imported are held like any import until the user trusts them.
+    In person, the engine's one macOS dialog (`trust`, its own text and three snippets) asks; else, or on Cancel, say
+    how to confirm them later."""
+    n = len(ids)
+    if can_ask_in_person(args):
+        r = run([engine, "trust", "--claude-import-since", repr(since), "--", *map(str, ids)], timeout=300)
+        if r.ok and (r.out or "").strip().startswith("trusted"):
+            say(f"\nThe {n} note{'s' if n > 1 else ''} you imported from Claude Code {'are' if n > 1 else 'is'} yours "
+                "now: every app may use them.")
+            return True
+    say(f"\nThe {n} note{'s' if n > 1 else ''} imported from Claude Code {'are' if n > 1 else 'is'} kept for search "
+        f"until you confirm {'them' if n > 1 else 'it'}: `{ENGINE} held` lists {'them' if n > 1 else 'it'}, and "
+        f"`{ENGINE} trust -- {' '.join(map(str, ids[:8]))}{' ...' if n > 8 else ''}` trusts "
+        f"{'them' if n > 1 else 'it'} as yours (it asks in a dialog).")
+    return False
 
 
 def _max_id():
@@ -690,6 +737,8 @@ def main(args, say=print):
     code = play(work, intro=intro, plain=args.plain, animate=not args.no_animation)
     if code == 0 and a.cursor_personal:  # widening needs the person to confirm it, here as in `access` itself
         access.main("cursor", "everything", work.engine, say=say)
+    if code == 0 and work.imported:  # the notes imported from Claude Code: the person trusts them in a dialog
+        trust_imported(work.engine, work.imported, work.import_since, args, say)
     for app, path, note, snippet in work.left_alone:
         say(f"\n{apps.LABELS.get(app, app)}: {short(path) + ': ' if path else ''}{note}")
         if snippet:
