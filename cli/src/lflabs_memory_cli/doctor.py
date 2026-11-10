@@ -8,12 +8,13 @@ import time
 from dataclasses import asdict, dataclass
 from importlib import metadata
 
-from . import apps, backend, launchd, models, settings, sockets
+from . import apps, backend, launchd, layout, models, settings, sockets
 from .brand import COMMAND
 from .layout import CONNECTOR, CONNECTOR_VERSION, ENGINE, ENGINE_DIST, SERVER, data_dir, engine_bin, home, short
 from .run import run
 
 SLOW = 1.5
+WARMING = 120  # seconds after the service starts in which a slow call is the models still loading
 IDLE = 600  # the engine reads a session once it has been quiet this long (EXTRACT_IDLE) or has ended
 LICENSES = [("embed", "bge-small-en-v1.5", "MIT"), ("rerank", "ms-marco-MiniLM-L-6-v2", "Apache-2.0"),
             ("sense", "friday-sense-v3 (mmBERT-base fine-tune)", "MIT base, LF Labs weights")]
@@ -51,12 +52,21 @@ def _count(db, sql, *args):
         return None
 
 
-def _uptime(pid):
+def _up_seconds(pid):
+    """How long the process has run, in seconds (ps etime), or None."""
     r = run(["ps", "-o", "etime=", "-p", str(pid)], timeout=5)
     m = re.fullmatch(r"\s*(?:(\d+)-)?(?:(\d+):)?(\d+):(\d+)\s*", r.out or "")
     if not r.ok or not m:
+        return None
+    d, h, mi, s = (int(m.group(i) or 0) for i in range(1, 5))
+    return ((d * 24 + h) * 60 + mi) * 60 + s
+
+
+def _uptime(pid):
+    up = _up_seconds(pid)
+    if up is None:
         return ""
-    d, h, mi = int(m.group(1) or 0), int(m.group(2) or 0), int(m.group(3))
+    d, h, mi = up // 86400, up // 3600, up // 60
     return f", up {d} d" if d else f", up {h} h" if h else f", up {mi} min"
 
 
@@ -80,9 +90,10 @@ def check_data(db):
     size = sum(f.stat().st_size for f in data_dir().glob("memory.db*")) / 1e6
     parts = [f"{mem:,} memor{'y' if mem == 1 else 'ies'}"] + \
         ([f"{claims:,} claim{'' if claims == 1 else 's'}"] if claims is not None else []) + [f"{size:.0f} MB"]
-    mode = os.stat(data_dir()).st_mode & 0o777
-    if mode & 0o077:
-        return Check("data", "warn", f"{d}  ({', '.join(parts)})", f"the folder is readable by others: chmod 700 '{data_dir()}'")
+    open_ = [str(p) for p in (data_dir(), layout.lf_labs_dir()) if p.is_dir() and os.stat(p).st_mode & 0o077]
+    if open_:
+        return Check("data", "warn", f"{d}  ({', '.join(parts)})",
+                     "the folder is readable by others: chmod 700 " + " ".join(f"'{p}'" for p in open_))
     return Check("data", "ok", f"{d}  ({', '.join(parts)})")
 
 
@@ -97,7 +108,7 @@ def check_models():
     names = ", ".join(n for n, s in got.items() if s == "ok")
     if bad:
         return Check("models", "fail", ", ".join(f"{n} {got[n]}" for n in bad),
-                     f"run {COMMAND} setup to download them again")
+                     f"run {COMMAND} setup --models")
     note = f"{names}: checksums match" + (f"; {', '.join(missing_optional)} not installed (word lists decide)"
                                           if missing_optional else "")
     return Check("models", "ok", note)
@@ -113,12 +124,18 @@ def check_hook():
         payload = json.dumps({"session_id": f"doctor-{os.getpid()}", "hook_event_name": "UserPromptSubmit",
                               "prompt": "doctor: what do you remember about this project?", "cwd": cwd,
                               "transcript_path": os.path.join(cwd, "none.jsonl")})
+        run([eng, "hook-prompt"], input=payload, timeout=10)  # warm-up: the first call after a start loads the models
         t0 = time.monotonic()
         r = run([eng, "hook-prompt"], input=payload, timeout=10)
         took = time.monotonic() - t0
     if not r.ok:
         return Check("hook speed", "fail", "the prompt hook failed", "see ~/Library/Logs/LF Labs/memory.log")
     if took > SLOW:
+        pid = launchd.loaded()[1]
+        up = _up_seconds(pid) if pid else None
+        if up is not None and up < WARMING:
+            return Check("hook speed", "ok", f"recall in {took:.2f} s: the service started {up} s ago and is still "
+                         f"loading its models (limit {SLOW} s once warm)")
         return Check("hook speed", "warn", f"recall in {took:.2f} s (limit {SLOW} s)",
                      "is the background service running? (engine line above)")
     return Check("hook speed", "ok", f"recall in {took:.2f} s (limit {SLOW} s)")
@@ -132,20 +149,53 @@ def check_connector():
                  "Codex and Cursor cannot reach memory: is the background service running?")
 
 
+def check_node(node, on_npm=True):
+    version, problem = node
+    if problem:
+        return Check("Node.js", "warn", problem, apps.NODE_FIX)
+    if on_npm is None:  # offline, or no npm: said, never a failure
+        return Check("Node.js", "ok", f"{version}; could not check {CONNECTOR}@{CONNECTOR_VERSION} on npm")
+    return Check("Node.js", "ok", version)
+
+
+def _no_tools(check, node, on_npm=True):
+    """An app row while Node.js is missing, or the pinned connector is not on npm: its MCP entry (npx) cannot start,
+    so the row warns (the fix is the Node.js row's)."""
+    if check.note == "not installed":
+        return check
+    if node[1]:
+        return Check(check.name, "warn", f"{check.note}; {check.name} cannot use memory's tools until Node.js 18 or "
+                     "later is installed", check.fix)
+    if on_npm is False:
+        return Check(check.name, "warn", f"{check.note}; {apps.NOT_ON_NPM}", check.fix)
+    return check
+
+
+READING_WAITS = "background reading waits (recall and remember still work)"
+
+
 def check_model(cfg, ping=True):
     llm = cfg["llm"]
     name = llm["backend"]
     if name == "none":
         return Check("model", "ok", f"none: {backend.NONE_LOSES}")
     model = backend.MODELS.get(llm["main_model"], llm["main_model"])
+    if name == "claude-cli":  # the service runs the claude setup found (claude_path), else one on launchd's PATH
+        where = llm.get("claude_path")
+        if where and not os.access(where, os.X_OK):
+            return Check("model", "warn", f"Claude Code is not at {where} any more",
+                         f"run {COMMAND} setup again: it finds claude again")
+        if not where and not layout.find_claude():
+            return Check("model", "warn", "Claude Code is not installed",
+                         f"install Claude Code, then run {COMMAND} setup again")
     s = backend.engine_status(ping) or (backend.claude_status(llm["main_model"], ping) if name == "claude-cli" else None)
     if name == "anthropic-api" and s is None:
         from . import keychain
-        if not keychain.present():
-            return Check("model", "fail", "API key missing from the Keychain", f"run {COMMAND} setup")
+        if not keychain.present():  # warn, not fail: background reading waits; recall and remember still work
+            return Check("model", "warn", f"API key missing from the Keychain; {READING_WAITS}", f"run {COMMAND} setup")
         return Check("model", "ok", f"Anthropic API key, {model}")
     if not s.ok:
-        return Check("model", "fail", s.note or "not working",
+        return Check("model", "warn", f"{s.note or 'not working'}; {READING_WAITS}",
                      s.note if "run claude" in (s.note or "") else f"run {COMMAND} setup to choose again")
     who = f"Claude Code {s.version}" if name == "claude-cli" else "Anthropic API key"
     login = ", logged in" if s.logged_in else ""
@@ -196,10 +246,9 @@ def check_claude():
     if r.ok and SERVER in r.out:
         m = re.search(rf"{re.escape(SERVER)}\S*\s+(?:Version:\s*)?v?(\d[\w.]*)", r.out)  # 2.1.301 lists "Version: x"
         plugin = f"plugin {SERVER}" + (f" {m.group(1)}" if m else "")
-        if not run(["zsh", "-lc", f"command -v {ENGINE}"], timeout=15).ok:  # the plugin's hooks run it by name
-            return Check("Claude Code", "warn", f"{plugin}, but its hooks cannot find {ENGINE}",
-                         'add ~/.local/bin to your PATH (export PATH="$HOME/.local/bin:$PATH" in ~/.zshrc), then '
-                         "restart Claude Code")
+        if not apps.hook_engine():  # where the plugin's hook launcher looks, never PATH
+            return Check("Claude Code", "warn", f"{plugin}, but its hooks cannot find the engine",
+                         f"run {COMMAND} setup again")
         return Check("Claude Code", "ok", f"{plugin}, hooks on")
     try:
         text = (home() / ".claude/settings.json").read_text()
@@ -242,10 +291,31 @@ def check_cursor():
     return Check("Cursor", "warn", "not connected", f"run {COMMAND} setup")
 
 
+def check_command():
+    if layout.on_shell_path():
+        return Check(COMMAND, "ok", "on your PATH")
+    return Check(COMMAND, "warn", "not on your PATH: a new Terminal window will not find it",
+                 f"add this line to ~/.zprofile, then open a new Terminal window: {layout.path_line()}")
+
+
+def check_held():
+    """[a row] when the engine holds app saves back from prompts (`lflabs-memory held --count`), else []: they wait
+    for the user's confirm code, which `lflabs-memory held` shows."""
+    eng = engine_bin()
+    r = run([eng, "held", "--count"], timeout=15) if eng else None
+    n = int(r.out.strip()) if r and r.ok and r.out.strip().isdigit() else 0
+    if not n:
+        return []
+    return [Check("held back", "ok", f"{n} app save{'s' if n != 1 else ''} held back from prompts: {ENGINE} held "
+                  "shows them and their confirm codes")]
+
+
 def check_privacy(cfg):
-    p = cfg["privacy"]
-    return Check("privacy", "ok", "local only; Codex sessions " + ("on" if p["codex_sessions"] else "off") +
-                 "; chat index " + ("on" if p["chat_index"] else "off") + "; no telemetry")
+    """What stays and what goes: the memory is on this Mac; background reading sends conversations to the user's own
+    model (their Claude plan or API key)."""
+    p, on = cfg["privacy"], lambda x: "on" if x else "off"
+    return Check("privacy", "ok", f"memory stored on this Mac; background reading {on(cfg['llm']['backend'] != 'none')}; "
+                 f"Codex sessions {on(p['codex_sessions'])}; chat index {on(p['chat_index'])}; no telemetry")
 
 
 def check_backups():
@@ -262,10 +332,13 @@ def check_backups():
 def checks(ping=True):
     cfg = settings.load()
     db = _db()
+    node = apps.node_status()
+    on_npm = apps.connector_on_npm() if not node[1] else True
     try:
         return [check_engine(), check_data(db), check_models(), check_hook(), check_connector(),
-                check_model(cfg, ping), check_budget(db, cfg), check_backlog(db), check_claude(), check_codex(),
-                check_cursor(), check_privacy(cfg), check_backups()]
+                check_node(node, on_npm), check_model(cfg, ping), check_budget(db, cfg), check_backlog(db),
+                *(_no_tools(c, node, on_npm) for c in (check_claude(), check_codex(), check_cursor())),
+                check_command(), check_privacy(cfg), check_backups(), *check_held()]
     finally:
         if db is not None:
             db.close()

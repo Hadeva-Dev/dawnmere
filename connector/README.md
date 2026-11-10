@@ -107,8 +107,6 @@ Needs Node 18 or later (Claude Desktop brings its own for the `.mcpb`).
 ## Limits
 
 - Mac only, and only with Dawnmere running. No Windows or Linux app yet.
-- Cloud apps (claude.ai, ChatGPT) cannot launch a local server. They will connect to Dawnmere's own URL instead, which
-  is not live yet.
 - An app's name is a label, not a password: any program running as you can talk to the socket. Permissions keep each
   AI app to what suits it; they are not a wall against software you already run.
 

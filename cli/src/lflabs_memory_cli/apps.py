@@ -9,13 +9,20 @@ Ours, wherever it appears:
 An entry named lflabs-memory that is not ours (another tool's) is left alone and reported.
 """
 import json
+import os
 import re
 import shlex
+import shutil
 from dataclasses import dataclass
 
+from importlib import metadata
+
 from . import edits
+from .brand import REPO
 from .edits import Skip
-from .layout import CLIENT_ENV, CONNECTOR, CONNECTOR_VERSION, ENGINE, SERVER, home
+from .layout import (CLI_DIST, CLIENT_ENV, CONNECTOR, CONNECTOR_VERSION, ENGINE, MARKETPLACE, SERVER, engine_record,
+                     home)
+from .run import run
 
 KEY_ENV = "LFLABS_MEMORY_CLIENT_KEY"  # an app trusted with more than work only carries its key (access.py)
 
@@ -25,6 +32,8 @@ DEFAULT = ("claude-code", "codex", "cursor")
 CLAUDE_HOOKS = (("UserPromptSubmit", "hook-prompt", 10), ("SessionStart", "hook-session-start", 120),
                 ("Stop", "hook-activity", 10), ("SessionEnd", "hook-session-end", 10))
 HINTS = {"codex": "type /hooks once", "cursor": "restart Cursor"}
+MIN_NODE = 18                # the connector's package.json engines
+NODE_FIX = "install Node.js 18 or later from nodejs.org"
 
 
 @dataclass
@@ -40,27 +49,125 @@ class Plan:
     added: str = ""      # exactly what was added (install.json): the TOML block, or the JSON entry
 
 
+def node_status():
+    """(node's version or None, the problem or None). Every app's MCP entry starts the connector with npx."""
+    if not shutil.which("npx"):
+        return None, "Node.js is not installed"
+    r = run(["node", "--version"], timeout=10)
+    v = r.out.strip() if r.ok else ""
+    m = re.match(r"v?(\d+)\.", v)
+    if not m:
+        return None, "Node.js is not installed"
+    if int(m.group(1)) < MIN_NODE:
+        return v, f"Node.js {v} is too old"
+    return v, None
+
+
+def marketplace_source(version=None):
+    """What `claude plugin marketplace add` gets: this repo at the release tag the CLI's wheels come from, so the
+    plugin (and what its hooks run) changes with a release, never with a push to main. LFLABS_MEMORY_MARKETPLACE
+    overrides it (a local checkout, for testing)."""
+    return os.environ.get("LFLABS_MEMORY_MARKETPLACE") or f"{REPO}#v{version or metadata.version(CLI_DIST)}"
+
+
+def marketplace_pinned(version=None):
+    """Whether Claude Code's marketplace (`claude plugin marketplace list --json`) is this repo at this release's tag.
+    True when it cannot tell (an old claude), or under LFLABS_MEMORY_MARKETPLACE (a local checkout)."""
+    if os.environ.get("LFLABS_MEMORY_MARKETPLACE"):
+        return True
+    r = run(["claude", "plugin", "marketplace", "list", "--json"], timeout=30)
+    try:
+        listed = json.loads(r.out) if r.ok else None
+    except ValueError:
+        listed = None
+    if not isinstance(listed, list):
+        return True
+    ours = next((m for m in listed if isinstance(m, dict) and m.get("name") == MARKETPLACE), None)
+    return ours is not None and ours.get("repo") == REPO and \
+        ours.get("ref") == f"v{version or metadata.version(CLI_DIST)}"
+
+
+def hook_engine():
+    """The engine the Claude Code plugin's hooks run, found where plugin/scripts/engine looks (never PATH): the path
+    setup recorded, else uv's tool bin folder. None when there is none."""
+    try:
+        recorded = engine_record().read_text().strip()
+    except OSError:
+        recorded = ""
+    bins = [os.environ.get("UV_TOOL_BIN_DIR"), os.environ.get("XDG_BIN_HOME"), str(home() / ".local/bin")]
+    for e in [recorded] + [os.path.join(b, ENGINE) for b in bins if b]:
+        if os.path.isabs(e) and os.access(e, os.X_OK):
+            return e
+    return None
+
+
+def connector_on_npm():
+    """Whether the connector version every app's entry pins (npx CONNECTOR@X) is on npm: True, False, or None
+    when it cannot be told (no npm, offline). A yes is remembered in the data folder; a no or a don't-know is asked
+    again next time."""
+    from .layout import data_dir
+    mark = data_dir() / "connector-on-npm"
+    try:
+        if mark.read_text().strip() == CONNECTOR_VERSION:
+            return True
+    except OSError:
+        pass
+    if not shutil.which("npm"):
+        return None
+    r = run(["npm", "view", f"{CONNECTOR}@{CONNECTOR_VERSION}", "version"], timeout=20)
+    if r.ok and r.out.strip() == CONNECTOR_VERSION:
+        if data_dir().is_dir():
+            mark.write_text(CONNECTOR_VERSION + "\n")
+        return True
+    if "E404" in r.err + r.out or (r.ok and not r.out.strip()):
+        return False
+    return None
+
+
+NOT_ON_NPM = f"the connector {CONNECTOR}@{CONNECTOR_VERSION} is not on npm yet: apps cannot start memory's tools"
+
+
 def connector_args():
     return ["-y", f"{CONNECTOR}@{CONNECTOR_VERSION}"]
 
 
+def _is_engine(word):
+    return isinstance(word, str) and (word == ENGINE or word.endswith("/" + ENGINE))
+
+
+def _program(words):
+    """The words from the program on: without `env` and VAR=value words (whatever the names: older engines wrote
+    JARVIS_MEMORY_*), and without a python that runs the engine's script (the engine's own `connect` writes
+    "/…/python /…/lflabs-memory hook-prompt")."""
+    words = [w for w in words if w != "env" and not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*=.*", w)]
+    if len(words) > 1 and re.fullmatch(r"python[0-9.]*", words[0].rsplit("/", 1)[-1]) and _is_engine(words[1]):
+        words = words[1:]
+    return words
+
+
 def ours_server(v):
+    """An MCP entry that runs the connector package, or the engine itself (`lflabs-memory serve`, as the engine's own
+    `connect` writes it), whatever its env holds."""
     args = v.get("args") if isinstance(v, dict) else None
-    return isinstance(args, list) and any(isinstance(a, str) and (a == CONNECTOR or a.startswith(CONNECTOR + "@"))
-                                          for a in args)
+    if not isinstance(args, list):
+        return False
+    if any(isinstance(a, str) and (a == CONNECTOR or a.startswith(CONNECTOR + "@")) for a in args):
+        return True
+    words = _program([v.get("command")] + args) if all(isinstance(a, str) for a in args) and \
+        isinstance(v.get("command"), str) else []
+    return len(words) > 1 and _is_engine(words[0]) and words[1] == "serve"
 
 
 def ours_command(cmd):
-    """A hook command that runs our engine: its program (after any VAR=value words) is lflabs-memory or a path to it."""
+    """A hook command that runs our engine: its program (after any env and VAR=value words, and a python running it)
+    is lflabs-memory or a path to it, with one of our hook- subcommands."""
     if not isinstance(cmd, str):
         return False
     try:
-        words = shlex.split(cmd)
+        words = _program(shlex.split(cmd))
     except ValueError:
         return False
-    words = [w for w in words if not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*=.*", w)]
-    return bool(words) and (words[0] == ENGINE or words[0].endswith("/" + ENGINE)) and len(words) > 1 and \
-        words[1].startswith("hook-")
+    return len(words) > 1 and _is_engine(words[0]) and words[1].startswith("hook-")
 
 
 def engine_cmd(engine, sub, client=None):
@@ -246,6 +353,14 @@ def _drop_toml(text, block):
     return out, removed
 
 
+def empty_structure(data, ignore=("version",)):
+    """Nothing but empty tables and lists left (a hooks file's "version" aside): what is left of a file setup created
+    once our entries are out of it."""
+    if isinstance(data, dict):
+        return all(k in ignore or empty_structure(v, ()) for k, v in data.items())
+    return isinstance(data, list) and all(empty_structure(v, ()) for v in data)
+
+
 def unplan(entry, h=None):
     """The plan that takes our entry out of one file (entry: an install.json file record, or one found by discovery:
     {"path", "kind", "added", "created"})."""
@@ -261,6 +376,8 @@ def unplan(entry, h=None):
             if not any(ours_server(v) for v in servers.values()):
                 return Plan(app, kind, path, "gone", f"no {SERVER} table (already removed)")
             new, removed = _drop_toml(old, entry.get("added"))
+            if entry.get("created") and empty_structure(edits.load_toml(new)) and not new.strip(" \t\r\n#"):
+                return Plan(app, kind, path, "remove", "remove config.toml (setup created it)", new=None, old=old)
             edits.load_toml(new)
             return Plan(app, kind, path, "remove", f"remove [mcp_servers.{SERVER}]", new=new, old=old)
         data = edits.load_json(old)
@@ -273,12 +390,14 @@ def unplan(entry, h=None):
             new = json.loads(json.dumps(data))
             for k in mine:
                 del new[key][k]
+            if entry.get("created") and empty_structure(new):
+                return Plan(app, kind, path, "remove", f"remove {path.name} (setup created it)", new=None, old=old)
             return Plan(app, kind, path, "remove", f'remove {key}."{SERVER}"', new=edits.dump_json(new, old), old=old)
         new, n = _drop_hooks(data)
         if not n:
             return Plan(app, kind, path, "gone", "no memory hooks (already removed)")
-        if kind == "cursor-hooks" and entry.get("created") and new in ({"version": 1}, {"version": 1, "hooks": {}}):
-            return Plan(app, kind, path, "remove", "remove hooks.json (setup created it)", new=None, old=old)
+        if entry.get("created") and empty_structure(new):
+            return Plan(app, kind, path, "remove", f"remove {path.name} (setup created it)", new=None, old=old)
         return Plan(app, kind, path, "remove", f"remove {n} memory hook" + ("s" if n > 1 else ""),
                     new=edits.dump_json(new, old), old=old)
     except Skip as e:
@@ -296,8 +415,12 @@ def discover(h=None):
 
 
 def apply(plan, record):
-    """Write one "add" plan and note it in the install record. Raises edits.Skip (the file is then as it was)."""
+    """Write one "add" plan and note it in the install record. Raises edits.Skip (the file is then as it was).
+    Only the first change to a file is backed up (the user's original: the one uninstall puts back), and never a
+    file that already holds a key."""
     from . import install_record
-    backup = edits.write(plan.path, plan.new, plan.old)
+    first = install_record.file_entry(record, plan) is None
+    backup = edits.write(plan.path, plan.new, plan.old, secret=KEY_ENV in (plan.new or ""),
+                         backup=first and KEY_ENV not in (plan.old or ""))
     install_record.add_file(record, plan, backup, edits.sha256(plan.new))
     return backup

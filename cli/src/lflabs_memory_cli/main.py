@@ -22,7 +22,7 @@ def full_show(show=False):
 def play(setup, intro=True, plain=False, animate=True):
     """Run a setup behind the screen. Returns its exit code."""
     state = screen.ScreenState(steps=setup.plan(), expect_apps=setup.expect_apps, intro=intro,
-                               **screen.detect(plain=plain, animate=animate))
+                               problem=getattr(setup, "problem", None), **screen.detect(plain=plain, animate=animate))
     ui = screen.Animator(state)
     ui.start()
     try:
@@ -107,6 +107,8 @@ def parser():
             sp.add_argument("--codex-sessions", action="store_true", help="also read Codex's saved sessions")
             sp.add_argument("--no-import", action="store_true", help="do not import Claude Code's memory files")
             sp.add_argument("--dry-run", action="store_true", help="show every change, make none")
+            sp.add_argument("--models", action="store_true",
+                            help="finish what setup could not download: the search models, then the service")
         elif name == "doctor":
             sp.add_argument("--json", action="store_true", help="the checks as JSON")
             sp.add_argument("--report", action="store_true", help="counts only, safe to paste into an issue")

@@ -50,6 +50,14 @@ def install(engine_bin):
     return done
 
 
+def restart():
+    """Unload the agent, wait for it to leave, load it again: [(argv, ok, note)] as install's."""
+    done = [_ran(["launchctl", "bootout", f"{domain()}/{LABEL}"])]
+    wait_gone()
+    done.append(_ran(["launchctl", "bootstrap", domain(), str(plist_path())]))
+    return done
+
+
 def _ran(argv):
     r = run(argv, timeout=30)
     lines = r.err.strip().splitlines()
@@ -81,6 +89,7 @@ def remove():
     was, _ = loaded()
     if was:
         run(["launchctl", "bootout", f"{domain()}/{LABEL}"], timeout=30)
+        wait_gone()  # bootout returns before the daemon has exited (and let go of its sockets)
     path = plist_path()
     had = path.exists()
     path.unlink(missing_ok=True)
