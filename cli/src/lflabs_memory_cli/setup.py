@@ -185,6 +185,9 @@ def memory_moment():
 
 # ---------- the work, shown on the setup screen ----------
 
+NO_CLAUDE = "memory's tools in Claude Code need the claude command, which was not found"
+
+
 class RealSetup:
     """plan() / expect_apps / run(ui): the interface screen.py's demo uses too."""
 
@@ -314,6 +317,10 @@ class RealSetup:
         return r
 
     def wire_claude_code(self):
+        if shutil.which("claude") is None:  # ~/.claude is here but not the claude command (VM run, 2026-11-10): its
+            # hooks in settings.json work without it; memory's tools in Claude Code wait for it
+            _, fine = self._apply(apps.file_plans("claude-code", self.engine))
+            return "hooks", NO_CLAUDE, fine
         listed = run(["claude", "plugin", "list"], timeout=30)
         if listed.ok and SERVER in listed.out:
             if apps.marketplace_pinned():
@@ -365,10 +372,12 @@ class RealSetup:
             return
         mem, _ = memory_moment()
         r = run([self.engine, "import"], timeout=300)
-        if not r.ok:
+        # The service imports them too as it first starts, at the same moment (VM run, 300 notes): what counts is
+        # what is new since setup began, whichever import wrote it.
+        self.imported = _imported_ids(self.notes_before)
+        if not r.ok and not self.imported:
             ui.step("Your notes", "warn", "could not import them now; the service tries again weekly")
             return
-        self.imported = _imported_ids(self.notes_before)
         ui.memory(mem)
         k = len(self.imported)  # this run's new notes; n counts every memory file, already imported ones too
         ui.step("Your notes", "ok", f"{k} imported from Claude Code" if k else "nothing new from Claude Code")
