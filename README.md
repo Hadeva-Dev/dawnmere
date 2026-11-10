@@ -40,8 +40,9 @@ Made by [LF Labs](#who-makes-it-and-the-lf-labs-names).
 
 ## What it does
 
-You tell one of your AI apps something worth keeping. Dawnmere saves it once, on your Mac, and the other apps
-recall it when it matters. Switch from Claude Code to Codex when you hit a limit, and Codex already knows that you
+You tell Claude Code or Codex something worth keeping ("remember that we deploy on Fridays"). Dawnmere saves it
+once, on your Mac. Ask the other one in similar words and it brings it up, and a new Cursor chat in that project
+shows it for the next day. Switch from Claude Code to Codex when you hit a limit, and Codex can recall that you
 deploy on Fridays and use pnpm.
 
 ```mermaid
@@ -78,7 +79,7 @@ Every app also gets four tools through MCP: `recall`, `remember`, `forget` and `
 
 - **One memory, not one per app.** The apps share a single store, so a fact saved from Claude Code is the same
   fact Cursor recalls.
-- **It stays on your Mac.** The memory is one SQLite file in your Library folder. Search runs on your Mac with
+- **Stored only on your Mac.** The memory is one SQLite file in your Library folder. Search runs on your Mac with
   small local models. There is no account, nothing is sent to LF Labs, and the tool collects no usage data.
 - **Your own model does the reading.** Automatic saving uses your Claude plan through Claude Code, or your own
   Anthropic API key. You can also run with no model at all.
@@ -124,6 +125,10 @@ agents than Dawnmere. The main difference is where the memory is kept. As each p
 If you use only one agent, its built-in memory may be all you need. Dawnmere starts from it: setup can import the
 notes Claude Code already keeps.
 
+**Why not CLAUDE.md or AGENTS.md?** Use them for rules you write on purpose; Dawnmere doesn't replace them. Dawnmere
+is for the things you say in passing and don't want to copy into three files. Recall is selective, so an app gets
+the memories that match the prompt, not the whole file every time.
+
 <!-- Sources, read 2026-11-08: claude-mem README ("Your memory lives in ~/.claude-mem on your machine"; "Works with
      Claude Code, Codex, Cursor, OpenCode and 11 more agents"; CLAUDE_MEM_SESSION_START_INCLUDE_ALL_SOURCES defaults
      to "false"). Supermemory coding-agents page ("a decision saved in Claude Code is there when you open Cursor";
@@ -137,6 +142,16 @@ notes Claude Code already keeps.
 ```bash
 curl -fsSL https://dawnmere.app/install | sh
 ```
+
+Prefer Homebrew?
+
+```bash
+brew install hadeva-dev/tap/dawnmere
+dawnmere setup
+```
+
+Homebrew brings Node.js with it. Update with `brew upgrade hadeva-dev/tap/dawnmere`, and run `dawnmere uninstall`
+before `brew uninstall dawnmere`.
 
 That address serves `install.sh` from the latest
 [GitHub release](https://github.com/Hadeva-Dev/dawnmere/releases/latest). The script:

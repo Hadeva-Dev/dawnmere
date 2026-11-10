@@ -31,6 +31,7 @@ curl -fsSL https://dawnmere.app/install | sh
 ```
 
 **环境要求：** 搭载 Apple 芯片的 Mac，macOS 14 或更高版本，1 GB 可用磁盘空间，Node.js 18 或更高版本。免费，无需注册账号。<br>
+**注意：** 目前英文效果最好，中文的记忆和提问还很难被可靠地找到（[#27](https://github.com/Hadeva-Dev/dawnmere/issues/27)）。<br>
 **状态：** 早期测试版（0.1.x）。客户端采用 MIT 许可，引擎源码可见（FSL，两年后转为 MIT）。由 [LF Labs](#who-makes-it-and-the-lf-labs-names) 开发。
 
 <!-- Apple silicon and macOS 14: install.sh:35-38 refuses anything else, and setup.py:73-74 checks macOS again.
@@ -40,7 +41,7 @@ curl -fsSL https://dawnmere.app/install | sh
 
 ## 它能做什么
 
-你把一件值得记住的事告诉某个 AI 应用，Dawnmere 就在你的 Mac 上存一份，其他应用在需要时会自动想起来。在 Claude Code 里用到额度上限、切到 Codex 继续干活时，Codex 已经知道你们周五部署、用的是 pnpm。
+你把一件值得记住的事告诉 Claude Code 或 Codex（比如 "remember that we deploy on Fridays"），Dawnmere 就在你的 Mac 上存一份。在另一个应用里用相近的说法问起，它会把这条记忆带出来；在那个项目里新开的 Cursor 对话，接下来一天内也会看到它。在 Claude Code 里用到额度上限、切到 Codex 继续干活时，Codex 能想起你们周五部署、用的是 pnpm。
 
 ```mermaid
 flowchart LR
@@ -73,7 +74,7 @@ flowchart LR
 ## 为什么用 Dawnmere
 
 - **一份记忆，而不是每个应用各存一份。** 所有应用共用同一个存储，你在 Claude Code 里存下的事实，就是 Cursor 召回的那一条。
-- **记忆留在你的 Mac 上。** 记忆就是你“资源库”（Library）文件夹里的一个 SQLite 文件。搜索用小型本地模型在你的 Mac 上完成。不需要账号，不会向 LF Labs 发送任何东西，工具本身也不收集使用数据。
+- **只存在你的 Mac 上。** 记忆就是你“资源库”（Library）文件夹里的一个 SQLite 文件。搜索用小型本地模型在你的 Mac 上完成。不需要账号，不会向 LF Labs 发送任何东西，工具本身也不收集使用数据。
 - **由你自己的模型来读。** 自动保存通过 Claude Code 使用你的 Claude 订阅，或者用你自己的 Anthropic API 密钥。也可以完全不用模型。
 - **每个应用只能看到你允许的内容。** Cursor 一开始只能看到工作笔记，新接入的应用也只能看到工作笔记。Claude Code 和 Claude Desktop 的记忆工具，以及只报出自己名字的应用，目前都只能看到工作笔记。Claude Code 在提示词里的自动召回仍然能看到全部内容。放宽某个应用能看到的范围需要你本人在终端里操作：运行 `dawnmere access cursor everything`，再输入一遍应用的名字，然后在 macOS 弹出的对话框里点 “Allow”。在聊天里提这个要求，只会得到这条命令。
   <!-- checked against v0.1.6 (406ee39/c3ed5b1): MCP tools of Claude Code, Claude Desktop and self-named apps see
