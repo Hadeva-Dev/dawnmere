@@ -99,7 +99,7 @@ def ask_key(a, say, yes):
     """The key for an OpenAI-compatible provider (none for a model on this Mac), tried once before it is kept."""
     name = backend.PROVIDERS.get(a.provider, a.api_base)
     local = a.provider == "ollama" or a.api_base.startswith(("http://localhost", "http://127.0.0.1"))
-    key = "" if local else os.environ.get("DAWNMERE_API_KEY") or ("" if yes else prompt.secret(
+    key = "" if local else os.environ.get("LFLABS_MEMORY_API_KEY") or ("" if yes else prompt.secret(
         f"Paste your {name} API key (it is kept in your Keychain only):"))
     if not key and not local:
         say(f"No key given for {name}: memory will run without a model for now.")

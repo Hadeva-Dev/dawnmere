@@ -1301,7 +1301,7 @@ def test_another_providers_key(box, monkeypatch, capsys):
     codex_ready(box, monkeypatch)
     tried = []
     monkeypatch.setattr(backend, "provider_ping", lambda *a: tried.append(a) or (True, ""))
-    monkeypatch.setenv("DAWNMERE_API_KEY", "sk-deepseek-test")
+    monkeypatch.setenv("LFLABS_MEMORY_API_KEY", "sk-deepseek-test")
     code, out = run_setup("--backend", "openai-api", "--provider", "deepseek")
     cfg = (layout.data_dir() / "config.toml").read_text()
     assert code == 0 and tried == [("deepseek", "sk-deepseek-test", "", "")]
@@ -1311,7 +1311,7 @@ def test_another_providers_key(box, monkeypatch, capsys):
     assert stored, "the key goes to the Keychain through security -i (stdin), never argv"
     assert not any("sk-deepseek-test" in " ".join(c) for c in box.calls("security"))
     # a later setup that chooses nothing keeps none of the provider's settings
-    monkeypatch.delenv("DAWNMERE_API_KEY")
+    monkeypatch.delenv("LFLABS_MEMORY_API_KEY")
     run_setup("--backend", "none")
     assert "provider" not in (layout.data_dir() / "config.toml").read_text()
 
@@ -1321,7 +1321,7 @@ def test_a_key_that_does_not_work_is_not_kept(box, monkeypatch, capsys):
     box.remove("claude")
     codex_ready(box, monkeypatch, logged="Not logged in")
     monkeypatch.setattr(backend, "provider_ping", lambda *a: (False, "the model provider refused the key (401)"))
-    monkeypatch.setenv("DAWNMERE_API_KEY", "sk-bad")
+    monkeypatch.setenv("LFLABS_MEMORY_API_KEY", "sk-bad")
     code, out = run_setup("--backend", "openai-api", "--provider", "kimi")
     assert 'backend = "none"' in (layout.data_dir() / "config.toml").read_text()
     assert "Kimi (Moonshot) did not answer" in out and "sk-bad" not in out
