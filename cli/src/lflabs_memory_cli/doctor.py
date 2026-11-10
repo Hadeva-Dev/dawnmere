@@ -298,6 +298,19 @@ def check_cursor():
     return Check("Cursor", "warn", "not connected", f"run {COMMAND} setup")
 
 
+def check_mcp_only():
+    """A row for each of Windsurf, Gemini CLI and VS Code that is on this Mac (none when it is not)."""
+    rows = []
+    for app, (label, _, path, _) in apps.MCP_ONLY.items():
+        if not apps.installed(app):
+            continue
+        if _has(home() / path, f"{CONNECTOR}@"):
+            rows.append(Check(label, "ok", "MCP, work only"))
+        else:
+            rows.append(Check(label, "warn", "not connected", f"run {COMMAND} setup"))
+    return rows
+
+
 def check_command():
     if layout.on_shell_path():
         return Check(COMMAND, "ok", "on your PATH")
@@ -344,7 +357,7 @@ def checks(ping=True):
     try:
         return [check_engine(), check_data(db), check_models(), check_hook(), check_connector(),
                 check_node(node, on_npm), check_model(cfg, ping), check_budget(db, cfg), check_backlog(db),
-                *(_no_tools(c, node, on_npm) for c in (check_claude(), check_codex(), check_cursor())),
+                *(_no_tools(c, node, on_npm) for c in (check_claude(), check_codex(), check_cursor(), *check_mcp_only())),
                 check_command(), check_privacy(cfg), check_backups(), *check_held()]
     finally:
         if db is not None:
