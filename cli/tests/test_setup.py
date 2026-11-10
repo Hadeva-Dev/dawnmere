@@ -512,7 +512,8 @@ def test_access_widens_codex_as_it_widens_cursor(box, monkeypatch, capsys):
     assert "LFLABS_MEMORY_CLIENT_KEY" not in toml.read_text(), "no key before the gate"
     at_a_terminal(monkeypatch, "codex")
     assert access.main("codex", "everything", eng, say=out.append) == 0
-    assert out[-1] == "Codex now sees everything, personal notes too. Restart Codex to load it."
+    assert out[-1] == ("Codex now sees everything, personal notes too. Restart Codex to load it. Its prompts still get work "
+                       "notes only; the rest it finds when it searches memory.")
     env = tomllib.loads(toml.read_text())["mcp_servers"]["lflabs-memory"]["env"]
     key = env["LFLABS_MEMORY_CLIENT_KEY"]
     assert len(key) >= 24 and env["LFLABS_MEMORY_CLIENT"] == "codex"
