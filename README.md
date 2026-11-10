@@ -353,9 +353,6 @@ The installer, the `dawnmere` command, the Claude Code plugin and the connector 
 (FSL-1.1-MIT): each version becomes MIT two years after its release. The search models keep their own licenses
 (`dawnmere doctor --licenses`, and [THIRD_PARTY.md](THIRD_PARTY.md)).
 
-<!-- ENGINE-PUBLIC: both engine links need Hadeva-Dev/lflabs-memory-engine public, with LICENSE at the root of main.
-     Engine license: wheel METADATA "License-Expression: FSL-1.1-MIT". -->
-
 ## Related
 
 [memory-bench](https://github.com/Hadeva-Dev/memory-bench) is an open benchmark for assistant memory, built by the
