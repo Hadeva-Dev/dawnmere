@@ -424,3 +424,16 @@ def test_claude_code_row_fits_80_columns(final, backend_name, logged_in, version
     state.steps[0].status, state.steps[0].note = status, note
     row = next(visible(x) for x in frame(end, state) if "Claude Code" in x and note in x)
     assert len(row) <= 80 and not row.endswith("…")
+
+
+def test_closing_lines_name_only_apps_whose_typed_notes_travel():
+    """Windsurf, Gemini CLI and VS Code have no prompt hook: what is told to them waits for confirmation."""
+    from types import SimpleNamespace
+    from lflabs_memory_cli import screen
+    plain = lambda xs: [re.sub(r"\x1b\[[0-9;]*m", "", x) for x in xs]
+    st = SimpleNamespace(memory=None, color=False)
+    assert plain(screen._memory_lines(st, ["Codex", "Cursor", "Windsurf", "Gemini CLI", "VS Code"])) == \
+        ["  What you tell Codex now reaches the others."]
+    assert plain(screen._memory_lines(st, ["Cursor", "Gemini CLI"])) == ["  Your apps now share one memory."]
+    lines, _ = screen._try_lines(120, ["Windsurf", "Codex", "Cursor"])
+    assert lines[0].startswith("Try it: in Codex,")

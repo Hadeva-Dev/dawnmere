@@ -260,7 +260,8 @@ def bump_pins(say, record=None):
     rec = record if record is not None else install_record.load()
     old_pin = re.compile(re.escape(CONNECTOR) + r"@[0-9][\w.\-]*")
     for app, kind, path in (("codex", "codex-toml", home() / ".codex/config.toml"),
-                            ("cursor", "mcp-json", home() / ".cursor/mcp.json")):
+                            ("cursor", "mcp-json", home() / ".cursor/mcp.json"),
+                            *((a, "mcp-json", home() / v[2]) for a, v in apps.MCP_ONLY.items())):
         try:
             old = edits.read(path)
         except edits.Skip:
