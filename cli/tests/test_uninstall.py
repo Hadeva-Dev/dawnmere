@@ -55,6 +55,24 @@ def test_uninstall_reverses_setup(mac, monkeypatch):
     assert not list(home.rglob("*.lflabs-backup-*")), "every file put back: its backups go too"
 
 
+def test_uninstall_under_homebrew_leaves_the_programs_to_brew(mac, monkeypatch):
+    """Its own steps as ever, then the formula's command: no uv tool uninstall, no word about uv."""
+    monkeypatch.setattr(layout, "homebrew", lambda: True)
+    home = mac.home
+    seed(home)
+    fake_setup(home)
+    local = home / ".local/bin"
+    local.mkdir(parents=True)
+    import shutil
+    shutil.copy(mac.bin / "uv", local / "uv")  # the user's own uv, from another tool's installer
+    out = []
+    assert uninstall.main(out=out.append) == 0
+    assert (home / ".cursor/mcp.json").read_text() == CURSOR_MCP and not layout.plist_path().exists()
+    assert mac.calls("uv") == []
+    assert out[-2:] == ["The dawnmere command itself came from Homebrew. To remove it:", "  brew uninstall dawnmere"]
+    assert not any("uv" in line.split() or "uv not found" in line for line in out)
+
+
 def test_uninstall_partial_state(mac):
     """Data folder deleted by hand (so no record), Cursor's entry removed by hand, uv gone: exit 0, all reported."""
     home = mac.home

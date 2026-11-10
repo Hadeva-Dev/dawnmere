@@ -343,7 +343,8 @@ def test_access_command(box, monkeypatch, capsys):
     entry = json.loads((box.home / ".cursor/mcp.json").read_text())["mcpServers"]["lflabs-memory"]
     assert "LFLABS_MEMORY_CLIENT_KEY" in entry["env"]
     assert access.main("cursor", "work", eng, say=out.append) == 0 and out[-1] == "Cursor now sees work notes only."
-    assert access.main("codex", "everything", eng, say=out.append) == 1
+    assert access.main("windsurf", "everything", eng, say=out.append) == 1
+    assert out[-1] == "Only Cursor and Codex can be widened from here for now.", "no pointer back to a chat (a loop)"
     assert access.main("cursor", None, eng, say=out.append) == 0
     assert out[-1].startswith("Cursor sees ") and "dawnmere access cursor everything | nothing-personal" in out[-1]
 
@@ -493,6 +494,59 @@ def test_widening_goes_through_the_engines_gate_first(box, monkeypatch, capsys):
     at_a_terminal(monkeypatch, "cursor")
     assert access.main("cursor", "everything", eng, say=out.append) == 0
     assert "LFLABS_MEMORY_CLIENT_KEY" in (box.home / ".cursor/mcp.json").read_text()
+
+
+def test_access_widens_codex_as_it_widens_cursor(box, monkeypatch, capsys):
+    """The engine's reply to "let codex see everything" is `dawnmere access codex everything`: it has to work. Same
+    gate first, then a key in Codex's own entry (config.toml), never on its hook's command line."""
+    import tomllib
+    from lflabs_memory_cli import access, uninstall
+    mine = 'model = "o5"\n\n[mcp_servers.gh]\ncommand = "gh-mcp"\n'
+    toml = box.home / ".codex/config.toml"
+    toml.write_text(mine)
+    assert run_setup()[0] == 0
+    eng, out = layout.engine_bin(), []
+    asked = at_a_terminal(monkeypatch, "no")
+    assert access.main("codex", "everything", eng, say=out.append) == 1
+    assert asked == [("codex", "everything")] and out[-1].startswith("Not changed: Codex still sees ")
+    assert "LFLABS_MEMORY_CLIENT_KEY" not in toml.read_text(), "no key before the gate"
+    at_a_terminal(monkeypatch, "codex")
+    assert access.main("codex", "everything", eng, say=out.append) == 0
+    assert out[-1] == "Codex now sees everything, personal notes too. Restart Codex to load it."
+    env = tomllib.loads(toml.read_text())["mcp_servers"]["lflabs-memory"]["env"]
+    key = env["LFLABS_MEMORY_CLIENT_KEY"]
+    assert len(key) >= 24 and env["LFLABS_MEMORY_CLIENT"] == "codex"
+    assert tomllib.loads(toml.read_text())["mcp_servers"]["gh"] == {"command": "gh-mcp"} and 'model = "o5"' in \
+        toml.read_text(), "the user's own lines stay"
+    assert oct(toml.stat().st_mode & 0o777) == "0o600", "the file with the key: owner only"
+    assert key not in (box.home / ".codex/hooks.json").read_text(), "never a key on a command line"
+    clients = json.loads((box.data / "clients.json").read_text())["clients"]
+    assert clients["codex"]["key_sha256"] and key not in json.dumps(clients), "the engine keeps only its hash"
+    for text in ("\n".join(out), capsys.readouterr().out, layout.install_json().read_text()):
+        assert key not in text, "the key is never shown or recorded"
+    for b in box.home.rglob("*.lflabs-backup-*"):
+        assert key not in b.read_text(), f"{b} holds Codex's key"
+    assert access.main("codex", "everything", eng, say=out.append) == 0  # again: the key is replaced, not added twice
+    again = tomllib.loads(toml.read_text())["mcp_servers"]["lflabs-memory"]["env"]["LFLABS_MEMORY_CLIENT_KEY"]
+    assert again != key and toml.read_text().count("LFLABS_MEMORY_CLIENT_KEY") == 1
+    assert uninstall.main(keep_data=True, out=lambda s: None) == 0
+    assert toml.read_text() == mine
+    assert not list((box.home / ".codex").glob("config.toml.lflabs-backup-*"))
+
+
+def test_codex_key_when_its_entry_has_another_shape(box, monkeypatch):
+    """An entry whose env is not the table setup writes is left alone, and Codex is said to stay at work only."""
+    from lflabs_memory_cli import access
+    assert run_setup()[0] == 0
+    toml = box.home / ".codex/config.toml"
+    inline = ('[mcp_servers.lflabs-memory]\ncommand = "npx"\nargs = ["-y", "dawnmere-connector@0.1.0"]\n'
+              'env = { LFLABS_MEMORY_CLIENT = "codex" }\n')
+    toml.write_text(inline)
+    at_a_terminal(monkeypatch, "codex")
+    out = []
+    assert access.main("codex", "everything", layout.engine_bin(), say=out.append) == 1
+    assert toml.read_text() == inline
+    assert "left alone" in out[-2] and out[-1] == "Codex stays at work only until its entry has a key."
 
 
 def test_the_gate_is_the_engines_command_on_this_terminal(monkeypatch):

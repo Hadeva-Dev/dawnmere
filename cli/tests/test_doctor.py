@@ -452,6 +452,58 @@ def test_update_pins_and_checks_every_dependency(mac, monkeypatch, tmp_path):
     assert finished and finished[0][1:] == ["update", "--finish", "0.1.0"]
 
 
+def test_doctor_claude_code_hooks_without_tools_is_a_warning(mac):
+    """The fallback's hooks in settings.json without memory's tools (no claude command, or `claude mcp add` failed)
+    is not fully connected: say so, in setup's words."""
+    (mac.home / ".claude").mkdir()
+    (mac.home / ".claude/settings.json").write_text(json.dumps({"hooks": {"UserPromptSubmit": [{"hooks": [
+        {"type": "command", "command": "/u/.local/bin/lflabs-memory hook-prompt"}]}]}}))
+    mac.on("claude", ["plugin", "list"], 0, "No plugins installed.\n")
+    mac.on("claude", ["mcp", "get"], 0, "lflabs-memory:\n  Type: stdio\n")
+    c = doctor.check_claude()
+    assert (c.state, c.note) == ("ok", "MCP + hooks in ~/.claude/settings.json")
+    mac.rules["claude"] = [r for r in mac.rules["claude"] if r[0] != ["mcp", "get"]]  # earlier rules win
+    mac.on("claude", ["mcp", "get"], 1, "No MCP server found with name: lflabs-memory")
+    c = doctor.check_claude()
+    assert (c.state, c.note, c.fix) == ("warn", "hooks only, no MCP tools (claude mcp add failed)",
+                                        "run dawnmere setup again")
+    mac.remove("claude")
+    c = doctor.check_claude()
+    assert (c.state, c.note) == ("warn", "hooks only, no MCP tools (the claude command was not found)")
+    assert c.fix == "install Claude Code's claude command, then run dawnmere setup again"
+
+
+def test_homebrew_is_told_from_where_the_package_lives(tmp_path):
+    """Under the formula the package is in the keg's virtualenv (Cellar/dawnmere/X/libexec). The Python's own path
+    says nothing: a uv tool install may run Homebrew's python@3.12, which is in the Cellar too."""
+    keg = "/opt/homebrew/Cellar/dawnmere/0.1.6/libexec/lib/python3.12/site-packages/lflabs_memory_cli/layout.py"
+    assert layout.homebrew(keg) and layout.homebrew(keg.replace("/opt/homebrew", "/usr/local"))
+    assert not layout.homebrew("/Users/me/.local/share/uv/tools/lflabs-memory-cli/lib/python3.12/site-packages/"
+                               "lflabs_memory_cli/layout.py")
+    assert not layout.homebrew(), "this checkout"
+    real = tmp_path / "Cellar/dawnmere/0.1.6/libexec/layout.py"
+    real.parent.mkdir(parents=True)
+    real.write_text("")
+    (tmp_path / "linked.py").symlink_to(real)
+    assert layout.homebrew(tmp_path / "linked.py"), "through a symlink"
+
+
+def test_update_under_homebrew_leaves_it_to_brew(mac, monkeypatch):
+    """Never uv tool install (a second copy in ~/.local, or a request for uv): the formula's own command instead."""
+    monkeypatch.setattr(update.layout, "homebrew", lambda: True)
+    monkeypatch.setattr(update, "installed_version", lambda: "0.1.0")
+
+    def no_network(url, **kw):
+        raise AssertionError("Homebrew decides what is newest, not GitHub's release")
+    for kw in ({"yes": True}, {"check_only": True}):
+        out = []
+        assert update.main(say=out.append, get=no_network, **kw) == 0
+        assert out == ["Dawnmere was installed with Homebrew, so Homebrew updates it:",
+                       "  brew upgrade hadeva-dev/tap/dawnmere",
+                       "Then run dawnmere setup again, so the memory service and your apps use the new version."]
+    assert mac.calls("uv") == []
+
+
 def test_update_refuses_a_release_without_constraints(mac, monkeypatch):
     monkeypatch.setattr(update, "installed_version", lambda: "0.1.0")
     out = []

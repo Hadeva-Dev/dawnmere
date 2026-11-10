@@ -6,6 +6,7 @@ engine on stdin and written into the app's config; it is never printed, logged o
 """
 import json
 import os
+import re
 import secrets
 import subprocess
 import sys
@@ -20,6 +21,7 @@ LEVELS = ("everything", "nothing-personal", "work", "nothing")
 SAYS = {"everything": "everything, personal notes too", "nothing-personal": "everything but personal notes",
         "work": "work notes only", "nothing": "nothing"}
 WIDER = ("everything", "nothing-personal")  # beyond work only: needs the key
+KEYED = ("cursor", "codex")  # the apps whose own entry this tool can give a key, so the only ones it widens
 RANK = {"nothing": 0, "work": 1, "work only": 1, "nothing-personal": 2, "nothing personal": 2, "everything": 3}
 # Set in the shells AI apps run their commands in (checked 2026-11): the engine's own list (mem.AGENT_ENV) and three
 # more seen here. Claude Code: in its Bash tool's shell (2.1.301). Codex: names its 0.160.0 binary sets for its shell
@@ -105,6 +107,47 @@ def plan_key_json(path, key):
         return apps.Plan("cursor", "mcp-json", path, "error", str(e))
 
 
+# ---------- Codex's two files with a key ----------
+
+def codex_plans(engine, key, h=None):
+    """Codex's config.toml entry with the key, and its prompt hook as setup writes it (no key there either: the hook
+    is held to work only, while the tools, which carry the key, see what Codex may see)."""
+    h = h or home()
+    return [plan_key_toml(h / ".codex/config.toml", key), apps.plan_codex_hooks(h / ".codex/hooks.json", engine)]
+
+
+def plan_key_toml(path, key):
+    p = apps.plan_codex_toml(path, client_key=key)
+    if p.state != "done":
+        return p
+    try:  # our entry is there already: give it the key
+        old = edits.read(path)
+        new = toml_with_key(old, key)
+        if new == old:
+            return p
+        return apps.Plan("codex", "codex-toml", path, "add", "give its entry a key", "", new, old, "")
+    except edits.Skip as e:
+        return apps.Plan("codex", "codex-toml", path, "error", str(e))
+
+
+def toml_with_key(text, key):
+    """text with the key set in our entry's env table, [mcp_servers.NAME.env] as setup writes it: an old key line
+    replaced, nothing else touched. Raises Skip for an entry in another shape (an inline env)."""
+    name = next(k for k, v in edits.load_toml(text)["mcp_servers"].items() if apps.ours_server(v))
+    s = re.escape(name)
+    head = re.search(rf'(?m)^[ \t]*\[[ \t]*mcp_servers\.(?:{s}|"{s}")\.env[ \t]*\][ \t]*\r?\n', text)
+    if not head:
+        raise edits.Skip(f"its {name} entry has no [mcp_servers.{name}.env] table: left alone")
+    nxt = re.compile(r"(?m)^[ \t]*\[").search(text, head.end())
+    end = nxt.start() if nxt else len(text)
+    body = re.sub(rf"(?m)^[ \t]*{KEY_ENV}[ \t]*=.*\n?", "", text[head.end():end])
+    new = text[:head.end()] + f"{KEY_ENV} = {json.dumps(key)}{edits.eol(text)}" + body + text[end:]
+    env = edits.load_toml(new)["mcp_servers"][name].get("env")
+    if not isinstance(env, dict) or env.get(KEY_ENV) != key:
+        raise edits.Skip(f"its {name} entry would not hold the key as written: left alone")
+    return new
+
+
 def agent_shell(env=None):
     """The first AI-app marker set in this environment, or None."""
     env = os.environ if env is None else env
@@ -155,14 +198,16 @@ def widens(app, level):
     return RANK[level] > RANK.get(now, 1)
 
 
-def widen_cursor(engine, record=None, say=print):
-    """Register a new key for Cursor and put it in both its files. True when Cursor will be recognised by it."""
-    key = register_key("cursor")
+def give_key(app, engine, record=None, say=print):
+    """Register a new key for Cursor or Codex and put it in the app's own files. True when the app will be recognised
+    by it."""
+    label = NAMES[app]
+    key = register_key(app)
     if not key:
-        say("The memory service could not register Cursor's key; Cursor stays at work only.")
+        say(f"The memory service could not register {label}'s key; {label} stays at work only.")
         return False
     ok = True
-    for p in cursor_plans(engine, key):
+    for p in (cursor_plans if app == "cursor" else codex_plans)(engine, key):
         if p.state == "add":
             try:
                 p.added, p.snippet = mask(p.added, key), mask(p.snippet, key)
@@ -173,6 +218,8 @@ def widen_cursor(engine, record=None, say=print):
         elif p.state in ("error", "stale"):
             say(f"{short(p.path)}: {p.note}")
             ok = False
+    if not ok:
+        say(f"{label} stays at work only until its entry has a key.")
     return ok
 
 
@@ -193,8 +240,8 @@ def main(app, level, engine, say=print):
         say(f"{NAMES.get(app, app.capitalize())} sees {now}. To change it: {COMMAND} access {app} "
             f"{' | '.join(LEVELS)}")
         return 0
-    if app != "cursor" and level in WIDER:
-        say(f"Only Cursor can be widened from here for now. In Claude Code, say \"let {app} see everything\".")
+    if app not in KEYED and level in WIDER:  # no pointer to a chat: a chat only answers with this command
+        say("Only Cursor and Codex can be widened from here for now.")
         return 1
     label = NAMES.get(app, app.capitalize())
     if widens(app, level):  # needs the person: the engine's gate decides, before any key is made
@@ -205,16 +252,16 @@ def main(app, level, engine, say=print):
         if not engine_widens(engine, app, level):
             say(f"Not changed: {label} still sees {current_level(app) or 'what it saw'}.")
             return 1
-        if app == "cursor" and level in WIDER:
-            record = install_record.load() or install_record.empty()  # so uninstall puts Cursor's files back too
-            widened = widen_cursor(engine, record, say=say)
+        if level in WIDER:
+            record = install_record.load() or install_record.empty()  # so uninstall puts the app's files back too
+            keyed = give_key(app, engine, record, say=say)
             install_record.save(record)
-            if not widened:
+            if not keyed:
                 return 1
     elif not set_level(engine, app, level):
         say(f"The memory service did not take the change; {COMMAND} doctor says why.")
         return 1
     say(f"{label} now sees {SAYS[level]}." +
-        (" Restart Cursor to load it." if app == "cursor" and level in WIDER else ""))
+        (f" Restart {label} to load it." if level in WIDER else ""))
     return 0
 
