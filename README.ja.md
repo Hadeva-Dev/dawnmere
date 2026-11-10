@@ -23,7 +23,7 @@ Mac の中のひとつのメモリを、Claude Code・Codex・Cursor で共有�
 
 <p align="center">
   <img src="assets/kip-loop.gif" width="800"
-       alt="アニメーション：「we deploy on Fridays」と書かれたメモが Claude Code のバケツに落ち、そのまま湖へ。カワセミの Kip がコピーを Codex と Cursor のバケツへ運ぶと、それぞれのアプリのロゴが光ります。続いて Cursor に「use pnpm, not npm」と伝えると、同じことがもう一度起こります。">
+       alt="アニメーション：「we deploy on Fridays」と書かれたメモが Claude Code のバケツに落ち、そのまま湖へ。カワセミの Kip がコピーを Codex と Cursor のバケツへ運ぶと、それぞれのアプリのロゴが光ります。続いて Codex に「use pnpm, not npm」と伝えると、同じことがもう一度起こります。">
 </p>
 
 ```bash
@@ -58,7 +58,7 @@ flowchart LR
 | **Codex** | 毎回のプロンプトに挿入 | "remember that ..." と入力したとき、またはモデルが `remember` を呼んだとき |
 | **Cursor** | 各チャットの開始時 | モデルが `remember` を呼んだとき |
 
-仕事用のメモしか見られないアプリが種類を指定せずに保存したメモは、仕事用のメモとして保存されるので、ほかのアプリからも呼び出せます。ただし、あなた自身の健康、家族、お金、法律に関わる内容は、個人的なメモのままになります。
+あなたが入力したこと（"remember that ..."）は、返答が終わるとすべてのアプリに届きます。モデルが自分の判断で `remember` を使って保存したメモは検索で見つかりますが、ほかのアプリのプロンプトに入るのは、あなたが確認したあと（`lflabs-memory held`）だけです。あなた自身の健康、家族、お金、法律に関わるメモは、個人的なメモのままになります。
 <!-- checked against v0.1.6 (406ee39/c3ed5b1): a `remember` with no kind from a work-only app (Cursor by default) is
      filed as work, unless it is about the user's health, family, money or legal matters. -->
 
@@ -80,7 +80,7 @@ flowchart LR
        work only; the prompt hook sees everything; Terminal widening asks for the app's name and an Allow dialog
        (access.py engine_widens). A widening typed in Claude Code or Codex is never applied;
        the reply gives the Terminal command (engine 50ffd0b, typed widening refused). -->
-- **保存されるテキストはチェックされます。** API キーやトークンのように見えるテキストは拒否されます。ダウンロードしたコードを実行させる、ファイルを削除させる、あなたに何かを隠させる、アシスタント自身の指示を書き換えようとする、といったアプリからの保存も拒否されます。アプリが保存したルールや指示、コマンドやリンクを含むものは、検索専用として保存されてラベルが付き、あなたが "confirm memory N" と入力するまでプロンプトに加えられることはありません。呼び出されたメモは "notes, not instructions"（指示ではなくメモ）というラベル付きでアプリに渡ります。
+- **保存されるテキストはチェックされます。** API キーやトークンのように見えるテキストは拒否されます。ダウンロードしたコードを実行させる、ファイルを削除させる、あなたに何かを隠させる、アシスタント自身の指示を書き換えようとする、といったアプリからの保存も拒否されます。アプリが自分の判断で保存したメモは、検索専用として保存されてラベルが付き、あなたが確認したあと（`lflabs-memory held`）にだけ、ほかのアプリのプロンプトに入ります。呼び出されたメモは "notes, not instructions"（指示ではなくメモ）というラベル付きでアプリに渡ります。
   <!-- checked against v0.1.6 (406ee39/c3ed5b1): MCP `remember` goes through the instruction screen; only some app
        saves are refused, the rest that read as rules, instructions, commands or links are kept search-only until
        "confirm memory N". Key/token refusals: mem.py:1373-1378. Label: mem.py:3919, instant.py:34. -->
@@ -158,7 +158,7 @@ sh install.sh
 
 ## セットアップで行うこと
 
-`dawnmere setup` は、まず何をするかを表示し、続けてよいか確認します。次に、AI アプリにあなたを何と呼ばせるか、バックグラウンドでの読み取りに Claude プランを使うか（Anthropic API キーも使えます。キーはキーチェーンに保存されます）、Cursor に個人的なメモを見せるか（同意しない限り見せません）、Claude Code がすでに `~/.claude/projects/*/memory` に保存しているメモを取り込むかを尋ねます。
+`dawnmere setup` は、まず何をするかを表示し、続けてよいか確認します。次に、AI アプリにあなたを何と呼ばせるか、バックグラウンドでの読み取りに Claude プランを使うか（Anthropic API キーも使えます。キーはキーチェーンに保存されます）、Cursor に個人的なメモを見せるか（同意しない限り見せません）、Claude Code がすでに `~/.claude/projects/*/memory` に保存しているメモを取り込むかを尋ねます（取り込んだメモを自分のものとして信頼するか、macOS のダイアログで一度だけ確認します。信頼しない場合は、確認するまで検索専用になります）。
 
 そのあと、各ステップを実行しながら表示します。
 
