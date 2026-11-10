@@ -43,6 +43,9 @@ def main():
         json.dump({k: v for k, v in state().items() if k not in ("fact", "id")}, open(STATE, "w"))
         print(f"purged #{sys.argv[2]}")
     elif sub == "import":
+        if os.environ.get("FAKE_IMPORT_FAIL"):  # the service's own first import wrote them a moment before
+            print("sqlite3.IntegrityError: UNIQUE constraint failed: memories.source", file=sys.stderr)
+            sys.exit(1)
         print("imported")
 
 

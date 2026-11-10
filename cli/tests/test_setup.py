@@ -1103,3 +1103,43 @@ def test_setup_yes_never_asks_to_trust_imported_notes(box, monkeypatch, capsys):
     log = [json.loads(x) for x in Path(os.environ["FAKE_LOG"]).read_text().splitlines()]
     assert not any(x.get("argv", [""])[0] == "trust" for x in log if x.get("prog") == "lflabs-memory")
     assert "kept for search until you confirm it" in out
+
+
+def _seed_note(box):
+    notes = box.home / ".claude/projects/-p/memory"
+    notes.mkdir(parents=True, exist_ok=True)
+    (notes / "a.md").write_text("---\ntype: project\n---\nOrchard deploys from main\n")
+
+
+def test_notes_the_service_imported_still_count_when_setups_import_fails(box, monkeypatch, capsys):
+    """VM run, 300 notes: the service's first import and setup's ran together, setup's failed, and the trust question
+    never came. What counts is what is new since setup began."""
+    _seed_note(box)
+    monkeypatch.setenv("FAKE_IMPORT_FAIL", "1")
+    monkeypatch.setattr(setup, "_imported_ids", lambda before: [3, 4])
+    code, out = run_setup()
+    shown = out + capsys.readouterr().out
+    assert code == 0, shown
+    assert "Your notes: 2 imported from Claude Code" in shown
+    assert "could not import them" not in shown
+    assert "kept for search until you confirm them" in out  # the --yes line, as after a clean import
+
+
+def test_a_failed_import_with_nothing_imported_warns(box, monkeypatch, capsys):
+    _seed_note(box)
+    monkeypatch.setenv("FAKE_IMPORT_FAIL", "1")
+    monkeypatch.setattr(setup, "_imported_ids", lambda before: [])
+    code, out = run_setup()
+    assert "could not import them now" in out + capsys.readouterr().out
+
+
+def test_claude_folder_without_the_claude_command_is_hooks_not_a_failure(box, capsys):
+    """~/.claude is here but not the claude command: the hooks are written, and the row says what is left."""
+    (box.bin / "claude").unlink()
+    code, out = run_setup()
+    shown = out + capsys.readouterr().out
+    assert code == 0, shown
+    assert setup.NO_CLAUDE in shown
+    assert "of 1 connected" not in shown and "of 3 connected" not in shown
+    hooks = json.loads((box.home / ".claude/settings.json").read_text())["hooks"]
+    assert set(hooks) == {"UserPromptSubmit", "SessionStart", "Stop", "SessionEnd"}
