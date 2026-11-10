@@ -275,7 +275,7 @@ Dawnmere 由 LF Labs（GitHub 上的 [Hadeva-Dev](https://github.com/Hadeva-Dev)
 
 - **只支持 Mac**：Apple 芯片，macOS 14 或更高版本。引擎用的 ONNX 运行时没有 Intel Mac 版本，也没有 Linux 或 Windows 版。
 - **只限一台 Mac。** 不在多台机器之间同步，也没有团队共享记忆。
-- **英文效果最好。** 搜索用的是英文模型，所以中文（以及其他语言）的记忆和提问，目前很难被可靠地找到。直接输入保存需要用英文说 "remember that"。想要效果好，暂时请用英文写记忆、用英文提问。
+- **英文效果最好。** 搜索用的是英文模型，所以中文（以及其他语言）的记忆和提问，目前很难被可靠地找到。直接输入保存要用 "remember that ..."，中文可以写 "记住：..."。想要效果好，暂时请用英文写记忆、用英文提问。
 - **从 Claude Code 保存效果最好。** 在 Codex 里要说 "remember that ..."；在 Cursor 里得由模型调用 `remember`。只有运行 `dawnmere setup --codex-sessions` 之后，才会读取 Codex 自己的会话文件。
 - **筛查是自动的，也会有漏网之鱼。** 用 `dawnmere export` 检查一下应用都存了什么。
 - **早期测试版。** 版本靠手动发布，更新也很频繁；更新前请先看 [release notes](https://github.com/Hadeva-Dev/dawnmere/releases)。
