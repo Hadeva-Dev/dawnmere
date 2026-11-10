@@ -276,7 +276,7 @@ time, for example to add a model later.
 
 When you forget a memory yourself (type "forget memory 12" in Claude Code or Codex, or run `lflabs-memory forget 12`
 in Terminal), its text, search entries, older versions and the facts drawn from it are deleted from the memory file
-and its backups. It cannot be brought back. If background reading is on, the words are kept for up to 24 hours so the
+and its backups when the reply finishes (typed in Codex, at your next prompt there). It cannot be brought back. If background reading is on, the words are kept for up to 24 hours so the
 background job can find other notes that mention them, then erased. When an app calls `forget` on its own, the memory
 is hidden at once and deleted for good after 24 hours; until then `lflabs-memory restore 12` brings it back. A
 fingerprint with no words stays, so the same thing is not saved again from an old chat. `dawnmere uninstall` can also
@@ -292,14 +292,14 @@ Your memory is never uploaded to us, and nothing is sent to LF Labs. What leaves
 - **Background reading**, if you chose a model, sends your own provider (your Claude plan through Claude Code, or the
   Anthropic API with your key) your Claude Code conversations, after every 6 of your messages and when a session goes
   quiet, with up to 8 related memories, which can include ones saved from Codex or Cursor. It also sends memories
-  waiting to be filed, a prompt not in English from any app (to search it in English), and for up to 24 hours the
+  waiting to be filed, a prompt not in English typed in Claude Code or Codex (to search it in English), and for up to 24 hours the
   words of something you forgot. Once a week, and once soon after setup, it also sends memories that say nearly the
   same thing, memories that read as out of date and dated status notes, each with a few related memories, to merge,
   rewrite or retire them. At most 200 calls a day in all; with no model, none of this is sent.
 - **GitHub**: releases and updates, and, if GitHub's `gh` is installed and logged in, the open pull requests of the
   repo you are working in.
 - **Downloads**: uv, Python and the engine's Python packages (from GitHub and PyPI); the search models and the Claude
-  Code plugin (from this repo's releases and repo); the connector (from npm, when an app starts it). `dawnmere update`
+  Code plugin (from this repo's releases and repo); the connector (from npm: downloaded once, and npm is checked when an app starts it). `dawnmere update`
   asks GitHub for the newest release.
 - **Setup's check of your model**: one short test call to Claude Code or the Anthropic API.
 - **The install line**: dawnmere.app counts each fetch of the install script (the tool that fetched it, the referring
