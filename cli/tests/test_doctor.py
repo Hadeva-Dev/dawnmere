@@ -963,3 +963,15 @@ def test_developer_tools_is_xcode_selects_folder(tmp_path, monkeypatch):
     assert layout.developer_tools() is True
     xs.write_text("#!/bin/sh\nexit 2\n")
     assert layout.developer_tools() is False
+
+
+def test_doctor_rows_for_other_mcp_apps(mac, monkeypatch, tmp_path, connector):
+    """Windsurf, Gemini CLI and VS Code get a row only when they are on this Mac."""
+    healthy(mac, monkeypatch, tmp_path)
+    assert "Gemini CLI" not in run_doctor()[1]
+    (mac.home / ".gemini").mkdir()
+    code, text = run_doctor()
+    assert re.search(r"Gemini CLI\s+warn\s+not connected", text) and "Windsurf" not in text
+    (mac.home / ".gemini/settings.json").write_text(
+        '{"mcpServers": {"lflabs-memory": {"command": "npx", "args": ["-y", "dawnmere-connector@0.1.1"]}}}')
+    assert re.search(r"Gemini CLI\s+ok\s+MCP, work only", run_doctor()[1])
