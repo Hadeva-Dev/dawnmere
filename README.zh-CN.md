@@ -219,7 +219,7 @@ sh install.sh
 
 ## 遗忘
 
-你自己遗忘一条记忆时（在 Claude Code 或 Codex 里输入 "forget memory 12"，或在终端里运行 `lflabs-memory forget 12`），它的文本、搜索条目、旧版本以及从中提取出的事实，都会从记忆文件及其备份中删除，无法找回。如果开启了后台阅读，这些文字最多会保留 24 小时，好让后台任务找到提到它们的其他笔记，之后就会被抹掉。应用自己调用 `forget` 时，这条记忆会立即隐藏，24 小时后彻底删除；在那之前，`lflabs-memory restore 12` 可以把它找回。会留下一个不含任何文字的指纹，这样同一件事就不会从旧对话里再被存一次。`dawnmere uninstall` 也可以删除全部记忆（会先问你）。
+你自己遗忘一条记忆时（在 Claude Code 或 Codex 里输入 "forget memory 12"，或在终端里运行 `lflabs-memory forget 12`），它的文本、搜索条目、旧版本以及从中提取出的事实，会在回复结束时从记忆文件及其备份中删除（在 Codex 里输入的，要等你在那里发下一条提示词），无法找回。如果开启了后台阅读，这些文字最多会保留 24 小时，好让后台任务找到提到它们的其他笔记，之后就会被抹掉。应用自己调用 `forget` 时，这条记忆会立即隐藏，24 小时后彻底删除；在那之前，`lflabs-memory restore 12` 可以把它找回。会留下一个不含任何文字的指纹，这样同一件事就不会从旧对话里再被存一次。`dawnmere uninstall` 也可以删除全部记忆（会先问你）。
 <!-- checked against v0.1.6 (406ee39/c3ed5b1): your own forget is a real delete (words kept up to 24 h when a model
      is on); an app's forget hides the memory, deletes it after 24 h, and `restore` brings it back until then. Before
      v0.1.6 every forget was a soft delete with `lflabs-memory purge` and `restore` (mem.py:1787-1790, 1954-1973). -->
@@ -228,9 +228,9 @@ sh install.sh
 
 你的记忆绝不会上传给我们，也不会向 LF Labs 发送任何东西。会离开你 Mac 的有：
 
-- **后台阅读**（如果你选了模型）：会把你的 Claude Code 对话发给你自己的模型提供方（通过 Claude Code 使用你的 Claude 订阅，或用你的密钥调用 Anthropic API），时机是你每发 6 条消息之后以及会话空闲时，并附上最多 8 条相关记忆，其中可能包括从 Codex 或 Cursor 存下的记忆。它还会发送等待归档的记忆、任何应用里非英文的提示词（以便用英文搜索），以及你遗忘的内容的文字（最多 24 小时）。每周一次（setup 之后不久也会有一次），它还会发送内容几乎相同的记忆、读起来已经过时的记忆和带日期的状态记录，每条附上几条相关记忆，用来合并、改写或停用它们。以上合计每天最多 200 次调用；不用模型时，这些都不会发送。
+- **后台阅读**（如果你选了模型）：会把你的 Claude Code 对话发给你自己的模型提供方（通过 Claude Code 使用你的 Claude 订阅，或用你的密钥调用 Anthropic API），时机是你每发 6 条消息之后以及会话空闲时，并附上最多 8 条相关记忆，其中可能包括从 Codex 或 Cursor 存下的记忆。它还会发送等待归档的记忆、在 Claude Code 或 Codex 里输入的非英文提示词（以便用英文搜索），以及你遗忘的内容的文字（最多 24 小时）。每周一次（setup 之后不久也会有一次），它还会发送内容几乎相同的记忆、读起来已经过时的记忆和带日期的状态记录，每条附上几条相关记忆，用来合并、改写或停用它们。以上合计每天最多 200 次调用；不用模型时，这些都不会发送。
 - **GitHub**：获取 release 和更新；如果装了 GitHub 的 `gh` 并已登录，还会获取你当前所在仓库的未关闭 pull request。
-- **下载**：uv、Python 和引擎依赖的 Python 包（来自 GitHub 和 PyPI）；搜索模型和 Claude Code 插件（来自本仓库及其 release）；连接器（应用启动它时从 npm 获取）。`dawnmere update` 会向 GitHub 查询最新 release。
+- **下载**：uv、Python 和引擎依赖的 Python 包（来自 GitHub 和 PyPI）；搜索模型和 Claude Code 插件（来自本仓库及其 release）；连接器（从 npm 下载一次，之后应用每次启动它时会向 npm 查询）。`dawnmere update` 会向 GitHub 查询最新 release。
 - **setup 检查模型**：向 Claude Code 或 Anthropic API 发一次简短的测试调用。
 - **安装命令**：dawnmere.app 会统计安装脚本每一次被获取（获取它的工具、来源网站和国家；不保留 IP 地址），然后转到 GitHub。网站自身的统计见它的[隐私页面](https://dawnmere.app/privacy)。
 
