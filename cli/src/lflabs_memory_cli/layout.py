@@ -73,7 +73,7 @@ def engine_bin():
     return str(sibling) if sibling.exists() else None
 
 
-BREW_FORMULA = "hadeva-dev/tap/dawnmere"  # the tap's formula: its caveats give the same two commands
+BREW_FORMULA = f"hadeva-dev/tap/{COMMAND}"  # the tap's formula: its caveats give the same two commands
 
 
 def homebrew(package=None):
