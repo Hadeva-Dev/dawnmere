@@ -83,7 +83,7 @@ def preflight(say):
     free = shutil.disk_usage(home()).free
     if free < MIN_DISK:
         problems.append(f"{PRODUCT} needs 1 GB of free disk space (this Mac has {free / 1e9:.1f} GB).")
-    if not uv_bin():
+    if not uv_bin() and not layout.homebrew():  # Homebrew's install never uses uv
         say(f"Note: uv is not on PATH, so `{COMMAND} update` and `{COMMAND} uninstall` will ask you to install it.")
     return problems
 

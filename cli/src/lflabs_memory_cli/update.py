@@ -1,4 +1,5 @@
-"""update: the newest release from GitHub, installed with its checksums checked (spec 9.6).
+"""update: the newest release from GitHub, installed with its checksums checked (spec 9.6). Under the Homebrew formula
+it only says how to update with brew (layout.homebrew).
 
 The only network call is GitHub's release API (and the release's own files). Two halves:
 1. this (old) program fetches the release, checks each wheel and constraints.txt against the release's SHA256SUMS and
@@ -22,7 +23,7 @@ import urllib.request
 from importlib import metadata
 from pathlib import Path
 
-from . import apps, edits, install_record, launchd, models, prompt
+from . import apps, edits, install_record, launchd, layout, models, prompt
 from .brand import COMMAND, PRODUCT, REPO
 from .layout import (CLI_DIST, CONNECTOR, CONNECTOR_VERSION, ENGINE_DIST, LABEL, MARKETPLACE, SERVER, data_dir,
                      developer_tools, engine_bin, engine_record, home, short, uv_bin)
@@ -183,6 +184,11 @@ def fail_closed(version, get, say):
 
 
 def main(check_only=False, yes=False, say=print, get=fetch):
+    if layout.homebrew():  # the formula's files are Homebrew's: uv tool install would put a second copy in ~/.local
+        say(f"{PRODUCT} was installed with Homebrew, so Homebrew updates it:")
+        say(f"  brew upgrade {layout.BREW_FORMULA}")
+        say(f"Then run {COMMAND} setup again, so the memory service and your apps use the new version.")
+        return 0
     have = installed_version()
     try:
         rel = release(get=get)
