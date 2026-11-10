@@ -289,17 +289,25 @@ Your memory is never uploaded to us, and nothing is sent to LF Labs. What leaves
   Anthropic API with your key) your Claude Code conversations, after every 6 of your messages and when a session goes
   quiet, with up to 8 related memories, which can include ones saved from Codex or Cursor. It also sends memories
   waiting to be filed, a prompt not in English from any app (to search it in English), and for up to 24 hours the
-  words of something you forgot. At most 200 calls a day; with no model, none of this is sent.
+  words of something you forgot. Once a week, and once soon after setup, it also sends memories that say nearly the
+  same thing, memories that read as out of date and dated status notes, each with a few related memories, to merge,
+  rewrite or retire them. At most 200 calls a day in all; with no model, none of this is sent.
 - **GitHub**: releases and updates, and, if GitHub's `gh` is installed and logged in, the open pull requests of the
   repo you are working in.
 - **Downloads**: uv, Python and the engine's Python packages (from GitHub and PyPI); the search models and the Claude
   Code plugin (from this repo's releases and repo); the connector (from npm, when an app starts it). `dawnmere update`
   asks GitHub for the newest release.
 - **Setup's check of your model**: one short test call to Claude Code or the Anthropic API.
+- **The install line**: dawnmere.app counts each fetch of the install script (the tool that fetched it, the referring
+  site and the country; no IP address is kept), then sends it on to GitHub. The site's own counting is on its
+  [privacy page](https://dawnmere.app/privacy).
 
 Each app decides for itself what it sends to its own model, including what it recalls from memory.
 
 <!-- checked against v0.1.6 (406ee39/c3ed5b1): what goes to the model provider and to GitHub, as listed.
+     Weekly tidy, engine 0.1.5 mem.py: _worker runs consolidate and audit every CONSOLIDATE_EVERY (7 days, and when no
+     run is recorded yet); merge sends each cluster at MERGE_SIM whole; review sends a STALE_RE match with up to 5
+     related; review_status_notes up to STATUS_NOTE_LIMIT (40) a run. All through llm_json, so inside the daily budget.
      200 a day: settings.py:8. Ping: backend.py:59-104. Models URL: THIRD_PARTY.md and models.json. -->
 
 ## Uninstall
