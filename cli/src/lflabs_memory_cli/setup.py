@@ -284,7 +284,10 @@ class RealSetup:
             if ok:
                 self.connected.append(row.name)
             ui.apps(shown)
-        note = "connected" if self.connected else "none found"
+        if len(self.connected) == len(order):
+            note = "connected" if order else "none found"
+        else:  # found, but not all of them could be connected: each row's hint says what is left
+            note = f"{len(self.connected)} of {len(order)} connected"
         ui.step("Your apps", "ok" if len(self.connected) == len(order) else "warn", note)
 
     def _apply(self, plans):
@@ -332,7 +335,7 @@ class RealSetup:
             mcp_ok = self._cmd(["claude", "mcp", "add", "--scope", "user", "--transport", "stdio", SERVER, "--", "npx",
                                 *apps.connector_args()]).ok
         _, fine = self._apply(apps.file_plans("claude-code", self.engine))
-        return "MCP + hooks", None, mcp_ok and fine
+        return "MCP + hooks" if mcp_ok else "hooks", None, mcp_ok and fine
 
     def _drop_fallback(self):
         """With the plugin installed, an earlier setup's fallback (its hooks in ~/.claude/settings.json, its MCP entry
@@ -360,14 +363,15 @@ class RealSetup:
         if not self.a.import_notes:
             ui.step("Your notes", "ok", "not imported")
             return
-        mem, n = memory_moment()
+        mem, _ = memory_moment()
         r = run([self.engine, "import"], timeout=300)
         if not r.ok:
             ui.step("Your notes", "warn", "could not import them now; the service tries again weekly")
             return
         self.imported = _imported_ids(self.notes_before)
         ui.memory(mem)
-        ui.step("Your notes", "ok", f"{n} imported from Claude Code")
+        k = len(self.imported)  # this run's new notes; n counts every memory file, already imported ones too
+        ui.step("Your notes", "ok", f"{k} imported from Claude Code" if k else "nothing new from Claude Code")
 
     def step_check(self, ui):
         ui.step("Self-check", "running")
@@ -562,7 +566,7 @@ def trust_imported(engine, ids, since, args, say):
         r = run([engine, "trust", "--claude-import-since", repr(since), "--", *map(str, ids)], timeout=300)
         if r.ok and (r.out or "").strip().startswith("trusted"):
             say(f"\nThe {n} note{'s' if n > 1 else ''} you imported from Claude Code {'are' if n > 1 else 'is'} yours "
-                "now: every app may use them.")
+                f"now: every app may use {'them' if n > 1 else 'it'}.")
             return True
     say(f"\nThe {n} note{'s' if n > 1 else ''} imported from Claude Code {'are' if n > 1 else 'is'} kept for search "
         f"until you confirm {'them' if n > 1 else 'it'}: `{ENGINE} held` lists {'them' if n > 1 else 'it'}, and "
