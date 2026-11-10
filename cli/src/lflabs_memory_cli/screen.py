@@ -561,7 +561,10 @@ def _memory_lines(state, names):
         add = paint(GREY, f"Add {' or '.join(later)} later: ") + paint(ORANGE, f"{COMMAND} setup")
         return [IND + first, IND + add]
     if not mem:
-        return [IND + paint(GREY, "Anything you tell one of them now reaches the others.")]
+        # Cursor has no prompt hook: a note told to Cursor is its model's own save and waits for the user's confirmation,
+        # so the line names only the apps whose typed notes do reach the others
+        told = [n for n in names if n != "Cursor"] or names
+        return [IND + paint(GREY, f"What you tell {' or '.join(told)} now reaches the others.")]
     tail = "  is now in both" if len(names) == 2 else f"  is now in all {len(names)}"
     return [IND + paint(NAME, f"“{cut(mem, room - 2 - len(tail))}”") + paint(GREY, tail)]
 
