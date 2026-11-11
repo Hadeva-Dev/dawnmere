@@ -3,6 +3,7 @@ import hashlib
 import importlib.metadata
 import json
 import os
+import re
 import shutil
 import socketserver
 import stat
@@ -346,7 +347,7 @@ def test_access_command(box, monkeypatch, capsys):
     assert access.main("windsurf", "everything", eng, say=out.append) == 1
     assert out[-1] == "Only Cursor and Codex can be widened from here for now.", "no pointer back to a chat (a loop)"
     assert access.main("cursor", None, eng, say=out.append) == 0
-    assert out[-1].startswith("Cursor sees ") and "dawnmere access cursor everything | nothing-personal" in out[-1]
+    assert out[-1].startswith("Cursor sees ") and "dawnmere access cursor everything | work | nothing" in out[-1]
 
 
 def test_node_missing_is_said(box, capsys):
@@ -977,6 +978,60 @@ def test_a_no_to_importing_notes_is_written_down_and_kept(box):
 def test_importing_notes_is_on_unless_declined(box):
     assert run_setup()[0] == 0
     assert tomllib.loads((layout.data_dir() / "config.toml").read_text())["privacy"]["claude_notes"] is True
+
+
+def test_access_alone_lists_every_connected_app(box, monkeypatch, capsys):
+    """`dawnmere access` with no app was argparse's "the following arguments are required: app" (exit 2): it now
+    says what each app on this Mac sees, and how to change one."""
+    from lflabs_memory_cli import access
+    args = cli.parser().parse_args(["access"])
+    assert args.app is None and args.level is None
+    out = []
+    assert access.main(None, None, layout.engine_bin(), say=out.append) == 1
+    assert out[-1] == "Memory is not set up yet: run dawnmere setup first."
+    assert run_setup()[0] == 0
+    (box.home / ".gemini").mkdir()
+    monkeypatch.setattr(access, "current_level", lambda app: "everything" if app == "cursor" else "work only")
+    monkeypatch.setattr(access, "keyless", lambda app: False)
+    out = []
+    assert access.main(None, None, layout.engine_bin(), say=out.append) == 0
+    text = "\n".join(out)
+    assert re.search(r"(?m)^Codex +work only$", text) and re.search(r"(?m)^Cursor +everything$", text)
+    assert re.search(r"(?m)^Gemini CLI +work only$", text) and "Windsurf" not in text, "only the apps on this Mac"
+    assert "Claude Code" in text and "its memory tools get work notes only" in text
+    assert out[-1] == ("To change one: dawnmere access APP everything | work | nothing (only Cursor and Codex can be "
+                       "given more than work notes)")
+    assert cli.main(["access"]) == 0 and "To change one: dawnmere access APP" in capsys.readouterr().out
+
+
+def test_nothing_personal_is_work_and_says_so(box, monkeypatch):
+    """`access cursor nothing-personal` answered "Cursor now sees everything but personal notes" while the engine had
+    put Cursor at work only: in a plain install the two levels hide the same sections. One level, one name."""
+    from lflabs_memory.profiles import generic
+    from lflabs_memory_cli import access
+    assert set(generic.NOTHING_PERSONAL) == {*generic.SECTIONS, generic.WITHHELD, "chats"} - set(generic.WORK_ONLY), \
+        "the engine's two levels differ now: give nothing-personal back its own name here"
+    assert "nothing-personal" not in access.LEVELS
+    assert run_setup()[0] == 0
+    out = []
+    assert access.main("cursor", "nothing-personal", layout.engine_bin(), say=out.append) == 0
+    assert out[-1] == "Cursor now sees work notes only."
+
+
+def test_access_refuses_a_name_that_is_no_app(box):
+    """`access bogusapp` answered "Bogusapp sees work only", and with a level made a client called bogusapp."""
+    from lflabs_memory_cli import access
+    assert run_setup()[0] == 0
+    out = []
+    eng = layout.engine_bin()
+    assert access.main("bogusapp", None, eng, say=out.append) == 2 and out[-1].startswith("No app called bogusapp here.")
+    assert access.main("bogusapp", "work", eng, say=out.append) == 2
+    log = [json.loads(x) for x in Path(os.environ["FAKE_LOG"]).read_text().splitlines()]
+    assert not any("bogusapp" in x.get("argv", []) for x in log), "the engine was never asked"
+    assert access.main("claude-code", None, eng, say=out.append) == 0
+    assert out[-1] == "Claude Code sees everything in your prompts; its memory tools get work notes only."
+    assert access.main("claude-code", "everything", eng, say=out.append) == 1
+    assert out[-1].endswith("That cannot be changed from here.")
 
 
 def test_access_says_a_keyless_app_gets_work_only(box, monkeypatch):

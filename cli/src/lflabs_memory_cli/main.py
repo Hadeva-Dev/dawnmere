@@ -85,7 +85,7 @@ COMMANDS = {
     "uninstall": (cmd_uninstall, "remove everything setup added"),
     "export": (cmd_export, "save your memory to a file"),
     "import": (cmd_import, "add memories from an export file"),
-    "access": (cmd_access, "change what an AI app may see: access cursor everything|work"),
+    "access": (cmd_access, "what each AI app may see (access), or change one: access cursor everything|work"),
     "update": (cmd_update, f"update {PRODUCT}"),
 }
 
@@ -166,8 +166,8 @@ def parser():
         elif name == "import":
             sp.add_argument("file")
         elif name == "access":
-            sp.add_argument("app", help="cursor, codex, ...")
-            sp.add_argument("level", nargs="?", help="everything, nothing-personal, work or nothing (none: show it)")
+            sp.add_argument("app", nargs="?", help="cursor, codex, ... (none: every app on this Mac)")
+            sp.add_argument("level", nargs="?", help="everything, work or nothing (none: show it)")
         elif name == "update":
             sp.add_argument("--check", action="store_true", help="only say whether there is a newer version")
             sp.add_argument("--yes", action="store_true")
