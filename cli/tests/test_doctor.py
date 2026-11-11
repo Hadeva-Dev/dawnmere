@@ -86,6 +86,16 @@ def run_doctor(**kw):
     return code, text
 
 
+def test_doctor_never_starts_the_engine_without_a_store(mac, monkeypatch):
+    """After an uninstall that deleted the memory, doctor's held-back row ran `held --count`, and the engine made a
+    new data folder and memory.db (VM run 2026-11-11)."""
+    ran = []
+    monkeypatch.setattr(doctor, "engine_bin", lambda: "/e/bin/lflabs-memory")
+    monkeypatch.setattr(doctor, "run", lambda argv, **kw: ran.append(argv))
+    assert not (layout.data_dir() / "memory.db").exists()
+    assert doctor.check_held() == [] and ran == []
+
+
 def test_doctor_lines_golden(mac, monkeypatch, tmp_path, connector):
     healthy(mac, monkeypatch, tmp_path)
     code, text = run_doctor()

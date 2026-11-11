@@ -252,8 +252,10 @@ def test_doctor_names_an_old_app_entry(home, monkeypatch):
 
 @pytest.mark.parametrize("argv", [["held"], ["held", "--count"], ["trust", "--", "5", "6"], ["forget", "12"],
                                   ["restore", "c3"], ["search", "deploy days", "-k", "3"], ["add", "we ship Fridays"]])
-def test_front_doors_run_the_engine_in_place(monkeypatch, argv):
+def test_front_doors_run_the_engine_in_place(monkeypatch, tmp_path, argv):
     ran = []
+    monkeypatch.setenv("LFLABS_MEMORY_HOME", str(tmp_path))
+    (tmp_path / "config.toml").write_text("version = 1\n")  # set up
     monkeypatch.setattr(layout, "engine_bin", lambda: "/e/bin/lflabs-memory")
     monkeypatch.setattr(os, "execv", lambda path, args: ran.append((path, args)))
     main.main(argv)
@@ -264,6 +266,22 @@ def test_front_door_without_an_engine(monkeypatch, capsys):
     monkeypatch.setattr(layout, "engine_bin", lambda: None)
     assert main.main(["held"]) == 1
     assert "The memory engine is not installed" in capsys.readouterr().err
+
+
+def test_front_doors_wait_for_setup(monkeypatch, tmp_path, capsys):
+    """Before setup, or after an uninstall that deleted the memory, `dawnmere held` (or search, add, ...) ran the
+    engine, which made a new empty store: uninstall had just said the memory was deleted, and the folder was back
+    (VM run 2026-11-11). They say setup has not run; --help still answers."""
+    ran = []
+    monkeypatch.setenv("LFLABS_MEMORY_HOME", str(tmp_path / "Memory"))
+    monkeypatch.setattr(layout, "engine_bin", lambda: "/e/bin/lflabs-memory")
+    monkeypatch.setattr(os, "execv", lambda path, args: ran.append(args))
+    for argv in (["held"], ["search", "deploy days"], ["add", "we ship Fridays"], ["forget", "3"]):
+        assert main.main(argv) == 1
+        assert "Dawnmere is not set up on this Mac yet: run dawnmere setup first." in capsys.readouterr().err
+    assert ran == [] and not (tmp_path / "Memory").exists()
+    main.main(["held", "--help"])
+    assert ran == [["/e/bin/lflabs-memory", "held", "--help"]]
 
 
 def test_help_lists_the_front_doors():

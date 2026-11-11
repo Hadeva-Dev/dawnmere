@@ -109,6 +109,10 @@ def front_door(argv):
         print(f"The memory engine is not installed, so `{COMMAND} {argv[0]}` cannot run. Run the install line again.",
               file=sys.stderr)
         return 1
+    if not (data_dir() / "config.toml").exists() and not any(a in ("-h", "--help") for a in argv[1:]):
+        # the engine would make a new, empty store: before setup, or after an uninstall that deleted the memory
+        print(f"{PRODUCT} is not set up on this Mac yet: run {COMMAND} setup first.", file=sys.stderr)
+        return 1
     os.execv(eng, [eng, *argv])
 
 
