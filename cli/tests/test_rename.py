@@ -397,5 +397,10 @@ def test_dawnmere_add_prints_a_plain_line(tmp_path):
            "add", "we ship the shop on Fridays"]
     first = subprocess.run(cmd, env=env, capture_output=True, text=True, timeout=180, stdin=subprocess.DEVNULL)
     again = subprocess.run(cmd, env=env, capture_output=True, text=True, timeout=180, stdin=subprocess.DEVNULL)
-    assert (first.returncode, first.stdout) == (0, "Saved as #1.\n"), first.stderr
-    assert (again.returncode, again.stdout) == (0, "Already in memory as #1.\n"), again.stderr
+    # engine 0.1.9: a note added with no Terminal (no dialog, so no Allow) also says it is held, on the same line
+    held = (" It is kept out of prompts until you confirm it, like an app's save: `dawnmere held` shows the line to "
+            "type.")
+    assert first.returncode == 0 and first.stdout.startswith("Saved as #1." + held), first.stdout + first.stderr
+    assert again.returncode == 0 and again.stdout.startswith("Already in memory as #1." + held), \
+        again.stdout + again.stderr
+    assert first.stdout.count("\n") == again.stdout.count("\n") == 1
