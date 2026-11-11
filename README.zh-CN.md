@@ -171,7 +171,7 @@ sh install.sh
 
 ## setup 会做什么
 
-`dawnmere setup` 会先列出它要做的事，问你是否继续。然后依次询问：AI 应用该怎么称呼你；后台阅读要不要用你的 Claude 订阅（或者 Anthropic API 密钥，存放在钥匙串里）；Cursor 能不能看到你的个人笔记（默认不能，除非你同意）；以及要不要现在就导入 Claude Code 已经存在 `~/.claude/projects/*/memory` 里的笔记，并把它们当作你自己的笔记（会弹出一个 macOS 对话框询问；如果不同意，它们会留作搜索用，等你确认）。如果你选否，记忆服务启动时和 Claude Code 新会话开始时，Dawnmere 仍会读入这些文件；它们只留作搜索用，在你确认之前（`dawnmere held`）不会进入任何提示词。
+`dawnmere setup` 会先列出它要做的事，问你是否继续。然后依次询问：AI 应用该怎么称呼你；后台阅读要不要用你的 Claude 订阅（或者 Anthropic API 密钥，存放在钥匙串里）；Cursor 能不能看到你的个人笔记（默认不能，除非你同意）；以及要不要现在就导入 Claude Code 已经存在 `~/.claude/projects/*/memory` 里的笔记，并把它们当作你自己的笔记（会弹出一个 macOS 对话框询问；如果不同意，它们会留作搜索用，等你确认）。
 
 之后它会边执行边显示每一步：
 

@@ -208,9 +208,7 @@ again also works.
 you, whether to use your Claude plan for background reading (or an Anthropic API key, kept in your Keychain), whether
 Cursor may see your personal notes (no, unless you say yes), and whether to import the notes Claude Code already keeps
 in `~/.claude/projects/*/memory` now and trust them as yours (one macOS dialog asks; if you don't, they are kept for
-search until you confirm them). If you say no, Dawnmere still reads those files in when the memory service starts and
-when a Claude Code session starts: they are kept for search and reach no prompt until you confirm them
-(`dawnmere held`).
+search until you confirm them).
 
 Then it shows each step as it runs:
 
