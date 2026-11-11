@@ -95,12 +95,59 @@ def node_problem():
     return f"{problem}: your apps cannot use memory's tools until you {apps.NODE_FIX}." if problem else None
 
 
+def ask_plan(a, has, args, yes):
+    """The subscription whose own coding tool will read, when Claude's does not: the tools found signed in
+    (backend.PLANS order: Codex, Kimi Code, Qwen Code, Gemini CLI). One: asked yes or no. Several: asked which
+    (--yes takes the first). None, or a no: None."""
+    if args.dry_run:
+        return None  # a dry run runs nothing, not even the sign-in check
+    for name, (cmd, _, _) in backend.PLANS.items():
+        if name in has and shutil.which(cmd):
+            a.plans[name] = a.codex if name == "codex-cli" else backend.plan_status(name, find_claude(cmd))
+    ready = [n for n, s in a.plans.items() if s.ok]
+    if not ready:
+        return None
+    if len(ready) == 1 or yes:
+        return ready[0] if prompt.yes_no(f"Use {backend.PLANS[ready[0]][2]} for memory's background reading?", True,
+                                         assume=yes) else None
+    short = {backend.PLANS[n][0]: n for n in ready}
+    pick = prompt.text(f"Several are signed in. Which should read in the background? ({', '.join(short)}, or none)",
+                       next(iter(short))).strip().lower()
+    return short.get(pick)
+
+
+def ask_key(a, say, yes):
+    """The key for an OpenAI-compatible provider (none for a model on this Mac), tried once before it is kept."""
+    name = backend.PROVIDERS.get(a.provider, a.api_base)
+    local = a.provider == "ollama" or a.api_base.startswith(("http://localhost", "http://127.0.0.1"))
+    key = "" if local else os.environ.get("LFLABS_MEMORY_API_KEY") or ("" if yes else prompt.secret(
+        f"Paste your {name} API key (it is kept in your Keychain only):"))
+    if not key and not local:
+        say(f"No key given for {name}: memory will run without a model for now.")
+        return
+    if a.provider in backend.NEEDS_MODEL and not a.api_model:
+        a.api_model = "" if yes else prompt.text(f"Which model at {name}? (its id, as {name} writes it)", "").strip()
+        if not a.api_model:
+            say(f"{name} needs a model named (--api-model): memory will run without a model for now.")
+            return
+    ok, note = backend.provider_ping(a.provider, key, a.api_base, a.api_model)
+    if not ok:
+        say(f"{name} did not answer ({note}).")
+        return
+    a.backend, a.api_key = "openai-api", key or None
+
+
 class Answers:
     def __init__(self):
         self.name = ""
         self.backend = "none"
         self.model = "haiku"
         self.claude = None            # backend.Status from the check
+        self.codex = None             # backend.Status of Codex as the reading model (the user's ChatGPT plan)
+        self.plans = {}               # backend name -> Status, for each plan tool found (backend.PLANS)
+        self.provider = ""            # backend openai-api: which provider (backend.PROVIDERS), "" with api_base
+        self.api_base = ""            # backend openai-api: an address the user gave
+        self.api_model = ""           # backend openai-api: a model the user named (else the provider's own)
         self.api_key = None
         self.import_notes = True
         self.codex_sessions = False
@@ -120,21 +167,63 @@ def ask(args, say):
         backend.Status("claude-cli", False, note="not installed")  # a dry run runs nothing, not even the ping
     # Plan first (decided 2026-10-28): the user's Claude plan whenever Claude Code is there, logged in or not; an API key
     # only when the user says yes to it, never as a fallback.
+    has = backend.engine_backends()
+    a.codex = backend.codex_status() if "codex-cli" in has and shutil.which("codex") and not args.dry_run else \
+        backend.Status("codex-cli", False, note="not installed")
+    a.provider = (getattr(args, "provider", None) or "").lower()
+    a.api_base = getattr(args, "api_base", None) or ""
+    a.api_model = getattr(args, "api_model", None) or ""
     if args.backend:
         a.backend = args.backend
         if a.backend == "claude-cli" and not a.claude.usable:
             say(f"Claude Code cannot be used for memory's background reading: {a.claude.note}.")
             a.backend = "none"
+        if a.backend in backend.PLANS:
+            cmd, label, _ = backend.PLANS[a.backend]
+            st = a.codex if a.backend == "codex-cli" else backend.Status(a.backend, False, note="not installed") \
+                if a.backend not in has or not shutil.which(cmd) or args.dry_run else \
+                backend.plan_status(a.backend, find_claude(cmd))
+            a.plans[a.backend] = st
+            if not st.usable:
+                say(f"{label} cannot be used for memory's background reading: {st.note}.")
+                a.backend = "none"
+            elif st.logged_in is False and a.backend != "codex-cli":
+                say(f"{label} is not signed in yet. Memory starts reading once you sign in.")
+        if a.backend == "openai-api":
+            a.backend = "none"
+            if "openai-api" not in has:
+                say("This version of the engine cannot use other providers yet.")
+            elif not (a.provider in backend.PROVIDERS or a.api_base):
+                say(f"--backend openai-api needs --provider ({', '.join(backend.PROVIDERS)}) or --api-base.")
+            else:
+                ask_key(a, say, args.yes)
     elif a.claude.usable and prompt.yes_no("Use your Claude plan for memory's background reading?", True,
                                            assume=yes):
         a.backend = "claude-cli"
-    elif not args.yes and prompt.yes_no("Use an Anthropic API key instead?", False):
-        key = prompt.secret("Paste your Anthropic API key (it is kept in your Keychain only):")
-        ok, note = backend.api_ping(key, a.model) if key else (False, "no key given")
-        if ok:
-            a.backend, a.api_key = "anthropic-api", key
+    # No Claude Code (or a no to it): the plan the user does have. What Codex reads then goes to Codex's own model.
+    elif (plan := ask_plan(a, has, args, yes)):
+        a.backend = plan
+    elif not args.yes and prompt.yes_no("Use an Anthropic API key instead, or another provider's? (OpenAI, Gemini, "
+                                        "DeepSeek, Kimi, Qwen, GLM, Doubao, OpenRouter, or a model on this Mac)",
+                                        False):
+        names = ["anthropic"] + [p for p in backend.PROVIDERS if "openai-api" in has]
+        pick = prompt.text(f"Which one? ({', '.join(names)})", "anthropic").strip().lower()
+        if pick == "anthropic":
+            key = prompt.secret("Paste your Anthropic API key (it is kept in your Keychain only):")
+            ok, note = backend.api_ping(key, a.model) if key else (False, "no key given")
+            if ok:
+                a.backend, a.api_key = "anthropic-api", key
+            else:
+                say(f"That key did not work ({note}).")
+        elif pick in names:
+            a.provider = pick
+            ask_key(a, say, False)
         else:
-            say(f"That key did not work ({note}).")
+            say(f"I don't know {pick!r}: memory will run without a model for now.")
+    if a.backend == "codex-cli" and not args.codex_sessions and not a.claude.usable:
+        a.codex_sessions = True  # Codex is this user's app and its own model reads: saving from its sessions is the point
+    if a.backend == "codex-cli" and a.codex.logged_in is False:
+        say("Codex is not logged in yet: run codex login. Memory starts reading once you do.")
     if a.backend == "claude-cli" and a.claude.logged_in is False:
         host = backend.claude_endpoint()
         say(backend.ENDPOINT_NOTE.format(host=host) + "." if host else
@@ -233,6 +322,11 @@ class RealSetup:
     def step_claude(self, ui):
         ui.step("Claude Code", "running")
         c = self.a.claude
+        other = {**{n: v[2] for n, v in backend.PLANS.items()},
+                 "openai-api": backend.PROVIDERS.get(self.a.provider, "your model provider")}.get(self.a.backend)
+        if other:
+            ui.step("Claude Code", "ok", f"{'found; ' if c and c.version else ''}not used: reading with {other}")
+            return
         if self.a.backend == "claude-cli" and c.logged_in is False:
             host = backend.claude_endpoint()
             ui.step("Claude Code", "warn", f"found; set to use {host}" if host else "found; log in to start: claude, then /login")
@@ -754,10 +848,13 @@ def main(args, say=print):
     a = ask(args, say)
     record = install_record.load() or install_record.empty()
     intro = full_show(args.show)
-    if a.api_key and keychain.store(a.api_key):
+    if a.api_key and keychain.store(a.api_key, (a.provider or backend.OTHER) if a.backend == "openai-api" else None):
         record["keychain"] = True
     settings.save(settings.render(a.name, a.backend, a.model, a.codex_sessions, claude_path=find_claude(),
-                                  keep=settings.raw()))
+                                  keep=settings.raw(), provider=a.provider, api_base=a.api_base,
+                                  api_model=a.api_model,
+                                  tool_path=find_claude(backend.PLANS[a.backend][0]) if a.backend in backend.PLANS
+                                  else None))
     record["versions"] = {"cli": _version(CLI_DIST), "engine": _version(ENGINE_DIST), "connector": CONNECTOR_VERSION}
     install_record.save(record)
     work = RealSetup(a, record, say)
@@ -781,6 +878,11 @@ def main(args, say=print):
         say({"claude-cli": plan,
              "anthropic-api": f"Background reading: your Anthropic API key ({model}), up to "
                               f"{settings.DEFAULTS['llm']['daily_calls']} calls a day",
+             **{n: f"Background reading: {v[2]}, up to {settings.DEFAULTS['llm']['daily_calls']} calls a day"
+                for n, v in backend.PLANS.items()},
+             "openai-api": f"Background reading: {backend.PROVIDERS.get(a.provider, a.api_base)}"
+                           f"{'' if a.provider == 'ollama' else ', with your API key'}, up to "
+                           f"{settings.DEFAULTS['llm']['daily_calls']} calls a day",
              "none": f"Background reading: off ({backend.NONE_LOSES})"}[a.backend])
         say(f"`{COMMAND} doctor` checks everything. `{COMMAND} uninstall` removes it all.")
     if not on_shell_path():

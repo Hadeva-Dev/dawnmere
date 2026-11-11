@@ -1252,3 +1252,148 @@ def test_version_flag(capsys):
         cli.parser().parse_args(["--version"])
     out = capsys.readouterr().out
     assert e.value.code == 0 and re.fullmatch(r"Dawnmere \S+ \(engine \S+, connector \d+\.\d+\.\d+\)\n", out), out
+
+
+# ---------- a reading model that is not Claude ----------
+
+def codex_ready(box, monkeypatch, logged="Logged in using ChatGPT"):
+    from lflabs_memory_cli import backend
+    monkeypatch.setattr(backend, "engine_backends", lambda: {"claude-cli", "anthropic-api", "codex-cli",
+                                                             "openai-api", "none"})
+    box.on("codex", ["--version"], 0, "codex-cli 0.167.0\n")
+    box.on("codex", ["login", "status"], 0, logged + "\n")
+
+
+def test_codex_reads_when_there_is_no_claude_code(box, monkeypatch, capsys):
+    """No Claude Code, Codex logged in: the ChatGPT plan reads, and Codex's own sessions are saved from."""
+    box.remove("claude")
+    codex_ready(box, monkeypatch)
+    code, out = run_setup()
+    cfg = (layout.data_dir() / "config.toml").read_text()
+    assert code == 0, out + capsys.readouterr().out
+    assert 'backend = "codex-cli"' in cfg and "codex_sessions = true" in cfg and "codex_path = " in cfg
+    assert "Background reading: your ChatGPT plan, through Codex, up to 200 calls a day" in out
+    assert "not used: reading with your ChatGPT plan, through Codex" in capsys.readouterr().out
+
+
+def test_claude_plan_still_comes_first(box, monkeypatch, capsys):
+    codex_ready(box, monkeypatch)
+    asked = answering(monkeypatch, {})
+    run_setup()
+    cfg = (layout.data_dir() / "config.toml").read_text()
+    assert 'backend = "claude-cli"' in cfg and "codex_sessions = false" in cfg and "codex_path" not in cfg
+    assert not any("ChatGPT" in q for q in asked)
+
+
+def test_codex_is_not_offered_by_an_engine_without_it(box, monkeypatch, capsys):
+    box.remove("claude")
+    box.on("codex", ["--version"], 0, "codex-cli 0.167.0\n")
+    box.on("codex", ["login", "status"], 0, "Logged in using ChatGPT\n")
+    run_setup()
+    assert 'backend = "none"' in (layout.data_dir() / "config.toml").read_text()
+
+
+def test_another_providers_key(box, monkeypatch, capsys):
+    """--backend openai-api --provider deepseek: the key is tried, kept in the Keychain under the provider's name,
+    and never written to config.toml."""
+    from lflabs_memory_cli import backend
+    box.remove("claude")
+    codex_ready(box, monkeypatch)
+    tried = []
+    monkeypatch.setattr(backend, "provider_ping", lambda *a: tried.append(a) or (True, ""))
+    monkeypatch.setenv("LFLABS_MEMORY_API_KEY", "sk-deepseek-test")
+    code, out = run_setup("--backend", "openai-api", "--provider", "deepseek")
+    cfg = (layout.data_dir() / "config.toml").read_text()
+    assert code == 0 and tried == [("deepseek", "sk-deepseek-test", "", "")]
+    assert 'backend = "openai-api"' in cfg and 'provider = "deepseek"' in cfg and "sk-deepseek-test" not in cfg
+    assert "Background reading: DeepSeek, with your API key" in out
+    stored = [c for c in box.calls("security") if c[:1] == ["-i"]]
+    assert stored, "the key goes to the Keychain through security -i (stdin), never argv"
+    assert not any("sk-deepseek-test" in " ".join(c) for c in box.calls("security"))
+    # a later setup that chooses nothing keeps none of the provider's settings
+    monkeypatch.delenv("LFLABS_MEMORY_API_KEY")
+    run_setup("--backend", "none")
+    assert "provider" not in (layout.data_dir() / "config.toml").read_text()
+
+
+def test_a_key_that_does_not_work_is_not_kept(box, monkeypatch, capsys):
+    from lflabs_memory_cli import backend
+    box.remove("claude")
+    codex_ready(box, monkeypatch, logged="Not logged in")
+    monkeypatch.setattr(backend, "provider_ping", lambda *a: (False, "the model provider refused the key (401)"))
+    monkeypatch.setenv("LFLABS_MEMORY_API_KEY", "sk-bad")
+    code, out = run_setup("--backend", "openai-api", "--provider", "kimi")
+    assert 'backend = "none"' in (layout.data_dir() / "config.toml").read_text()
+    assert "Kimi (Moonshot) did not answer" in out and "sk-bad" not in out
+    assert not [c for c in box.calls("security") if c[:1] == ["-i"]]
+
+
+def test_a_provider_without_its_own_model_needs_one_named(box, monkeypatch, capsys):
+    from lflabs_memory_cli import backend
+    box.remove("claude")
+    codex_ready(box, monkeypatch, logged="Not logged in")
+    tried = []
+    monkeypatch.setattr(backend, "provider_ping", lambda *a: tried.append(a) or (True, ""))
+    code, out = run_setup("--backend", "openai-api", "--provider", "ollama")
+    assert 'backend = "none"' in (layout.data_dir() / "config.toml").read_text() and "--api-model" in out
+    code, out = run_setup("--backend", "openai-api", "--provider", "ollama", "--api-model", "qwen3:8b")
+    cfg = (layout.data_dir() / "config.toml").read_text()
+    assert tried == [("ollama", "", "", "qwen3:8b")], "a model on this Mac: no key asked for"
+    assert 'provider = "ollama"' in cfg and 'main_model = "qwen3:8b"' in cfg and 'cheap_model = "qwen3:8b"' in cfg
+    assert "Background reading: Ollama on this Mac, up to" in out
+
+
+def plans_ready(box, monkeypatch, signed_in):
+    """Kimi Code, Qwen Code and Gemini CLI on PATH; those named are signed in (the engine's check is faked)."""
+    from lflabs_memory_cli import backend
+    monkeypatch.setattr(backend, "engine_backends", lambda: {"claude-cli", "anthropic-api", "none", *backend.PLANS,
+                                                             "openai-api"})
+    for cmd in ("kimi", "qwen", "gemini"):
+        box.add(cmd)
+    asked = []
+
+    def status(name, path=None):
+        asked.append(name)
+        ok = name in signed_in
+        return backend.Status(name, ok, "9.9.9", ok, "" if ok else "not signed in", usable=True)
+    monkeypatch.setattr(backend, "plan_status", status)
+    return asked
+
+
+def test_the_subscription_tool_that_is_signed_in_reads(box, monkeypatch, capsys):
+    box.remove("claude")
+    plans_ready(box, monkeypatch, {"qwen-cli"})
+    code, out = run_setup()
+    cfg = (layout.data_dir() / "config.toml").read_text()
+    assert code == 0 and 'backend = "qwen-cli"' in cfg and "qwen_path = " in cfg and "codex_path" not in cfg
+    assert "codex_sessions = false" in cfg, "Codex's sessions are read only when Codex itself reads"
+    assert "Background reading: your Qwen plan, through Qwen Code, up to 200 calls a day" in out
+
+
+def test_several_signed_in_the_first_by_default_or_the_one_named(box, monkeypatch, capsys):
+    box.remove("claude")
+    plans_ready(box, monkeypatch, {"kimi-cli", "gemini-cli"})
+    run_setup()
+    assert 'backend = "kimi-cli"' in (layout.data_dir() / "config.toml").read_text(), "--yes: the first in order"
+    from lflabs_memory_cli import prompt
+    asked = []
+    monkeypatch.setattr(prompt, "text", lambda q, default="": asked.append(q) or (
+        "gemini" if "Several are signed in" in q else default))
+    answering(monkeypatch, {})
+    args = cli.parser().parse_args(["setup", "--plain"])
+    a = setup.ask(args, [].append)
+    assert a.backend == "gemini-cli" and any("kimi, gemini, or none" in q for q in asked)
+
+
+def test_no_subscription_tool_signed_in_and_no_key_is_none(box, monkeypatch, capsys):
+    box.remove("claude")
+    asked = plans_ready(box, monkeypatch, set())
+    run_setup()
+    assert 'backend = "none"' in (layout.data_dir() / "config.toml").read_text()
+    assert set(asked) == {"kimi-cli", "qwen-cli", "gemini-cli"}
+
+
+def test_claude_plan_first_never_checks_the_others(box, monkeypatch, capsys):
+    asked = plans_ready(box, monkeypatch, {"kimi-cli"})
+    run_setup()
+    assert 'backend = "claude-cli"' in (layout.data_dir() / "config.toml").read_text() and asked == []
