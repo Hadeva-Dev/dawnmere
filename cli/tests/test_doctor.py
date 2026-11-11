@@ -65,7 +65,7 @@ engine        ok    1.0.0b1, running (pid 4120), up 2 d
 data          ok    ~/Library/Application Support/LF Labs/Memory  (4 memories, 2 claims, 0 MB)
 models        ok    embed, rerank: checksums match
 hook speed    ok    recall in N s (limit 1.5 s)
-connector     ok    lflabs-memory/1 on SOCK
+connector     ok    answering on SOCK
 Node.js       ok    v20.11.0
 model         ok    Claude Code 2.1.301, logged in, Haiku
 budget        ok    today 41 of 200 calls; last 7 days 0.9k in / 0.2k out tokens a day

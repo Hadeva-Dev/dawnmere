@@ -146,7 +146,7 @@ def check_hook():
 def check_connector():
     got = sockets.ping_connector()
     if got:
-        return Check("connector", "ok", f"{sockets.PROTOCOL} on {short(sockets.connector_sock())}")
+        return Check("connector", "ok", f"answering on {short(sockets.connector_sock())}")
     return Check("connector", "fail", "nothing answers on the connector socket",
                  "Codex and Cursor cannot reach memory: is the background service running?")
 

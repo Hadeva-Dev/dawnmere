@@ -355,3 +355,29 @@ def test_no_old_org_url_is_left():
     for f in ("connector/server.json", "connector/package.json"):
         text = (ROOT / f).read_text()
         assert text.lower().count("hadeva") == 1 and '"io.github.Hadeva-Dev/dawnmere-connector"' in text
+
+
+def test_no_doctor_line_shows_an_old_name(mac, monkeypatch, tmp_path, connector):
+    """Every doctor line is for the user: dawnmere's names only (the data folder's "LF Labs" aside, by decision)."""
+    from test_doctor import healthy, run_doctor
+    healthy(mac, monkeypatch, tmp_path)
+    text = run_doctor()[1]
+    assert "lflabs" not in text.lower() and "connector     ok    answering on" in text
+
+
+@pytest.mark.skipif(not os.environ.get("LFLABS_MEMORY_MODELS"), reason="needs the search models (LFLABS_MEMORY_MODELS)")
+def test_dawnmere_add_prints_a_plain_line(tmp_path):
+    """VM gate 0.1.10 rc1: `dawnmere add` printed the engine's raw tuple, (1, 'added'). Same exit code, plain words."""
+    data = tmp_path / "data"
+    data.mkdir()
+    (data / "config.toml").write_text('version = 1\nprofile = "generic"\nowner_name = "Robin"\n')
+    env = {**os.environ, "LFLABS_MEMORY_HOME": str(data), "LFLABS_MEMORY_UNDER_TEST": "1",
+           "LFLABS_MEMORY_NOTIFY": "off"}
+    for k in ("CLAUDECODE", "CLAUDE_CODE_ENTRYPOINT"):
+        env.pop(k, None)
+    cmd = [sys.executable, "-c", "import sys; from lflabs_memory_cli import main; sys.exit(main.main())",
+           "add", "we ship the shop on Fridays"]
+    first = subprocess.run(cmd, env=env, capture_output=True, text=True, timeout=180, stdin=subprocess.DEVNULL)
+    again = subprocess.run(cmd, env=env, capture_output=True, text=True, timeout=180, stdin=subprocess.DEVNULL)
+    assert (first.returncode, first.stdout) == (0, "Saved as #1.\n"), first.stderr
+    assert (again.returncode, again.stdout) == (0, "Already in memory as #1.\n"), again.stderr
