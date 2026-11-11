@@ -6,7 +6,8 @@ import tomllib
 from .layout import data_dir
 
 DEFAULTS = {"llm": {"backend": "claude-cli", "main_model": "haiku", "cheap_model": "haiku", "daily_calls": 200},
-            "privacy": {"codex_sessions": False, "chat_index": False, "holdout": False, "new_clients": "work"},
+            "privacy": {"codex_sessions": False, "claude_notes": True, "chat_index": False, "holdout": False,
+                        "new_clients": "work"},
             "connector": {"enabled": True}}
 
 
@@ -37,9 +38,11 @@ def _plain(v):
                                                                                   for x in v))
 
 
-def render(owner_name, backend, main_model="haiku", codex_sessions=False, claude_path=None, keep=None):
+def render(owner_name, backend, main_model="haiku", codex_sessions=False, claude_path=None, keep=None,
+           claude_notes=None):
     """config.toml. keep: the file setup found (a re-run): every value it holds that setup's questions do not ask
-    about stays as the user left it (daily_calls, chat_index, a models folder, ...)."""
+    about stays as the user left it (daily_calls, chat_index, a models folder, ...). claude_notes: whether the engine
+    reads Claude Code's own memory files in by itself (None: as keep has it, else on)."""
     keep = keep or {}
     cfg = json.loads(json.dumps(DEFAULTS))
     for section, values in keep.items():
@@ -47,6 +50,8 @@ def render(owner_name, backend, main_model="haiku", codex_sessions=False, claude
             cfg.setdefault(section, {}).update({k: v for k, v in values.items() if _plain(v)})
     cfg["llm"].update(backend=backend, main_model=main_model, **({"claude_path": claude_path} if claude_path else {}))
     cfg["privacy"]["codex_sessions"] = codex_sessions
+    if claude_notes is not None:
+        cfg["privacy"]["claude_notes"] = claude_notes
     lines = ["version = 1", 'profile = "generic"'] + ([f"owner_name = {_value(owner_name)}"] if owner_name else [])
     lines += [f"{k} = {_value(v)}" for k, v in keep.items()
               if k not in ("version", "profile", "owner_name") and _plain(v)]
