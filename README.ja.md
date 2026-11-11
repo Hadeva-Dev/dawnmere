@@ -33,7 +33,7 @@ curl -fsSL https://dawnmere.app/install | sh
 
 ## できること
 
-覚えておく価値のあることを、Claude Code か Codex に伝えます（たとえば "remember that we deploy on Fridays"）。Dawnmere はそれをあなたの Mac に一度だけ保存します。もう一方のアプリで似た言葉でたずねると、そのメモリが出てきます。そのプロジェクトで新しく開いた Cursor のチャットにも、その後 1 日のあいだ表示されます。Claude Code で上限に達して Codex に乗り換えても、Codex は「デプロイは金曜」「pnpm を使う」ことを思い出せます。
+覚えておく価値のあることを、Claude Code か Codex に伝えます（たとえば "remember that we deploy on Fridays"）。Dawnmere はそれをあなたの Mac に一度だけ保存します。もう一方のアプリで似た言葉でたずねると、そのメモリが出てきます。そのプロジェクトで新しく開いた Cursor のチャットにも、その後 1 日のあいだ表示されます（新しいものから 5 件まで）。Claude Code で上限に達して Codex に乗り換えても、Codex は「デプロイは金曜」「pnpm を使う」ことを思い出せます。
 
 ```mermaid
 flowchart LR
@@ -98,6 +98,8 @@ flowchart LR
 
 使うエージェントがひとつだけなら、組み込みのメモリで十分かもしれません。Dawnmere もそこから始めます。セットアップのときに、Claude Code がすでに保存しているメモを取り込めます。
 
+**CLAUDE.md や AGENTS.md ではだめなのか。** 意図して書くルールにはそれらを使ってください。Dawnmere はその代わりではありません。Dawnmere が扱うのは、何気なく口にしたことで、3 つのファイルに書き写したくはないものです。呼び出しは選択的で、アプリが受け取るのはプロンプトに合うメモリだけです。毎回ファイル全体ではありません。
+
 <!-- Sources, read 2026-11-08: claude-mem README ("Your memory lives in ~/.claude-mem on your machine"; "Works with
      Claude Code, Codex, Cursor, OpenCode and 11 more agents"; CLAUDE_MEM_SESSION_START_INCLUDE_ALL_SOURCES defaults
      to "false"). Supermemory coding-agents page ("a decision saved in Claude Code is there when you open Cursor";
@@ -112,7 +114,16 @@ flowchart LR
 curl -fsSL https://dawnmere.app/install | sh
 ```
 
-Claude Code を使っているなら、2 つのコマンドのあとに `/dawnmere:setup` を実行するだけです。
+Homebrew を使いたい場合：
+
+```bash
+brew install lf-labs-inc/tap/dawnmere
+dawnmere setup
+```
+
+Homebrew が Node.js も一緒にインストールします。アップデートは `brew upgrade lf-labs-inc/tap/dawnmere` のあと、もう一度 `dawnmere setup` を実行します。削除するときは、`brew uninstall dawnmere` の前に `dawnmere uninstall` を実行してください。
+
+Claude Code を使っているなら、2 つのコマンドのあとに `/dawnmere:setup` を実行するだけです。この方法には git が必要です。Apple の Command Line Tools が入っていない Mac では、先に `xcode-select --install` を実行するか、上のインストール用の 1 行を使ってください。
 
 ```text
 /plugin marketplace add LF-Labs-Inc/dawnmere
@@ -160,7 +171,7 @@ sh install.sh
 
 ## セットアップで行うこと
 
-`dawnmere setup` は、まず何をするかを表示し、続けてよいか確認します。次に、AI アプリにあなたを何と呼ばせるか、バックグラウンドでの読み取りに Claude プランを使うか（Anthropic API キーも使えます。キーはキーチェーンに保存されます）、Cursor に個人的なメモを見せるか（同意しない限り見せません）、Claude Code がすでに `~/.claude/projects/*/memory` に保存しているメモを取り込むかを尋ねます（取り込んだメモを自分のものとして信頼するか、macOS のダイアログで一度だけ確認します。信頼しない場合は、確認するまで検索専用になります）。
+`dawnmere setup` は、まず何をするかを表示し、続けてよいか確認します。次に、AI アプリにあなたを何と呼ばせるか、バックグラウンドでの読み取りに Claude プランを使うか（Anthropic API キーも使えます。キーはキーチェーンに保存されます）、Cursor に個人的なメモを見せるか（同意しない限り見せません）、Claude Code がすでに `~/.claude/projects/*/memory` に保存しているメモをいま取り込み、自分のものとして信頼するかを尋ねます（macOS のダイアログで一度だけ確認します。信頼しない場合は、確認するまで検索専用になります）。「いいえ」と答えても、メモリサービスの起動時と Claude Code の新しいセッションの開始時に、Dawnmere はこれらのファイルを読み込みます。読み込んだメモは検索専用で、確認する（`dawnmere held`）までどのプロンプトにも入りません。
 
 そのあと、各ステップを実行しながら表示します。
 
@@ -169,7 +180,7 @@ sh install.sh
 | Claude Code | `claude` があり、ログイン済みかを確認 |
 | 検索モデル | 検索モデル（約 310 MB）をダウンロードし、各ファイルのサイズと sha256 を確認 |
 | メモリサービス | 検索を速く保つバックグラウンドサービス（LaunchAgent）を起動 |
-| アプリ | インストールされていれば Claude Code、Codex、Cursor を接続 |
+| アプリ | インストールされていれば、Claude Code、Codex、Cursor と、下に挙げるほかのアプリを接続 |
 | メモ | Claude Code のメモを取り込む |
 | セルフチェック | テスト用のメモリを保存し、Codex や Cursor と同じ方法で見つけてから削除 |
 
@@ -184,10 +195,10 @@ sh install.sh
 
 ## 対応アプリ
 
-- **Claude Code**（2.1.301 以降）：インストールした release と同じバージョンの `dawnmere` プラグインを、このリポジトリからインストールします。プラグインがツールと 4 つのフックを追加します。プラグインをインストールできない場合は、`claude mcp add` で同じツールを追加し、フックを `~/.claude/settings.json` に書き込みます。
+- **Claude Code**（2.1.301 以降）：インストールした release と同じバージョンの `dawnmere` プラグインを、このリポジトリからインストールします。プラグインがツールと 4 つのフックを追加します。プラグインをインストールできない場合（git がないときなど）は、`claude mcp add` で同じツールを追加し、フックを `~/.claude/settings.json` に書き込みます。
   <!-- checked against v0.1.6 (406ee39/c3ed5b1): the plugin pins to the release tag. -->
 - **Codex**：`~/.codex/config.toml` に `[mcp_servers.dawnmere]` を、`~/.codex/hooks.json` にプロンプトフックを追加します。Codex で一度 `/hooks` と入力し、フックを信頼してください。
-- **Cursor**：`~/.cursor/mcp.json` に `dawnmere` を、`~/.cursor/hooks.json` にセッション開始フックを追加します。そのあと Cursor を再起動してください。`dawnmere access cursor everything` を実行するまで、Cursor は仕事用のメモしか見られません。`dawnmere access cursor work` で元に戻せます。
+- **Cursor**：`~/.cursor/mcp.json` に `dawnmere` を、`~/.cursor/hooks.json` にセッション開始フックを追加します。そのあと Cursor を再起動してください。`dawnmere access cursor everything` を実行するまで、Cursor は仕事用のメモしか見られません。`dawnmere access cursor work` で元に戻せます。広げたあとはメモリツールがすべてを見られるようになりますが、チャット開始時に表示されるメモは仕事用のメモのままです。Codex も同じで、プロンプトに入るのは仕事用のメモだけです。
 - **Windsurf、Gemini CLI、VS Code（Copilot）、Qwen Code、Kimi Code、Qoder CLI、iFlow CLI、Cline CLI**：セットアップがこれらを見つけると、それぞれの MCP 設定ファイル（`~/.codeium/windsurf/mcp_config.json`、`~/.gemini/settings.json`、`~/Library/Application Support/Code/User/mcp.json`、`~/.qwen/settings.json`、`~/.kimi-code/mcp.json`、`~/.qoder/settings.json`、`~/.iflow/settings.json`、`~/.cline/data/settings/cline_mcp_settings.json`）に `dawnmere` を追加します。そのあとアプリを再起動してください。追加されるのはツールだけでフックはないため、ツールを呼び出したときにだけ思い出し、見られるのは仕事用のメモだけです。
 - **Claude Desktop とそのほかの MCP アプリ**：セットアップでは接続しません。Claude Desktop の場合は、[最新の release](https://github.com/LF-Labs-Inc/dawnmere/releases/latest) から `dawnmere-connector.mcpb` を開くか、次の内容を `~/Library/Application Support/Claude/claude_desktop_config.json` に追加してください。
 
@@ -222,9 +233,9 @@ sh install.sh
 | `dawnmere update` | 最新の release をインストールし、チェックサムで照合する |
 | `dawnmere uninstall` | セットアップが追加したものをすべて削除する |
 | `dawnmere held` | 確認するまでプロンプトに入らないアプリの保存と、それぞれを確認するための 1 行を表示する |
-| `dawnmere trust -- ID...` | macOS のダイアログで「許可」をクリックしたあと、メモリをあなた自身の言葉として扱う |
+| `dawnmere trust -- ID...` | macOS のダイアログで「Allow」をクリックしたあと、メモリをあなた自身の言葉として扱う |
 | `dawnmere search QUERY` | メモリを検索する |
-| `dawnmere add TEXT` | メモリをひとつ保存する |
+| `dawnmere add TEXT` | メモリをひとつ保存する。あなた自身の言葉かどうかを macOS のダイアログで確認し、「Allow」をクリックするまではアプリの保存と同じく保留される（`dawnmere held`） |
 | `dawnmere forget ID` | メモリを完全に削除する |
 | `dawnmere restore ID` | アプリが直近 1 日以内に忘れさせたメモリを元に戻す |
 
@@ -288,7 +299,7 @@ Dawnmere は LF Labs（GitHub の [LF-Labs-Inc](https://github.com/LF-Labs-Inc) 
 
 - **Mac 専用**です。Apple シリコン、macOS 14 以降が必要です。エンジンの ONNX ランタイムには Intel Mac 版がなく、Linux 版や Windows 版もありません。
 - **Mac 1 台だけ。** マシン間の同期や、チームで共有するメモリはありません。
-- **中国語と日本語の想起は言葉の一致で行います。** 中国語や日本語で保存したメモは、同じ言葉を一部使って質問したときにプロンプトへ追加されます。言い換えた質問は見つからないことがよくありますが、アプリから検索はできます。モデルを設定している場合、中国語や日本語の質問は英語でも検索されます（1回につき小さなモデル呼び出し1回）。入力して保存するには "remember that ..." と書きます。日本語なら "覚えておいて：..." でも保存できます。
+- **中国語と日本語の想起は言葉の一致で行います。** 中国語や日本語で保存したメモは、同じ言葉を一部使って質問したときにプロンプトへ追加されます。言い換えた質問は見つからないことがよくありますが、アプリから検索はできます。モデルを設定している場合、中国語や日本語の質問は英語でも検索されます（1回につき小さなモデル呼び出し1回）。入力して保存するには "remember that ..." と書きます。日本語なら "覚えておいて：..." でも保存できます。そのほかの言語は、今のところ見つかる確実性がかなり低くなります。
 - **保存がいちばん確実なのは Claude Code です。** Codex では "remember that ..." と言ってください。Cursor ではモデルが `remember` を呼ぶ必要があります。Codex 自身のセッションファイルは、`dawnmere setup --codex-sessions` を実行した場合だけ読み取ります。
 - **チェックは自動なので、見逃すこともあります。** アプリが何を保存したかは `dawnmere export` で確認してください。
 - **初期ベータです。** リリースは手作業で、頻繁に出ます。アップデートの前に [リリースノート](https://github.com/LF-Labs-Inc/dawnmere/releases) を読んでください。
