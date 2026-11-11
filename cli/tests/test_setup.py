@@ -960,6 +960,25 @@ def test_setup_says_when_the_connector_is_not_on_npm(box, capsys):
     assert f"dawnmere-connector@{layout.CONNECTOR_VERSION} is not on npm yet: apps cannot start memory's tools" in shown
 
 
+def test_a_no_to_importing_notes_is_written_down_and_kept(box):
+    """--no-import (or a no to the question) once only skipped setup's own import: the engine read Claude Code's
+    notes in by itself minutes later. The answer is now config.toml's privacy.claude_notes, which the engine
+    follows, and a later `setup --yes` keeps it."""
+    notes = box.home / ".claude/projects/-p/memory"
+    notes.mkdir(parents=True)
+    (notes / "deploys.md").write_text("---\ntype: project\n---\nWe deploy on Fridays.\n")
+    cfg = lambda: tomllib.loads((layout.data_dir() / "config.toml").read_text())["privacy"]  # noqa: E731
+    code, out = run_setup("--no-import")
+    assert code == 0 and cfg()["claude_notes"] is False
+    assert run_setup()[0] == 0 and cfg()["claude_notes"] is False, "a re-run with --yes keeps the no"
+    assert "claude_notes = false" in run_setup("--dry-run")[1]
+
+
+def test_importing_notes_is_on_unless_declined(box):
+    assert run_setup()[0] == 0
+    assert tomllib.loads((layout.data_dir() / "config.toml").read_text())["privacy"]["claude_notes"] is True
+
+
 def test_access_says_a_keyless_app_gets_work_only(box, monkeypatch):
     """An app widened in the engine but without a key in its config is still held to work only: say so."""
     from lflabs_memory_cli import access
