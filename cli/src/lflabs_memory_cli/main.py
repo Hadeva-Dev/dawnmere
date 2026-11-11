@@ -1,6 +1,8 @@
 """The command line: setup, doctor, uninstall, export, update; and the engine's memory commands (held, trust, forget,
 restore, search, add), run as the engine runs them."""
 import argparse
+import codecs
+import locale
 import os
 import sys
 from pathlib import Path
@@ -83,7 +85,7 @@ COMMANDS = {
     "uninstall": (cmd_uninstall, "remove everything setup added"),
     "export": (cmd_export, "save your memory to a file"),
     "import": (cmd_import, "add memories from an export file"),
-    "access": (cmd_access, "change what an AI app may see: access cursor everything|work"),
+    "access": (cmd_access, "what each AI app may see (access), or change one: access cursor everything|work"),
     "update": (cmd_update, f"update {PRODUCT}"),
 }
 
@@ -106,6 +108,10 @@ def front_door(argv):
     if not eng:
         print(f"The memory engine is not installed, so `{COMMAND} {argv[0]}` cannot run. Run the install line again.",
               file=sys.stderr)
+        return 1
+    if not (data_dir() / "config.toml").exists() and not any(a in ("-h", "--help") for a in argv[1:]):
+        # the engine would make a new, empty store: before setup, or after an uninstall that deleted the memory
+        print(f"{PRODUCT} is not set up on this Mac yet: run {COMMAND} setup first.", file=sys.stderr)
         return 1
     os.execv(eng, [eng, *argv])
 
@@ -164,8 +170,8 @@ def parser():
         elif name == "import":
             sp.add_argument("file")
         elif name == "access":
-            sp.add_argument("app", help="cursor, codex, ...")
-            sp.add_argument("level", nargs="?", help="everything, nothing-personal, work or nothing (none: show it)")
+            sp.add_argument("app", nargs="?", help="cursor, codex, ... (none: every app on this Mac)")
+            sp.add_argument("level", nargs="?", help="everything, work or nothing (none: show it)")
         elif name == "update":
             sp.add_argument("--check", action="store_true", help="only say whether there is a newer version")
             sp.add_argument("--yes", action="store_true")
@@ -173,7 +179,37 @@ def parser():
     return p
 
 
+def utf8_everywhere():
+    """Under a locale that is not UTF-8 (LANG=zh_CN.GB2312, ja_JP.SJIS, de_DE.ISO8859-1) Python reads and writes every
+    file in that locale: config.toml with a name it cannot decode was a traceback in setup and doctor, and an app's
+    settings file could be read garbled. Every file this program touches is UTF-8, so start again in Python's UTF-8
+    mode (it cannot be turned on once Python runs), with what was typed on the command line passed on as UTF-8. Then
+    only a Terminal is read and written in the locale's encoding, with ? for what it cannot show. The engine's own
+    command does the same (lflabs_memory.cli.utf8_everywhere)."""
+    try:
+        enc = codecs.lookup(locale.getencoding()).name
+    except LookupError:
+        return
+    if enc == "utf-8":
+        return
+    if not sys.flags.utf8_mode and "PYTHONUTF8" not in os.environ and len(sys.orig_argv) > 1:
+        def arg(a):
+            raw = os.fsencode(a)
+            try:
+                raw.decode("utf-8")
+                return raw
+            except UnicodeDecodeError:
+                return raw.decode(enc, "replace").encode("utf-8")
+        os.environ["PYTHONUTF8"] = "1"
+        os.execv(sys.executable, [sys.executable, *(arg(a) for a in sys.orig_argv[1:])])
+    for stream in (sys.stdin, sys.stdout, sys.stderr):
+        if stream is not None and stream.isatty():
+            stream.reconfigure(encoding=enc, errors="replace")
+
+
 def main(argv=None):
+    if argv is None:  # the command itself, not a test's call
+        utf8_everywhere()
     argv = sys.argv[1:] if argv is None else list(argv)
     if argv and argv[0] in FRONT:
         return front_door(argv)

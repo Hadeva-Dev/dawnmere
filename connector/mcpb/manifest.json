@@ -2,7 +2,7 @@
   "manifest_version": "0.3",
   "name": "dawnmere-connector",
   "display_name": "Dawnmere",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "One memory shared across your AI apps. Connects to Dawnmere on your Mac.",
   "long_description": "Dawnmere gives Claude, Cursor, Codex and your other AI apps one shared memory, kept on your Mac. This extension connects Claude Desktop to Dawnmere: it searches, saves and forgets memories through Dawnmere and stores nothing itself. Early beta: it needs Dawnmere running on the same Mac.",
   "author": {

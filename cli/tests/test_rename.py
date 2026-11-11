@@ -252,8 +252,10 @@ def test_doctor_names_an_old_app_entry(home, monkeypatch):
 
 @pytest.mark.parametrize("argv", [["held"], ["held", "--count"], ["trust", "--", "5", "6"], ["forget", "12"],
                                   ["restore", "c3"], ["search", "deploy days", "-k", "3"], ["add", "we ship Fridays"]])
-def test_front_doors_run_the_engine_in_place(monkeypatch, argv):
+def test_front_doors_run_the_engine_in_place(monkeypatch, tmp_path, argv):
     ran = []
+    monkeypatch.setenv("LFLABS_MEMORY_HOME", str(tmp_path))
+    (tmp_path / "config.toml").write_text("version = 1\n")  # set up
     monkeypatch.setattr(layout, "engine_bin", lambda: "/e/bin/lflabs-memory")
     monkeypatch.setattr(os, "execv", lambda path, args: ran.append((path, args)))
     main.main(argv)
@@ -264,6 +266,22 @@ def test_front_door_without_an_engine(monkeypatch, capsys):
     monkeypatch.setattr(layout, "engine_bin", lambda: None)
     assert main.main(["held"]) == 1
     assert "The memory engine is not installed" in capsys.readouterr().err
+
+
+def test_front_doors_wait_for_setup(monkeypatch, tmp_path, capsys):
+    """Before setup, or after an uninstall that deleted the memory, `dawnmere held` (or search, add, ...) ran the
+    engine, which made a new empty store: uninstall had just said the memory was deleted, and the folder was back
+    (VM run 2026-11-11). They say setup has not run; --help still answers."""
+    ran = []
+    monkeypatch.setenv("LFLABS_MEMORY_HOME", str(tmp_path / "Memory"))
+    monkeypatch.setattr(layout, "engine_bin", lambda: "/e/bin/lflabs-memory")
+    monkeypatch.setattr(os, "execv", lambda path, args: ran.append(args))
+    for argv in (["held"], ["search", "deploy days"], ["add", "we ship Fridays"], ["forget", "3"]):
+        assert main.main(argv) == 1
+        assert "Dawnmere is not set up on this Mac yet: run dawnmere setup first." in capsys.readouterr().err
+    assert ran == [] and not (tmp_path / "Memory").exists()
+    main.main(["held", "--help"])
+    assert ran == [["/e/bin/lflabs-memory", "held", "--help"]]
 
 
 def test_help_lists_the_front_doors():
@@ -344,17 +362,16 @@ def test_the_old_orgs_marketplace_checkout_is_cleaned_up(home, mac):
 
 
 def test_no_old_org_url_is_left():
-    """Every link and source names LF-Labs-Inc; only the MCP Registry name (published under the new namespace at the
-    connector's next release) and the migration's own constants know the old one."""
-    allowed = {"connector/server.json", "connector/package.json", "connector/docs/GO-PUBLIC.md",
-               "cli/src/lflabs_memory_cli/layout.py", "cli/tests/test_rename.py"}
+    """Every link and source names LF-Labs-Inc, the MCP Registry name included (connector 0.1.2); only the
+    migration's own constants know the old one."""
+    allowed = {"cli/src/lflabs_memory_cli/layout.py", "cli/tests/test_rename.py"}
     files = subprocess.run(["git", "ls-files"], cwd=ROOT, capture_output=True, text=True).stdout.split()
     hits = [f for f in files if f not in allowed and (ROOT / f).is_file() and not f.endswith(("lock", ".png", ".gif"))
             and "hadeva" in (ROOT / f).read_text(errors="ignore").lower()]
     assert hits == []
     for f in ("connector/server.json", "connector/package.json"):
         text = (ROOT / f).read_text()
-        assert text.lower().count("hadeva") == 1 and '"io.github.Hadeva-Dev/dawnmere-connector"' in text
+        assert '"io.github.LF-Labs-Inc/dawnmere-connector"' in text
 
 
 def test_no_doctor_line_shows_an_old_name(mac, monkeypatch, tmp_path, connector):
@@ -379,5 +396,10 @@ def test_dawnmere_add_prints_a_plain_line(tmp_path):
            "add", "we ship the shop on Fridays"]
     first = subprocess.run(cmd, env=env, capture_output=True, text=True, timeout=180, stdin=subprocess.DEVNULL)
     again = subprocess.run(cmd, env=env, capture_output=True, text=True, timeout=180, stdin=subprocess.DEVNULL)
-    assert (first.returncode, first.stdout) == (0, "Saved as #1.\n"), first.stderr
-    assert (again.returncode, again.stdout) == (0, "Already in memory as #1.\n"), again.stderr
+    # engine 0.1.9: a note added with no Terminal (no dialog, so no Allow) also says it is held, on the same line
+    held = (" It is kept out of prompts until you confirm it, like an app's save: `dawnmere held` shows the line to "
+            "type.")
+    assert first.returncode == 0 and first.stdout.startswith("Saved as #1." + held), first.stdout + first.stderr
+    assert again.returncode == 0 and again.stdout.startswith("Already in memory as #1." + held), \
+        again.stdout + again.stderr
+    assert first.stdout.count("\n") == again.stdout.count("\n") == 1

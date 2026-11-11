@@ -103,6 +103,7 @@ class Answers:
         self.claude = None            # backend.Status from the check
         self.api_key = None
         self.import_notes = True
+        self.claude_notes = True      # config.toml's privacy.claude_notes: a no to importing stops the engine's own too
         self.codex_sessions = False
         self.apps = list(apps.DEFAULT)
         self.cursor_personal = False  # Cursor starts at work only unless the user says yes
@@ -146,11 +147,17 @@ def ask(args, say):
     if "cursor" in a.apps and apps.installed("cursor") and not access.agent_shell():  # never offered to an agent
         a.cursor_personal = prompt.yes_no(f"Let Cursor see your personal notes too? (Change it any time: {COMMAND} "
                                           "access cursor work)", False, assume=False if args.yes else None)
-    if args.no_import or not list(claude_notes()):
-        a.import_notes = False
+    # A no is kept (privacy.claude_notes): the engine otherwise reads those files in by itself, at the service's start
+    # and at every Claude Code session start. A re-run's default, and --yes, is the answer given before.
+    before = settings.load()["privacy"].get("claude_notes") is not False
+    if args.no_import:
+        a.import_notes = a.claude_notes = False
+    elif not list(claude_notes()):
+        a.import_notes, a.claude_notes = False, before  # nothing to import now: later notes as chosen before
     else:
-        a.import_notes = prompt.yes_no("Import the notes Claude Code already keeps in ~/.claude/projects/*/memory?",
-                                       True, assume=yes)
+        a.import_notes = a.claude_notes = prompt.yes_no(
+            "Import the notes Claude Code already keeps in ~/.claude/projects/*/memory?", before,
+            assume=before if args.yes else None)
     return a
 
 
@@ -485,7 +492,12 @@ def self_check(engine):
         sid = f"self-check-{secrets.token_hex(4)}"
         base = {"session_id": sid, "transcript_path": str(project / "t.jsonl"), "cwd": str(project),
                 "hook_event_name": "UserPromptSubmit"}
-        ok, took, _ = _hook(engine, "hook-prompt", {**base, "prompt": "what do we know about this project?"})
+        # The first prompt after an install pays once for what no later prompt does (the hook's first start, the
+        # models' first search): it is run, and the second is the one timed, as every prompt after setup will be.
+        ask = {**base, "prompt": "what do we know about this project?"}
+        ok, took, _ = _hook(engine, "hook-prompt", ask)
+        if ok:
+            ok, took, _ = _hook(engine, "hook-prompt", ask)
         if not ok:
             return False, took, "the prompt hook failed: see ~/Library/Logs/LF Labs/memory.log"
         fact = check_phrase()
@@ -621,7 +633,8 @@ def dry_run(a, say):
     eng = engine_bin() or ENGINE
     say("A dry run: nothing is changed. Setup would:\n")
     say(f"  write {short(settings.path())} (0600):")
-    say(textwrap.indent(settings.render(a.name, a.backend, a.model, a.codex_sessions), "      "))
+    say(textwrap.indent(settings.render(a.name, a.backend, a.model, a.codex_sessions, claude_notes=a.claude_notes),
+                        "      "))
     say(f"  download the search models into {short(models.folder())}")
     say(f"  write {short(launchd.plist_path())} and run: launchctl bootstrap {launchd.domain()} "
         f"{short(launchd.plist_path())}")
@@ -757,7 +770,7 @@ def main(args, say=print):
     if a.api_key and keychain.store(a.api_key):
         record["keychain"] = True
     settings.save(settings.render(a.name, a.backend, a.model, a.codex_sessions, claude_path=find_claude(),
-                                  keep=settings.raw()))
+                                  keep=settings.raw(), claude_notes=a.claude_notes))
     record["versions"] = {"cli": _version(CLI_DIST), "engine": _version(ENGINE_DIST), "connector": CONNECTOR_VERSION}
     install_record.save(record)
     work = RealSetup(a, record, say)

@@ -3,6 +3,7 @@ import hashlib
 import importlib.metadata
 import json
 import os
+import re
 import shutil
 import socketserver
 import stat
@@ -114,7 +115,7 @@ def test_setup_end_to_end(box, capsys):
     version = importlib.metadata.version("lflabs-memory-cli")
     assert ["plugin", "marketplace", "add", f"LF-Labs-Inc/dawnmere#v{version}", "--scope", "user"] in \
         box.calls("claude"), "the plugin at the release tag the wheels come from, never main's head"
-    assert "dawnmere-connector@0.1.1" in (box.home / ".codex/config.toml").read_text()
+    assert "dawnmere-connector@0.1.2" in (box.home / ".codex/config.toml").read_text()
     assert "hook-cursor-start" in (box.home / ".cursor/hooks.json").read_text()
     assert (layout.data_dir() / "config.toml").read_text().startswith('version = 1\nprofile = "generic"')
     assert oct(os.stat(layout.data_dir() / "config.toml").st_mode & 0o777) == "0o600"
@@ -133,7 +134,7 @@ def test_setup_dry_run_lists_changes(box):
     assert code == 0
     assert tree(box.home) == before and not (layout.data_dir() / "config.toml").exists()
     assert box.calls("launchctl") == [] and not [c for c in box.calls("claude") if c[:1] == ["plugin"]]
-    for line in ("~/.codex/config.toml: add [mcp_servers.dawnmere]", 'args = ["-y", "dawnmere-connector@0.1.1"]',
+    for line in ("~/.codex/config.toml: add [mcp_servers.dawnmere]", 'args = ["-y", "dawnmere-connector@0.1.2"]',
                  "~/.cursor/mcp.json: add mcpServers.\"dawnmere\"", "claude plugin install dawnmere@dawnmere",
                  'LFLABS_MEMORY_CLIENT = "codex"', "hook-cursor-start"):
         assert line in out, line
@@ -156,7 +157,7 @@ def test_setup_leaves_jsonc_alone(box, capsys):
     assert code == 0
     assert (box.home / ".cursor/mcp.json").read_text() == jsonc
     assert "~/.cursor/mcp.json: is not plain JSON (comments?): left alone; add this by hand" in out
-    assert '"dawnmere-connector@0.1.1"' in out, "the lines to add are printed"
+    assert '"dawnmere-connector@0.1.2"' in out, "the lines to add are printed"
 
 
 def test_plugin_fallback_when_plugin_cli_fails(box, capsys):
@@ -164,7 +165,7 @@ def test_plugin_fallback_when_plugin_cli_fails(box, capsys):
     assert run_setup()[0] == 0
     calls = box.calls("claude")
     assert ["mcp", "add", "--scope", "user", "--transport", "stdio", "dawnmere", "--", "npx", "-y",
-            "dawnmere-connector@0.1.1"] in calls
+            "dawnmere-connector@0.1.2"] in calls
     hooks = json.loads((box.home / ".claude/settings.json").read_text())["hooks"]
     assert set(hooks) == {"UserPromptSubmit", "SessionStart", "Stop", "SessionEnd"}
     assert hooks["UserPromptSubmit"][0]["hooks"][0]["command"] == f"{box.bin}/lflabs-memory hook-prompt", \
@@ -346,7 +347,7 @@ def test_access_command(box, monkeypatch, capsys):
     assert access.main("windsurf", "everything", eng, say=out.append) == 1
     assert out[-1] == "Only Cursor and Codex can be widened from here for now.", "no pointer back to a chat (a loop)"
     assert access.main("cursor", None, eng, say=out.append) == 0
-    assert out[-1].startswith("Cursor sees ") and "dawnmere access cursor everything | nothing-personal" in out[-1]
+    assert out[-1].startswith("Cursor sees ") and "dawnmere access cursor everything | work | nothing" in out[-1]
 
 
 def test_node_missing_is_said(box, capsys):
@@ -960,6 +961,79 @@ def test_setup_says_when_the_connector_is_not_on_npm(box, capsys):
     assert f"dawnmere-connector@{layout.CONNECTOR_VERSION} is not on npm yet: apps cannot start memory's tools" in shown
 
 
+def test_a_no_to_importing_notes_is_written_down_and_kept(box):
+    """--no-import (or a no to the question) once only skipped setup's own import: the engine read Claude Code's
+    notes in by itself minutes later. The answer is now config.toml's privacy.claude_notes, which the engine
+    follows, and a later `setup --yes` keeps it."""
+    notes = box.home / ".claude/projects/-p/memory"
+    notes.mkdir(parents=True)
+    (notes / "deploys.md").write_text("---\ntype: project\n---\nWe deploy on Fridays.\n")
+    cfg = lambda: tomllib.loads((layout.data_dir() / "config.toml").read_text())["privacy"]  # noqa: E731
+    code, out = run_setup("--no-import")
+    assert code == 0 and cfg()["claude_notes"] is False
+    assert run_setup()[0] == 0 and cfg()["claude_notes"] is False, "a re-run with --yes keeps the no"
+    assert "claude_notes = false" in run_setup("--dry-run")[1]
+
+
+def test_importing_notes_is_on_unless_declined(box):
+    assert run_setup()[0] == 0
+    assert tomllib.loads((layout.data_dir() / "config.toml").read_text())["privacy"]["claude_notes"] is True
+
+
+def test_access_alone_lists_every_connected_app(box, monkeypatch, capsys):
+    """`dawnmere access` with no app was argparse's "the following arguments are required: app" (exit 2): it now
+    says what each app on this Mac sees, and how to change one."""
+    from lflabs_memory_cli import access
+    args = cli.parser().parse_args(["access"])
+    assert args.app is None and args.level is None
+    out = []
+    assert access.main(None, None, layout.engine_bin(), say=out.append) == 1
+    assert out[-1] == "Memory is not set up yet: run dawnmere setup first."
+    assert run_setup()[0] == 0
+    (box.home / ".gemini").mkdir()
+    monkeypatch.setattr(access, "current_level", lambda app: "everything" if app == "cursor" else "work only")
+    monkeypatch.setattr(access, "keyless", lambda app: False)
+    out = []
+    assert access.main(None, None, layout.engine_bin(), say=out.append) == 0
+    text = "\n".join(out)
+    assert re.search(r"(?m)^Codex +work only$", text) and re.search(r"(?m)^Cursor +everything$", text)
+    assert re.search(r"(?m)^Gemini CLI +work only$", text) and "Windsurf" not in text, "only the apps on this Mac"
+    assert "Claude Code" in text and "its memory tools get work notes only" in text
+    assert out[-1] == ("To change one: dawnmere access APP everything | work | nothing (only Cursor and Codex can be "
+                       "given more than work notes)")
+    assert cli.main(["access"]) == 0 and "To change one: dawnmere access APP" in capsys.readouterr().out
+
+
+def test_nothing_personal_is_work_and_says_so(box, monkeypatch):
+    """`access cursor nothing-personal` answered "Cursor now sees everything but personal notes" while the engine had
+    put Cursor at work only: in a plain install the two levels hide the same sections. One level, one name."""
+    from lflabs_memory.profiles import generic
+    from lflabs_memory_cli import access
+    assert set(generic.NOTHING_PERSONAL) == {*generic.SECTIONS, generic.WITHHELD, "chats"} - set(generic.WORK_ONLY), \
+        "the engine's two levels differ now: give nothing-personal back its own name here"
+    assert "nothing-personal" not in access.LEVELS
+    assert run_setup()[0] == 0
+    out = []
+    assert access.main("cursor", "nothing-personal", layout.engine_bin(), say=out.append) == 0
+    assert out[-1] == "Cursor now sees work notes only."
+
+
+def test_access_refuses_a_name_that_is_no_app(box):
+    """`access bogusapp` answered "Bogusapp sees work only", and with a level made a client called bogusapp."""
+    from lflabs_memory_cli import access
+    assert run_setup()[0] == 0
+    out = []
+    eng = layout.engine_bin()
+    assert access.main("bogusapp", None, eng, say=out.append) == 2 and out[-1].startswith("No app called bogusapp here.")
+    assert access.main("bogusapp", "work", eng, say=out.append) == 2
+    log = [json.loads(x) for x in Path(os.environ["FAKE_LOG"]).read_text().splitlines()]
+    assert not any("bogusapp" in x.get("argv", []) for x in log), "the engine was never asked"
+    assert access.main("claude-code", None, eng, say=out.append) == 0
+    assert out[-1] == "Claude Code sees everything in your prompts; its memory tools get work notes only."
+    assert access.main("claude-code", "everything", eng, say=out.append) == 1
+    assert out[-1].endswith("That cannot be changed from here.")
+
+
 def test_access_says_a_keyless_app_gets_work_only(box, monkeypatch):
     """An app widened in the engine but without a key in its config is still held to work only: say so."""
     from lflabs_memory_cli import access
@@ -1104,6 +1178,23 @@ def test_self_check_confirms_its_typed_save_like_the_next_prompt(box, monkeypatc
     assert not list((box.home / ".claude" / "projects").glob("-*-self-check-*")), "nothing of the check stays"
 
 
+def test_self_check_times_the_second_prompt_not_the_first(box, monkeypatch, capsys):
+    """The first prompt after an install is slow once (the hook's first start, the models' first search). Setup runs
+    it and times the next one, so its screen shows the speed every later prompt has, not "slow"."""
+    real, n = setup._hook, []
+
+    def hook(engine, sub, payload, client=None):
+        ok, took, out = real(engine, sub, payload, client)
+        if sub == "hook-prompt" and payload["prompt"].startswith("what do we know"):
+            n.append(1)
+            took = 2.42 if len(n) == 1 else 0.09
+        return ok, took, out
+    monkeypatch.setattr(setup, "_hook", hook)
+    code, out = run_setup()
+    shown = out + capsys.readouterr().out
+    assert code == 0 and len(n) == 2, shown
+    assert "recall in 0.09 s" in shown and "slow" not in shown
+
 
 class _Args:
     def __init__(self, yes):
@@ -1214,7 +1305,7 @@ def test_other_mcp_apps_are_connected_when_found(box, capsys):
     assert code == 0, out + capsys.readouterr().out
     for app, (_, _, path, key) in apps.MCP_ONLY.items():
         entry = json.loads((box.home / path).read_text())[key]["dawnmere"]
-        assert entry["args"] == ["-y", "dawnmere-connector@0.1.1"] and entry["env"] == {"LFLABS_MEMORY_CLIENT": app}
+        assert entry["args"] == ["-y", "dawnmere-connector@0.1.2"] and entry["env"] == {"LFLABS_MEMORY_CLIENT": app}
         assert ("type" in entry) == (key == "servers"), "VS Code's file names the transport"
     assert json.loads((box.home / ".gemini/settings.json").read_text())["theme"] == "dark"
     assert uninstall.main(keep_data=True, out=lambda s: None) == 0

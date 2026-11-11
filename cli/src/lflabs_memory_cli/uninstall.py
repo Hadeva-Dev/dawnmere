@@ -173,6 +173,10 @@ def main(keep_data=False, out=print):
     _zprofile(rep)
     rep.row("API key", *(("removed", "removed from the Keychain") if keychain.delete() else
                           ("gone", "none in the Keychain")))
+    # What the record listed is undone, so the record goes: kept with the memory, the next setup took its entries for
+    # its own first change (no new backup, "setup created this file" carried over), and the uninstall after that
+    # deleted or rewrote the user's own file. Anything left alone above is found again by looking (apps.discover).
+    layout.install_json().unlink(missing_ok=True)
 
     data = data_dir()
     # Always asked, --yes or not: the memory cannot be brought back. Nobody at a terminal to answer: it is kept.

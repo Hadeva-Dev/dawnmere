@@ -33,7 +33,7 @@ Made by [LF Labs](#who-makes-it-and-the-lf-labs-names).
 
 You tell Claude Code or Codex something worth keeping ("remember that we deploy on Fridays"). Dawnmere saves it
 once, on your Mac. Ask the other one in similar words and it brings it up, and a new Cursor chat in that project
-shows it for the next day. Switch from Claude Code to Codex when you hit a limit, and Codex can recall that you
+shows it for the next day (the 5 newest notes). Switch from Claude Code to Codex when you hit a limit, and Codex can recall that you
 deploy on Fridays and use pnpm.
 
 ```mermaid
@@ -144,7 +144,8 @@ dawnmere setup
 Homebrew brings Node.js with it. Update with `brew upgrade lf-labs-inc/tap/dawnmere`, then run `dawnmere setup`
 again. To remove it, run `dawnmere uninstall` before `brew uninstall dawnmere`.
 
-In Claude Code? Two commands, then `/dawnmere:setup`:
+In Claude Code? Two commands, then `/dawnmere:setup`. This route needs git: on a Mac without Apple's Command Line
+Tools, run `xcode-select --install` first, or use the install line above.
 
 ```text
 /plugin marketplace add LF-Labs-Inc/dawnmere
@@ -206,8 +207,8 @@ again also works.
 `dawnmere setup` first shows what it will do and asks you to continue. Then it asks what your AI apps should call
 you, whether to use your Claude plan for background reading (or an Anthropic API key, kept in your Keychain), whether
 Cursor may see your personal notes (no, unless you say yes), and whether to import the notes Claude Code already keeps
-in `~/.claude/projects/*/memory` (one macOS dialog asks whether to trust them as your own; if you don't, they are
-kept for search until you confirm them).
+in `~/.claude/projects/*/memory` now and trust them as yours (one macOS dialog asks; if you don't, they are kept for
+search until you confirm them).
 
 Then it shows each step as it runs:
 
@@ -234,14 +235,16 @@ time, for example to add a model later.
 ## Your apps
 
 - **Claude Code** (2.1.301 or later): setup installs the `dawnmere` plugin from this repo, at the release you
-  installed, which adds the tools and four hooks. If the plugin cannot be installed, it adds the same tools with
+  installed, which adds the tools and four hooks. If the plugin cannot be installed (for example, git is missing), it adds the same tools with
   `claude mcp add` and the hooks to `~/.claude/settings.json`.
   <!-- checked against v0.1.6 (406ee39/c3ed5b1): the plugin pins to the release tag. -->
 - **Codex**: adds `[mcp_servers.dawnmere]` to `~/.codex/config.toml` and a prompt hook to `~/.codex/hooks.json`.
   Type `/hooks` once in Codex to trust the hook.
 - **Cursor**: adds `dawnmere` to `~/.cursor/mcp.json` and a session-start hook to `~/.cursor/hooks.json`, then
   restart Cursor. Cursor sees work notes only until you run `dawnmere access cursor everything`;
-  `dawnmere access cursor work` takes that back.
+  `dawnmere access cursor work` takes that back. After widening, its memory tools see everything, but the notes
+  shown at the start of a chat stay work notes only. The same holds for Codex: its prompts keep getting work notes
+  only.
 - **Windsurf, Gemini CLI, VS Code (Copilot), Qwen Code, Kimi Code, Qoder CLI, iFlow CLI and Cline CLI**: when setup
   finds one, it adds `dawnmere` to its MCP file (`~/.codeium/windsurf/mcp_config.json`,
   `~/.gemini/settings.json`, `~/Library/Application Support/Code/User/mcp.json`, `~/.qwen/settings.json`,
@@ -257,7 +260,7 @@ time, for example to add a model later.
     "mcpServers": {
       "dawnmere": {
         "command": "npx",
-        "args": ["-y", "dawnmere-connector@0.1.1"]
+        "args": ["-y", "dawnmere-connector@0.1.2"]
       }
     }
   }
@@ -281,13 +284,13 @@ removes either name.
 | `dawnmere doctor` | check that everything works, Node.js included, one line per check, with what to do about each problem |
 | `dawnmere export` | save your memory to `~/Downloads/dawnmere-export-<date>.json` (`--format md` for Markdown) |
 | `dawnmere import FILE` | add the memories from an export file, skipping any already there; they count as app saves until you confirm them in one macOS dialog |
-| `dawnmere access APP [LEVEL]` | show what an app may see, or change it: `everything`, `nothing-personal`, `work` or `nothing` (only Cursor and Codex can be widened from here) |
+| `dawnmere access APP [LEVEL]` | show what an app may see, or change it: `everything`, `work` or `nothing` (only Cursor and Codex can be widened from here) |
 | `dawnmere update` | install the newest release, checked against its checksums |
 | `dawnmere uninstall` | remove everything setup added |
 | `dawnmere held` | app saves kept out of your prompts until you confirm them, with the line that confirms each |
 | `dawnmere trust -- ID...` | make memories your own words, after you click Allow in a macOS dialog |
 | `dawnmere search QUERY` | search your memory |
-| `dawnmere add TEXT` | save one memory |
+| `dawnmere add TEXT` | save one memory; a macOS dialog asks whether these are your own words, and until you click Allow it is held like an app save (`dawnmere held`) |
 | `dawnmere forget ID` | delete a memory for good |
 | `dawnmere restore ID` | bring back a memory an app forgot in the last day |
 

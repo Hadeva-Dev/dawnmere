@@ -17,10 +17,13 @@ from .layout import CLIENT_ENV, data_dir, home, short
 from .run import run
 
 KEY_ENV = apps.KEY_ENV
-LEVELS = ("everything", "nothing-personal", "work", "nothing")
-SAYS = {"everything": "everything, personal notes too", "nothing-personal": "everything but personal notes",
-        "work": "work notes only", "nothing": "nothing"}
-WIDER = ("everything", "nothing-personal")  # beyond work only: needs the key
+LEVELS = ("everything", "work", "nothing")
+# The engine's fourth level hides, in a plain install (its generic profile), exactly what "work" hides: people,
+# personal, health and money, past chats. It was offered here as "everything but personal notes" and answered "now sees
+# everything but personal notes" while the app was at work only (VM run 2026-11-11). Still taken, as what it is.
+SAME_AS = {"nothing-personal": "work"}
+SAYS = {"everything": "everything, personal notes too", "work": "work notes only", "nothing": "nothing"}
+WIDER = ("everything",)  # beyond work only: needs the key
 KEYED = ("cursor", "codex")  # the apps whose own entry this tool can give a key, so the only ones it widens
 RANK = {"nothing": 0, "work": 1, "work only": 1, "nothing-personal": 2, "nothing personal": 2, "everything": 3}
 # Set in the shells AI apps run their commands in (checked 2026-11): the engine's own list (mem.AGENT_ENV) and three
@@ -232,14 +235,37 @@ def give_key(app, engine, record=None, say=print):
 
 # ---------- access APP LEVEL ----------
 
+def listing(say):
+    """`access` alone: what each app on this Mac sees, one line each, then how to change one."""
+    if apps.installed("claude-code"):  # no level of its own: the README's "Each app sees what you allow"
+        say(f"{'Claude Code':<13}everything in your prompts; its memory tools get work notes only")
+    for app in (*KEYED[::-1], *apps.MCP_ONLY):
+        if apps.installed(app):
+            say(f"{NAMES[app]:<13}{current_level(app) or 'work only'}"
+                + (" (work only until it has a key)" if keyless(app) else ""))
+    say(f"To change one: {COMMAND} access APP {' | '.join(LEVELS)} (only Cursor and Codex can be given more than work "
+        "notes)")
+    return 0
+
+
 def main(app, level, engine, say=print):
-    app = app.lower()
-    if level is not None and level not in LEVELS:
-        say(f"Choose one of: {', '.join(LEVELS)}.")
-        return 2
     if not (data_dir() / "config.toml").exists():
         say(f"Memory is not set up yet: run {COMMAND} setup first.")
         return 1
+    if app is None:
+        return listing(say)
+    app = app.lower()
+    if app not in NAMES:  # any name was answered ("Bogusapp sees work only"), and a level made it a client of its own
+        say(f"No app called {app} here. Apps: {', '.join(NAMES)}.")
+        return 2
+    level = SAME_AS.get(level, level)
+    if level is not None and level not in LEVELS:
+        say(f"Choose one of: {', '.join(LEVELS)}.")
+        return 2
+    if app == "claude-code":  # no level of its own in memory: it is the app the user's own prompts come from
+        say("Claude Code sees everything in your prompts; its memory tools get work notes only."
+            + (" That cannot be changed from here." if level else ""))
+        return 1 if level else 0
     if level is None:  # just say what it sees, and how to change it
         now = current_level(app) or "what the memory service decides"
         if keyless(app):  # as the engine's `clients` says it

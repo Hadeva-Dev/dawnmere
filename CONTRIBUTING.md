@@ -23,7 +23,8 @@ to this repo, in a folder named `lflabs-memory-engine`.
 
 ## Running the tests
 
-You need a Mac with Apple silicon, [uv](https://github.com/astral-sh/uv) and Node.js 18 or later.
+You need a Mac with Apple silicon, [uv](https://github.com/astral-sh/uv) and Node.js 22 or later (the connector runs on
+18; its tests need 22).
 
 ```bash
 git clone https://github.com/LF-Labs-Inc/dawnmere.git

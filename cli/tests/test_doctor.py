@@ -86,6 +86,16 @@ def run_doctor(**kw):
     return code, text
 
 
+def test_doctor_never_starts_the_engine_without_a_store(mac, monkeypatch):
+    """After an uninstall that deleted the memory, doctor's held-back row ran `held --count`, and the engine made a
+    new data folder and memory.db (VM run 2026-11-11)."""
+    ran = []
+    monkeypatch.setattr(doctor, "engine_bin", lambda: "/e/bin/lflabs-memory")
+    monkeypatch.setattr(doctor, "run", lambda argv, **kw: ran.append(argv))
+    assert not (layout.data_dir() / "memory.db").exists()
+    assert doctor.check_held() == [] and ran == []
+
+
 def test_doctor_lines_golden(mac, monkeypatch, tmp_path, connector):
     healthy(mac, monkeypatch, tmp_path)
     code, text = run_doctor()
@@ -973,7 +983,7 @@ def test_doctor_rows_for_other_mcp_apps(mac, monkeypatch, tmp_path, connector):
     code, text = run_doctor()
     assert re.search(r"Gemini CLI\s+warn\s+not connected", text) and "Windsurf" not in text
     (mac.home / ".gemini/settings.json").write_text(
-        '{"mcpServers": {"dawnmere": {"command": "npx", "args": ["-y", "dawnmere-connector@0.1.1"]}}}')
+        '{"mcpServers": {"dawnmere": {"command": "npx", "args": ["-y", "dawnmere-connector@0.1.2"]}}}')
     assert re.search(r"Gemini CLI\s+ok\s+MCP, work only", run_doctor()[1])
 
 

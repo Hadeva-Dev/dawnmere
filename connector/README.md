@@ -1,8 +1,8 @@
 # Dawnmere connector
 
 Lets your AI apps share one memory. Claude, Cursor, Codex and the rest each launch this small MCP server, and it
-passes their `recall`, `remember` and `forget` calls to Dawnmere on your Mac. Tell Claude a project decision on Monday
-and Cursor knows it on Tuesday.
+passes their `recall`, `remember` and `forget` calls to Dawnmere on your Mac. Type "remember that ..." in Claude Code,
+and a new Cursor chat in that project shows it for the next day; after that Cursor finds it when it searches.
 
 ```mermaid
 flowchart LR
@@ -14,15 +14,14 @@ flowchart LR
 
 **Status: early beta, Mac only.** The connector is the small piece each AI app launches; Dawnmere itself installs with
 one line (see the [repo's README](https://github.com/LF-Labs-Inc/dawnmere#readme)) and runs in the background on the same Mac. Without it every call
-answers "Dawnmere isn't running on this computer". The package and settings names below are neutral and will not
-change if the product name does.
+answers "Dawnmere isn't running on this computer". The settings names below (`LFLABS_MEMORY_*`) are neutral and stay as they are.
 
 ## Why a connector and not a memory server
 
 Most MCP memory servers keep the memory inside the server, so each app gets its own pile. Here the memory lives in
 one place, Dawnmere, and every app reaches the same one. The connector stores nothing, sends nothing over the
-network, and does not decide what an app may see: Dawnmere does, per AI app (Cursor can be held to work notes while
-Claude sees everything). That keeps this folder small enough to read in a few minutes.
+network, and does not decide what an app may see: Dawnmere does, per AI app (an app that only names itself, Claude Code and
+Claude Desktop included, sees work notes only; Cursor and Codex see more once you widen them with `dawnmere access`). That keeps this folder small enough to read in a few minutes.
 
 ## Install
 
@@ -92,7 +91,7 @@ Needs Node 18 or later (Claude Desktop brings its own for the `.mcpb`).
 | --- | --- |
 | `recall` | search the memory by meaning and keywords (read only) |
 | `remember` | save one fact for future conversations |
-| `forget` | retire one memory (it can be restored) |
+| `forget` | hide one memory at once; it is deleted for good after 24 hours unless you bring it back with `dawnmere restore ID` |
 | `access_status` | say what this app is allowed to see |
 
 ## Settings

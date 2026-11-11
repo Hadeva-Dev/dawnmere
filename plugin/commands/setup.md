@@ -21,6 +21,10 @@ Run `command -v dawnmere || ls ~/.local/bin/dawnmere`. If it's found and
 `~/Library/Application Support/LF Labs/Memory/config.toml` exists, Dawnmere is already set up: run `dawnmere doctor`
 (or `~/.local/bin/dawnmere doctor`), tell the user what it found in a sentence or two, and stop.
 
+If the command is found but that `config.toml` is not (installed with Homebrew, or the installer was stopped before
+setup), do not install again: go to step 3, and use the path this step found wherever the steps below say
+`~/.local/bin/dawnmere`.
+
 ## 2. Install it
 
 Tell the user, in one or two sentences, that this downloads Dawnmere (and uv, if it isn't installed) from GitHub,
