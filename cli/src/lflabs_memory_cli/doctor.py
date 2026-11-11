@@ -348,6 +348,8 @@ def check_held():
     """[a row] when the engine holds app saves back from prompts (`held --count`), else []: they wait for the user's
     confirm code, which `held` shows."""
     eng = engine_bin()
+    if not (data_dir() / "memory.db").exists():  # running the engine would create its data folder (check_hook)
+        return []
     r = run([eng, "held", "--count"], timeout=15) if eng else None
     n = int(r.out.strip()) if r and r.ok and r.out.strip().isdigit() else 0
     if not n:
