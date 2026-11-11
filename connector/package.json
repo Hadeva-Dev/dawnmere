@@ -1,8 +1,8 @@
 {
   "name": "dawnmere-connector",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Connect your AI apps to Dawnmere, one memory shared across Claude, Cursor, Codex and more. Talks to Dawnmere on your Mac.",
-  "mcpName": "io.github.Hadeva-Dev/dawnmere-connector",
+  "mcpName": "io.github.LF-Labs-Inc/dawnmere-connector",
   "type": "module",
   "bin": {
     "dawnmere-connector": "dist/index.js"
@@ -29,7 +29,16 @@
     "memory",
     "claude",
     "cursor",
-    "codex"
+    "codex",
+    "model-context-protocol",
+    "mcp-memory",
+    "ai-memory",
+    "agent-memory",
+    "long-term-memory",
+    "claude-code",
+    "local-first",
+    "sqlite",
+    "macos"
   ],
   "author": "LF Labs",
   "license": "MIT",

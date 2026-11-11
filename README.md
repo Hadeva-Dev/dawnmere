@@ -257,7 +257,7 @@ time, for example to add a model later.
     "mcpServers": {
       "dawnmere": {
         "command": "npx",
-        "args": ["-y", "dawnmere-connector@0.1.1"]
+        "args": ["-y", "dawnmere-connector@0.1.2"]
       }
     }
   }

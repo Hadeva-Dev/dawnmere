@@ -196,7 +196,7 @@ sh install.sh
     "mcpServers": {
       "dawnmere": {
         "command": "npx",
-        "args": ["-y", "dawnmere-connector@0.1.1"]
+        "args": ["-y", "dawnmere-connector@0.1.2"]
       }
     }
   }
