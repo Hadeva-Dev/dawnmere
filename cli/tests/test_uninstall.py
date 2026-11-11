@@ -106,6 +106,41 @@ def test_uninstall_keep_data(mac):
     assert (layout.data_dir() / "memory.db").exists()
 
 
+def wire(home, *names):
+    """As setup does it: the record that is there (a second setup on a kept data folder), else a new one."""
+    record = install_record.load() or install_record.empty()
+    for app in names:
+        for p in apps.file_plans(app, ENGINE, home):
+            assert p.state == "add", (p.path, p.note)
+            apps.apply(p, record)
+    install_record.save(record)
+    (layout.data_dir() / "memory.db").write_text("db")
+
+
+def test_uninstall_forgets_what_it_undid(mac):
+    """Uninstall that keeps the memory left install.json in the kept folder, still listing every file it had just
+    put back. The next setup took those entries for its own first change: no new backup, and "setup created this
+    file" carried over. So after setup, uninstall (keep the memory), the user's own new ~/.cursor/mcp.json, setup
+    and uninstall again, their file was deleted; a file that was there all along was edited instead of put back
+    (VM run 2026-11-11)."""
+    home = mac.home
+    (home / ".cursor").mkdir()
+    (home / ".codex").mkdir()
+    (home / ".codex/config.toml").write_bytes(CODEX_TOML.encode())
+    wire(home, "cursor", "codex")  # setup makes ~/.cursor/mcp.json: there was none
+    assert uninstall.main(keep_data=True, out=lambda s: None) == 0
+    assert not (home / ".cursor/mcp.json").exists() and not layout.install_json().exists()
+    assert (layout.data_dir() / "memory.db").exists()
+    (home / ".cursor/mcp.json").write_text(CURSOR_MCP)  # the user's own, written since
+    wire(home, "cursor", "codex")
+    out = []
+    assert uninstall.main(keep_data=True, out=out.append) == 0
+    assert (home / ".cursor/mcp.json").read_text() == CURSOR_MCP, "the user's own file, byte for byte"
+    assert (home / ".codex/config.toml").read_bytes() == CODEX_TOML.encode()
+    assert any("mcp.json: put back as it was" in line for line in out), out
+    assert not list(home.rglob("*.lflabs-backup-*"))
+
+
 def test_uninstall_without_install_record(mac):
     """Discovery: our entries come out of files the user changed since; theirs stay."""
     home = mac.home
