@@ -1062,7 +1062,7 @@ def _lazy_manifest(tmp_path, names=("embed", "embed-ml", "rerank-ml")):
 
 
 def test_cjk_models_are_fetched_by_models_get_and_doctor_says_where_they_are(mac, monkeypatch, tmp_path):
-    """0.1.10: embed-ml and rerank-ml are never in setup or update; the engine runs `models --get` on the first CJK
+    """0.1.11: embed-ml and rerank-ml are never in setup or update; the engine runs `models --get` on the first CJK
     text. doctor: fine while not downloaded; a failed download is a warning with the command to run."""
     import json
     man = _lazy_manifest(tmp_path)

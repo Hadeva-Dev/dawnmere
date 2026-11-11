@@ -18,7 +18,7 @@ from .layout import data_dir
 
 MODELS_ENV = "LFLABS_MEMORY_MODELS"  # the engine reads it first too (config.load)
 OPTIONAL = ("sense",)  # without it the word lists decide (spec 10.2)
-# Chinese and Japanese only (engine 0.1.8): never in setup or update. The engine asks for them the first time it sees
+# Chinese and Japanese only (engine 0.1.9): never in setup or update. The engine asks for them the first time it sees
 # Chinese or Japanese text, by running `models --get` (get below) in the background; until then its CJK word rules
 # decide. Their state, for doctor and for the engine's next ask: data_dir()/models-ml.json.
 LAZY = ("embed-ml", "rerank-ml")

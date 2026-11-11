@@ -1255,7 +1255,7 @@ def test_version_flag(capsys):
 
 
 def test_setup_leaves_the_chinese_and_japanese_models_for_later(box, monkeypatch, tmp_path):
-    """0.1.10: an English user downloads nothing extra; the engine asks for embed-ml and rerank-ml on first CJK text."""
+    """0.1.11: an English user downloads nothing extra; the engine asks for embed-ml and rerank-ml on first CJK text."""
     man = models.manifest()
     body = b"ml weights" * 50
     src = tmp_path / "ml.onnx"
