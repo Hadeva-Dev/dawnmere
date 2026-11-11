@@ -13,7 +13,7 @@ flowchart LR
 ```
 
 **Status: early beta, Mac only.** The connector is the small piece each AI app launches; Dawnmere itself installs with
-one line (see the [repo's README](https://github.com/Hadeva-Dev/dawnmere#readme)) and runs in the background on the same Mac. Without it every call
+one line (see the [repo's README](https://github.com/LF-Labs-Inc/dawnmere#readme)) and runs in the background on the same Mac. Without it every call
 answers "Dawnmere isn't running on this computer". The package and settings names below are neutral and will not
 change if the product name does.
 
@@ -37,10 +37,10 @@ npx -y dawnmere-connector --check
 **Claude Code:**
 
 ```bash
-claude mcp add --scope user lflabs-memory -- npx -y dawnmere-connector
+claude mcp add --scope user dawnmere -- npx -y dawnmere-connector
 ```
 
-or as a plugin: `/plugin marketplace add Hadeva-Dev/dawnmere`, then `/plugin install lflabs-memory@lflabs`.
+or as a plugin: `/plugin marketplace add LF-Labs-Inc/dawnmere`, then `/plugin install dawnmere@dawnmere`.
 
 **Cursor, Windsurf, Gemini CLI** (`~/.cursor/mcp.json`, `~/.codeium/windsurf/mcp_config.json`,
 `~/.gemini/settings.json`):
@@ -48,7 +48,7 @@ or as a plugin: `/plugin marketplace add Hadeva-Dev/dawnmere`, then `/plugin ins
 ```json
 {
   "mcpServers": {
-    "lflabs-memory": {
+    "dawnmere": {
       "command": "npx",
       "args": ["-y", "dawnmere-connector"],
       "env": { "LFLABS_MEMORY_CLIENT": "cursor" }
@@ -65,7 +65,7 @@ see, so do not copy Cursor's into another app.
 ```json
 {
   "servers": {
-    "lflabs-memory": {
+    "dawnmere": {
       "type": "stdio",
       "command": "npx",
       "args": ["-y", "dawnmere-connector"],
@@ -78,7 +78,7 @@ see, so do not copy Cursor's into another app.
 **Codex** (`~/.codex/config.toml`):
 
 ```toml
-[mcp_servers.lflabs-memory]
+[mcp_servers.dawnmere]
 command = "npx"
 args = ["-y", "dawnmere-connector"]
 env = { LFLABS_MEMORY_CLIENT = "codex" }

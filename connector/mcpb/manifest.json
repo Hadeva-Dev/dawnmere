@@ -7,14 +7,14 @@
   "long_description": "Dawnmere gives Claude, Cursor, Codex and your other AI apps one shared memory, kept on your Mac. This extension connects Claude Desktop to Dawnmere: it searches, saves and forgets memories through Dawnmere and stores nothing itself. Early beta: it needs Dawnmere running on the same Mac.",
   "author": {
     "name": "LF Labs",
-    "url": "https://github.com/Hadeva-Dev"
+    "url": "https://github.com/LF-Labs-Inc"
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/Hadeva-Dev/dawnmere.git"
+    "url": "https://github.com/LF-Labs-Inc/dawnmere.git"
   },
-  "homepage": "https://github.com/Hadeva-Dev/dawnmere",
-  "support": "https://github.com/Hadeva-Dev/dawnmere/issues",
+  "homepage": "https://github.com/LF-Labs-Inc/dawnmere",
+  "support": "https://github.com/LF-Labs-Inc/dawnmere/issues",
   "server": {
     "type": "node",
     "entry_point": "server/index.mjs",

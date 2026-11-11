@@ -6,7 +6,7 @@ Dawnmere edits your AI apps' settings and keeps your memory on your Mac, so secu
 
 Please do not open a public issue. Report it privately, either way:
 
-- through GitHub: [report a vulnerability](https://github.com/Hadeva-Dev/dawnmere/security/advisories/new)
+- through GitHub: [report a vulnerability](https://github.com/LF-Labs-Inc/dawnmere/security/advisories/new)
   (the Security tab of this repo, then "Report a vulnerability");
 - by email: [hello@dawnmere.app](mailto:hello@dawnmere.app).
 

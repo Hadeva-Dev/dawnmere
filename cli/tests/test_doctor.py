@@ -50,13 +50,13 @@ def healthy(mac, monkeypatch, tmp_path, backend_name="claude-cli"):
     layout.engine_record().write_text(f"{mac.bin}/lflabs-memory\n")
     mac.on("node", ["--version"], 0, "v20.11.0\n")
     mac.on("claude", ["--version"], 0, "2.1.301 (Claude Code)\n")
-    mac.on("claude", ["plugin", "list"], 0, "  lflabs-memory@lflabs  1.0.0b1  enabled\n")
+    mac.on("claude", ["plugin", "list"], 0, "  dawnmere@dawnmere  1.0.0b1  enabled\n")
     mac.on("claude", ["-p"], 0, '{"is_error": false, "result": "ok"}')
     for d in (".claude", ".codex", ".cursor"):
         (h / d).mkdir()
-    (h / ".codex/config.toml").write_text('[mcp_servers.lflabs-memory]\nargs = ["-y", "dawnmere-connector@0.1.0"]\n')
+    (h / ".codex/config.toml").write_text('[mcp_servers.dawnmere]\nargs = ["-y", "dawnmere-connector@0.1.0"]\n')
     (h / ".codex/hooks.json").write_text('{"hooks": {"UserPromptSubmit": [{"hooks": [{"command": "lflabs-memory hook-prompt"}]}]}}')
-    (h / ".cursor/mcp.json").write_text('{"mcpServers": {"lflabs-memory": {"args": ["-y", "dawnmere-connector@0.1.0"]}}}')
+    (h / ".cursor/mcp.json").write_text('{"mcpServers": {"dawnmere": {"args": ["-y", "dawnmere-connector@0.1.0"]}}}')
     (h / ".cursor/hooks.json").write_text('{"version": 1, "hooks": {"sessionStart": [{"command": "x/lflabs-memory hook-cursor-start"}]}}')
 
 
@@ -65,12 +65,12 @@ engine        ok    1.0.0b1, running (pid 4120), up 2 d
 data          ok    ~/Library/Application Support/LF Labs/Memory  (4 memories, 2 claims, 0 MB)
 models        ok    embed, rerank: checksums match
 hook speed    ok    recall in N s (limit 1.5 s)
-connector     ok    lflabs-memory/1 on SOCK
+connector     ok    answering on SOCK
 Node.js       ok    v20.11.0
 model         ok    Claude Code 2.1.301, logged in, Haiku
 budget        ok    today 41 of 200 calls; last 7 days 0.9k in / 0.2k out tokens a day
 backlog       ok    0 sessions waiting to be read
-Claude Code   ok    plugin lflabs-memory 1.0.0b1, hooks on
+Claude Code   ok    plugin dawnmere 1.0.0b1, hooks on
 Codex         ok    MCP + hook (Codex asks you to trust the hook once: /hooks)
 Cursor        ok    MCP, work only (change it: dawnmere access cursor)
 dawnmere      ok    on your PATH
@@ -192,7 +192,7 @@ def test_doctor_counts_saves_held_back(mac, monkeypatch, tmp_path, connector):
     healthy(mac, monkeypatch, tmp_path)
     mac.on("lflabs-memory", ["held", "--count"], 0, "3\n")
     code, text = run_doctor()
-    assert "held back     ok    3 app saves held back from prompts: lflabs-memory held shows them and their confirm " \
+    assert "held back     ok    3 app saves held back from prompts: dawnmere held shows them and their confirm " \
            "codes" in text
     mac.rules["lflabs-memory"] = [[["held", "--count"], 0, "0\n"]]
     mac.save()
@@ -499,7 +499,7 @@ def test_update_under_homebrew_leaves_it_to_brew(mac, monkeypatch):
         out = []
         assert update.main(say=out.append, get=no_network, **kw) == 0
         assert out == ["Dawnmere was installed with Homebrew, so Homebrew updates it:",
-                       "  brew upgrade hadeva-dev/tap/dawnmere",
+                       "  brew upgrade lf-labs-inc/tap/dawnmere",
                        "Then run dawnmere setup again, so the memory service and your apps use the new version."]
     assert mac.calls("uv") == []
 
@@ -551,7 +551,7 @@ def test_update_that_cannot_put_the_old_release_back_leaves_nothing(mac, monkeyp
     assert len(uv_installs(mac)) == 1 and ["tool", "uninstall", "lflabs-memory-cli"] in mac.calls("uv")
     assert out[-2] == "Could not reinstall 0.1.0 (0.1.0 has no constraints.txt to check it against), so Dawnmere is " \
                       "uninstalled. Install it again with:"
-    assert out[-1] == "  curl -fsSL https://github.com/Hadeva-Dev/dawnmere/releases/latest/download/install.sh | sh"
+    assert out[-1] == "  curl -fsSL https://github.com/LF-Labs-Inc/dawnmere/releases/latest/download/install.sh | sh"
 
 
 def test_quarantine_moves_the_environment_aside_when_uv_cannot_uninstall(mac, tmp_path):
@@ -627,16 +627,16 @@ def test_update_moves_the_plugin_to_the_new_tag(mac, monkeypatch, tmp_path):
     data.mkdir(parents=True)
     mac.add("lflabs-memory")
     (mac.home / ".claude").mkdir()
-    mac.on("claude", ["plugin", "list"], 0, "  lflabs-memory@lflabs  0.1.5  enabled\n")
+    mac.on("claude", ["plugin", "list"], 0, "  dawnmere@dawnmere  0.1.5  enabled\n")
     monkeypatch.setattr(models, "manifest", lambda: None)
     monkeypatch.setattr(update, "installed_version", lambda: "0.2.0")
     out = []
     assert update.finish("0.1.0", say=out.append, get=fake_github({"0.2.0": wheelset("0.2.0")})) == 0
     claude = mac.calls("claude")
-    want = [["plugin", "marketplace", "remove", "lflabs"],
-            ["plugin", "marketplace", "add", "Hadeva-Dev/dawnmere#v0.2.0", "--scope", "user"],
-            ["plugin", "install", "lflabs-memory@lflabs", "--scope", "user", "-y"]]
-    assert [c for c in claude if c[:2] != ["plugin", "list"]] == want
+    want = [["plugin", "marketplace", "remove", "dawnmere"],
+            ["plugin", "marketplace", "add", "LF-Labs-Inc/dawnmere#v0.2.0", "--scope", "user"],
+            ["plugin", "install", "dawnmere@dawnmere", "--scope", "user", "-y"]]
+    assert [c for c in claude if c[:2] not in (["plugin", "list"], ["mcp", "get"])] == want
     assert "Claude Code's plugin: now v0.2.0 (restart Claude Code to load it)" in out
     assert layout.engine_record().read_text() == f"{mac.bin}/lflabs-memory\n"
     mac.on("claude", ["plugin", "marketplace", "add"], 1, "")
@@ -687,11 +687,11 @@ def test_first_day_wording(mac, monkeypatch, tmp_path):
     finally:
         db.close()
     (mac.home / ".claude").mkdir()
-    mac.on("claude", ["plugin", "list"], 0, "Installed plugins:\n\n  > lflabs-memory@lflabs\n    Version: 0.1.0\n"
+    mac.on("claude", ["plugin", "list"], 0, "Installed plugins:\n\n  > dawnmere@dawnmere\n    Version: 0.1.0\n"
            "    Scope: user\n    Status: enabled\n")
     mac.add("lflabs-memory")
     layout.engine_record().write_text(f"{mac.bin}/lflabs-memory\n")
-    assert doctor.check_claude().note == "plugin lflabs-memory 0.1.0, hooks on"
+    assert doctor.check_claude().note == "plugin dawnmere 0.1.0, hooks on"
     mac.remove("lflabs-memory")
     c = doctor.check_claude()
     assert c.state == "warn" and c.note.endswith("but its hooks cannot find the engine")
@@ -801,11 +801,11 @@ def test_update_falls_back_to_the_api_asset(mac, monkeypatch, tmp_path):
         asked.append(url)
         if url.startswith("https://dl/"):
             raise OSError("504")
-        if url.startswith("https://api.github.com/repos/Hadeva-Dev/dawnmere/releases/assets/"):
+        if url.startswith("https://api.github.com/repos/LF-Labs-Inc/dawnmere/releases/assets/"):
             return gh("https://dl/0.2.0/" + url.rsplit("/", 1)[1])
         doc = json.loads(gh(url))
         for a in doc["assets"]:
-            a["url"] = "https://api.github.com/repos/Hadeva-Dev/dawnmere/releases/assets/" + a["name"]
+            a["url"] = "https://api.github.com/repos/LF-Labs-Inc/dawnmere/releases/assets/" + a["name"]
         return json.dumps(doc).encode()
     rel = update.release(get=get)
     paths = update.wheels(rel, get, tmp_path)
@@ -973,7 +973,7 @@ def test_doctor_rows_for_other_mcp_apps(mac, monkeypatch, tmp_path, connector):
     code, text = run_doctor()
     assert re.search(r"Gemini CLI\s+warn\s+not connected", text) and "Windsurf" not in text
     (mac.home / ".gemini/settings.json").write_text(
-        '{"mcpServers": {"lflabs-memory": {"command": "npx", "args": ["-y", "dawnmere-connector@0.1.1"]}}}')
+        '{"mcpServers": {"dawnmere": {"command": "npx", "args": ["-y", "dawnmere-connector@0.1.1"]}}}')
     assert re.search(r"Gemini CLI\s+ok\s+MCP, work only", run_doctor()[1])
 
 

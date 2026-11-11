@@ -1,4 +1,5 @@
-"""The command line: setup, doctor, uninstall, export, update."""
+"""The command line: setup, doctor, uninstall, export, update; and the engine's memory commands (held, trust, forget,
+restore, search, add), run as the engine runs them."""
 import argparse
 import os
 import sys
@@ -87,9 +88,48 @@ COMMANDS = {
 }
 
 
+# The engine's own commands, under this command's name: the engine runs them in this one's place (exec), with the same
+# arguments, terminal, dialogs and exit code. `lflabs-memory COMMAND` keeps working.
+FRONT = {
+    "held": "app saves held back from prompts, and the line that confirms each",
+    "trust": "make memories your own words, after you click Allow in a dialog: trust -- ID...",
+    "forget": "delete a memory for good: forget ID",
+    "restore": "bring back a memory an app forgot in the last day: restore ID",
+    "search": "search your memory: search QUERY",
+    "add": "save one memory: add TEXT",
+}
+
+
+def front_door(argv):
+    from .layout import engine_bin
+    eng = engine_bin()
+    if not eng:
+        print(f"The memory engine is not installed, so `{COMMAND} {argv[0]}` cannot run. Run the install line again.",
+              file=sys.stderr)
+        return 1
+    os.execv(eng, [eng, *argv])
+
+
+def version_line():
+    """What --version prints: the release, and the engine and connector that go with it."""
+    from importlib import metadata
+
+    from .layout import CLI_DIST, CONNECTOR_VERSION, ENGINE_DIST
+
+    def v(dist):
+        try:
+            return metadata.version(dist)
+        except metadata.PackageNotFoundError:
+            return "?"
+    return f"{PRODUCT} {v(CLI_DIST)} (engine {v(ENGINE_DIST)}, connector {CONNECTOR_VERSION})"
+
+
 def parser():
     p = argparse.ArgumentParser(prog=COMMAND, description=f"{PRODUCT}: one memory for Claude Code, Codex and Cursor.")
+    p.add_argument("--version", action="version", version=version_line())
     sub = p.add_subparsers(dest="command", required=True, metavar="command")
+    for name, help_text in FRONT.items():  # listed in --help; main() hands them to the engine before parsing
+        sub.add_parser(name, help=help_text, add_help=False).add_argument("args", nargs=argparse.REMAINDER)
     for name, (_, help_text) in COMMANDS.items():
         sp = sub.add_parser(name, help=help_text, description=help_text)
         if name == "setup":
@@ -103,7 +143,7 @@ def parser():
             sp.add_argument("--backend", choices=("claude-cli", "anthropic-api", "none"))
             sp.add_argument("--model", choices=("haiku", "sonnet"),
                             help="sonnet remembers a few more of your rules, at about 10 times the usage")
-            sp.add_argument("--only", help="apps to connect: claude-code,codex,cursor,windsurf,gemini,copilot")
+            sp.add_argument("--only", help="apps to connect: claude-code,codex,cursor,windsurf,gemini,copilot,qwen-code,kimi-code,qoder,iflow,cline")
             sp.add_argument("--codex-sessions", action="store_true", help="also read Codex's saved sessions")
             sp.add_argument("--no-import", action="store_true", help="do not import Claude Code's memory files")
             sp.add_argument("--dry-run", action="store_true", help="show every change, make none")
@@ -134,6 +174,9 @@ def parser():
 
 
 def main(argv=None):
+    argv = sys.argv[1:] if argv is None else list(argv)
+    if argv and argv[0] in FRONT:
+        return front_door(argv)
     args = parser().parse_args(argv)
     try:
         return COMMANDS[args.command][0](args)

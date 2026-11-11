@@ -21,7 +21,7 @@ test("one version everywhere", () => {
   // the Claude Code plugin ships with each CLI release (its marketplace is pinned to that tag, cli/tests
   // test_versions_agree): its own version is the CLI's, and it runs this connector's version
   assert.equal(plugin.version, market.plugins[0].version);
-  assert.deepEqual(pluginMcp.mcpServers["lflabs-memory"].args, ["-y", `${pkg.name}@${VERSION}`]);
+  assert.deepEqual(pluginMcp.mcpServers[SERVER_NAME].args, ["-y", `${pkg.name}@${VERSION}`]);
 });
 
 test("the registry name and the npm package point at each other", () => {
@@ -56,10 +56,10 @@ test("the product name lives only in the files a rename touches", () => {
   }).split("\n").filter(Boolean);
   const name = new RegExp(PRODUCT, "i");
   const stray = tracked.filter((f) => !BRANDED.includes(f) && name.test(readFileSync(new URL(`../${f}`, import.meta.url), "utf8")));
-  assert.deepEqual(stray, []);  // The package family is the one branded identifier, and it is the command's name plus "-connector"; the server id,
-  // the plugin and the marketplace stay neutral, so a rename never touches a user's config keys.
+  assert.deepEqual(stray, []);
+  // The package family is the command's name plus "-connector"; since 0.1.10 the server id, the plugin and the
+  // marketplace are the command's name too (the CLI renames an older install's "lflabs-memory" entries).
   assert.equal(PACKAGE, `${COMMAND}-connector`);
   for (const id of [pkg.name, pkg.mcpName, server.name, manifest.name]) assert.match(id, name);
-  for (const id of [plugin.name, market.name, SERVER_NAME])
-    assert.doesNotMatch(id, name, "the server id, plugin and marketplace stay neutral");
+  for (const id of [plugin.name, market.name, market.plugins[0].name, SERVER_NAME]) assert.equal(id, COMMAND);
 });

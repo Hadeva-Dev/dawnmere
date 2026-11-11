@@ -2,7 +2,7 @@
 # Installs Dawnmere on a Mac: uv if it is missing, then the CLI and the engine, each file checked against the
 # sha256 written below, their dependencies pinned and hash-checked by constraints.txt, then `dawnmere setup`.
 #
-#   curl -fsSL https://github.com/Hadeva-Dev/dawnmere/releases/latest/download/install.sh | sh
+#   curl -fsSL https://github.com/LF-Labs-Inc/dawnmere/releases/latest/download/install.sh | sh
 #
 # The release workflow fills the release lines below; the copy in the source tree refuses to run.
 set -eu
@@ -23,7 +23,7 @@ UV_VERSION="0.12.5"
 UV_SHA256_arm64="5bb0e5fe008a773c3dbcb97ff79cd89e1241464fe9d2f986d52ad8f1b037bd62"
 UV_SIZE_arm64=18518284
 
-REPO="Hadeva-Dev/dawnmere"
+REPO="LF-Labs-Inc/dawnmere"
 BASE="${LFLABS_MEMORY_RELEASE_BASE:-https://github.com/$REPO/releases/download/v$VERSION}"
 API="${LFLABS_MEMORY_API_BASE:-https://api.github.com}"
 UV_BASE="${LFLABS_MEMORY_UV_BASE:-https://github.com/astral-sh/uv/releases/download/$UV_VERSION}"

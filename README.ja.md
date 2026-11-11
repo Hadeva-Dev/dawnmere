@@ -23,7 +23,7 @@ curl -fsSL https://dawnmere.app/install | sh
 ```
 
 **必要なもの：** Apple シリコン搭載の Mac、macOS 14 以降、1 GB の空きディスク容量、Node.js 18 以降。無料で、アカウントは不要です。<br>
-**ご注意：** 日本語のメモは、同じ言葉を使って質問すると見つかります。言い換えた質問はまだ見つからないことが多いです（[#27](https://github.com/Hadeva-Dev/dawnmere/issues/27)）。<br>
+**ご注意：** 日本語のメモは、同じ言葉を使って質問すると見つかります。言い換えた質問はまだ見つからないことが多いです（[#27](https://github.com/LF-Labs-Inc/dawnmere/issues/27)）。<br>
 **ステータス：** 初期ベータ（0.1.x）。クライアントは MIT、エンジンはソース公開（source-available、FSL。2 年後に MIT へ移行）。開発は [LF Labs](#who-makes-it-and-the-lf-labs-names) です。
 
 <!-- Apple silicon and macOS 14: install.sh:35-38 refuses anything else, and setup.py:73-74 checks macOS again.
@@ -51,7 +51,7 @@ flowchart LR
 | **Codex** | 毎回のプロンプトに挿入 | "remember that ..." と入力したとき、またはモデルが `remember` を呼んだとき |
 | **Cursor** | 各チャットの開始時 | モデルが `remember` を呼んだとき |
 
-あなたが入力したこと（"remember that ..."）は、返答が終わるとすべてのアプリに届きます（Codex で入力した場合は、そこで次のプロンプトを送ったときです）。モデルが自分の判断で `remember` を使って保存したメモは検索で見つかりますが、ほかのアプリのプロンプトに入るのは、あなたが確認したあと（`lflabs-memory held`）だけです。あなた自身の健康、家族、お金、法律に関わるメモは、個人的なメモのままになります。
+あなたが入力したこと（"remember that ..."）は、返答が終わるとすべてのアプリに届きます（Codex で入力した場合は、そこで次のプロンプトを送ったときです）。モデルが自分の判断で `remember` を使って保存したメモは検索で見つかりますが、ほかのアプリのプロンプトに入るのは、あなたが確認したあと（`dawnmere held`）だけです。あなた自身の健康、家族、お金、法律に関わるメモは、個人的なメモのままになります。
 <!-- checked against v0.1.6 (406ee39/c3ed5b1): a `remember` with no kind from a work-only app (Cursor by default) is
      filed as work, unless it is about the user's health, family, money or legal matters. -->
 
@@ -73,7 +73,7 @@ flowchart LR
        work only; the prompt hook sees everything; Terminal widening asks for the app's name and an Allow dialog
        (access.py engine_widens). A widening typed in Claude Code or Codex is never applied;
        the reply gives the Terminal command (engine 50ffd0b, typed widening refused). -->
-- **保存されるテキストはチェックされます。** API キーやトークンのように見えるテキストは拒否されます。ダウンロードしたコードを実行させる、ファイルを削除させる、あなたに何かを隠させる、アシスタント自身の指示を書き換えようとする、といったアプリからの保存も拒否されます。アプリが自分の判断で保存したメモは、検索専用として保存されてラベルが付き、あなたが確認したあと（`lflabs-memory held`）にだけ、ほかのアプリのプロンプトに入ります。呼び出されたメモは "notes, not instructions"（指示ではなくメモ）というラベル付きでアプリに渡ります。
+- **保存されるテキストはチェックされます。** API キーやトークンのように見えるテキストは拒否されます。ダウンロードしたコードを実行させる、ファイルを削除させる、あなたに何かを隠させる、アシスタント自身の指示を書き換えようとする、といったアプリからの保存も拒否されます。アプリが自分の判断で保存したメモは、検索専用として保存されてラベルが付き、あなたが確認したあと（`dawnmere held`）にだけ、ほかのアプリのプロンプトに入ります。呼び出されたメモは "notes, not instructions"（指示ではなくメモ）というラベル付きでアプリに渡ります。
   <!-- checked against v0.1.6 (406ee39/c3ed5b1): MCP `remember` goes through the instruction screen; only some app
        saves are refused, the rest that read as rules, instructions, commands or links are kept search-only until
        "confirm memory N". Key/token refusals: mem.py:1373-1378. Label: mem.py:3919, instant.py:34. -->
@@ -112,7 +112,16 @@ flowchart LR
 curl -fsSL https://dawnmere.app/install | sh
 ```
 
-このアドレスは、最新の [GitHub release](https://github.com/Hadeva-Dev/dawnmere/releases/latest) にある `install.sh` をそのまま返します。スクリプトは次のことを行います。
+Claude Code を使っているなら、2 つのコマンドのあとに `/dawnmere:setup` を実行するだけです。
+
+```text
+/plugin marketplace add LF-Labs-Inc/dawnmere
+/plugin install dawnmere@dawnmere
+```
+
+そのあと Claude Code で `/dawnmere:setup` を実行してください。上のインストール用の 1 行を実行し（コマンドはひとつずつあなたが承認します）、ターミナルのウィンドウで `dawnmere setup` を実行するよう案内します。あなたが望めば、既定の設定のままその場で実行します。それまでは、Claude Code で新しいセッションを始めるたびに Dawnmere がまだセットアップされていないと表示されるだけで、ほかには何も起きません。
+
+このアドレスは、最新の [GitHub release](https://github.com/LF-Labs-Inc/dawnmere/releases/latest) にある `install.sh` をそのまま返します。スクリプトは次のことを行います。
 
 1. Apple シリコン搭載で macOS 14 以降の Mac でなければ、そこで止まります。
 2. 新しめの [uv](https://github.com/astral-sh/uv) がなければ uv 0.12.5 をダウンロードし、release から `dawnmere` とエンジンのパッケージをダウンロードします。
@@ -175,17 +184,17 @@ sh install.sh
 
 ## 対応アプリ
 
-- **Claude Code**（2.1.301 以降）：インストールした release と同じバージョンの `lflabs-memory` プラグインを、このリポジトリからインストールします。プラグインがツールと 4 つのフックを追加します。プラグインをインストールできない場合は、`claude mcp add` で同じツールを追加し、フックを `~/.claude/settings.json` に書き込みます。
+- **Claude Code**（2.1.301 以降）：インストールした release と同じバージョンの `dawnmere` プラグインを、このリポジトリからインストールします。プラグインがツールと 4 つのフックを追加します。プラグインをインストールできない場合は、`claude mcp add` で同じツールを追加し、フックを `~/.claude/settings.json` に書き込みます。
   <!-- checked against v0.1.6 (406ee39/c3ed5b1): the plugin pins to the release tag. -->
-- **Codex**：`~/.codex/config.toml` に `[mcp_servers.lflabs-memory]` を、`~/.codex/hooks.json` にプロンプトフックを追加します。Codex で一度 `/hooks` と入力し、フックを信頼してください。
-- **Cursor**：`~/.cursor/mcp.json` に `lflabs-memory` を、`~/.cursor/hooks.json` にセッション開始フックを追加します。そのあと Cursor を再起動してください。`dawnmere access cursor everything` を実行するまで、Cursor は仕事用のメモしか見られません。`dawnmere access cursor work` で元に戻せます。
-- **Windsurf、Gemini CLI、VS Code（Copilot）**：セットアップがこれらを見つけると、それぞれの MCP 設定ファイル（`~/.codeium/windsurf/mcp_config.json`、`~/.gemini/settings.json`、`~/Library/Application Support/Code/User/mcp.json`）に `lflabs-memory` を追加します。そのあとアプリを再起動してください。追加されるのはツールだけでフックはないため、ツールを呼び出したときにだけ思い出し、見られるのは仕事用のメモだけです。
-- **Claude Desktop とそのほかの MCP アプリ**：セットアップでは接続しません。Claude Desktop の場合は、[最新の release](https://github.com/Hadeva-Dev/dawnmere/releases/latest) から `dawnmere-connector.mcpb` を開くか、次の内容を `~/Library/Application Support/Claude/claude_desktop_config.json` に追加してください。
+- **Codex**：`~/.codex/config.toml` に `[mcp_servers.dawnmere]` を、`~/.codex/hooks.json` にプロンプトフックを追加します。Codex で一度 `/hooks` と入力し、フックを信頼してください。
+- **Cursor**：`~/.cursor/mcp.json` に `dawnmere` を、`~/.cursor/hooks.json` にセッション開始フックを追加します。そのあと Cursor を再起動してください。`dawnmere access cursor everything` を実行するまで、Cursor は仕事用のメモしか見られません。`dawnmere access cursor work` で元に戻せます。
+- **Windsurf、Gemini CLI、VS Code（Copilot）、Qwen Code、Kimi Code、Qoder CLI、iFlow CLI、Cline CLI**：セットアップがこれらを見つけると、それぞれの MCP 設定ファイル（`~/.codeium/windsurf/mcp_config.json`、`~/.gemini/settings.json`、`~/Library/Application Support/Code/User/mcp.json`、`~/.qwen/settings.json`、`~/.kimi-code/mcp.json`、`~/.qoder/settings.json`、`~/.iflow/settings.json`、`~/.cline/data/settings/cline_mcp_settings.json`）に `dawnmere` を追加します。そのあとアプリを再起動してください。追加されるのはツールだけでフックはないため、ツールを呼び出したときにだけ思い出し、見られるのは仕事用のメモだけです。
+- **Claude Desktop とそのほかの MCP アプリ**：セットアップでは接続しません。Claude Desktop の場合は、[最新の release](https://github.com/LF-Labs-Inc/dawnmere/releases/latest) から `dawnmere-connector.mcpb` を開くか、次の内容を `~/Library/Application Support/Claude/claude_desktop_config.json` に追加してください。
 
   ```json
   {
     "mcpServers": {
-      "lflabs-memory": {
+      "dawnmere": {
         "command": "npx",
         "args": ["-y", "dawnmere-connector@0.1.1"]
       }
@@ -195,6 +204,8 @@ sh install.sh
 
   <!-- checked against v0.1.6 (406ee39/c3ed5b1): connector 0.1.1 matches layout.py CONNECTOR_VERSION. -->
   Windsurf や Gemini CLI などの設定は、[コネクタの README](connector/README.md) にあります。
+
+0.1.10 より前は、エントリとプラグインの名前は `lflabs-memory`（プラグインは `lflabs-memory@lflabs`）でした。セットアップ、インストール用の 1 行、`dawnmere update` が、すべてのアプリでこれを `dawnmere` に変更するので、メモリが二重に表示されることはありません。`dawnmere uninstall` はどちらの名前も削除します。
 
 <!-- MIN_CLAUDE layout.py:20. Plugin then fallback: setup.py:294-313. Codex: apps.py:100-116, 146-153; hint
      apps.py:27. Cursor: apps.py:156-163, access.py:18-21, 124-126. The .mcpb is a release asset. -->
@@ -210,6 +221,12 @@ sh install.sh
 | `dawnmere access APP [LEVEL]` | アプリが見られる範囲を表示・変更する：`everything`、`nothing-personal`、`work`、`nothing`（ここから広げられるのは Cursor と Codex だけ） |
 | `dawnmere update` | 最新の release をインストールし、チェックサムで照合する |
 | `dawnmere uninstall` | セットアップが追加したものをすべて削除する |
+| `dawnmere held` | 確認するまでプロンプトに入らないアプリの保存と、それぞれを確認するための 1 行を表示する |
+| `dawnmere trust -- ID...` | macOS のダイアログで「許可」をクリックしたあと、メモリをあなた自身の言葉として扱う |
+| `dawnmere search QUERY` | メモリを検索する |
+| `dawnmere add TEXT` | メモリをひとつ保存する |
+| `dawnmere forget ID` | メモリを完全に削除する |
+| `dawnmere restore ID` | アプリが直近 1 日以内に忘れさせたメモリを元に戻す |
 
 <!-- checked against v0.1.6 (406ee39/c3ed5b1): doctor checks Node. Commands: main.py:76-131. Export path:
      export.py:79. Import skips duplicates: export.py:112-134. Levels and widening: access.py:18, 124-126. -->
@@ -219,9 +236,9 @@ sh install.sh
 
 ## 忘れさせる（forget）
 
-自分でメモリを忘れさせた場合（Claude Code や Codex で "forget memory 12" と入力するか、ターミナルで `lflabs-memory forget 12` を実行）、その本文、検索用のエントリ、古いバージョン、そこから取り出された事実が、返答が終わるとメモリファイルとそのバックアップから削除されます（Codex で入力した場合は、そこで次のプロンプトを送ったときです）。元には戻せません。バックグラウンドでの読み取りがオンの場合は、その言葉に触れているほかのメモをバックグラウンドの処理が見つけられるよう、言葉だけが最大 24 時間残り、そのあと消去されます。アプリが自分で `forget` を呼んだ場合、そのメモリはすぐに非表示になり、24 時間後に完全に削除されます。それまでは `lflabs-memory restore 12` で元に戻せます。言葉を含まないフィンガープリントだけは残るので、古いチャットから同じことがもう一度保存されることはありません。`dawnmere uninstall` でメモリ全体を削除することもできます（先に確認します）。
+自分でメモリを忘れさせた場合（Claude Code や Codex で "forget memory 12" と入力するか、ターミナルで `dawnmere forget 12` を実行）、その本文、検索用のエントリ、古いバージョン、そこから取り出された事実が、返答が終わるとメモリファイルとそのバックアップから削除されます（Codex で入力した場合は、そこで次のプロンプトを送ったときです）。元には戻せません。バックグラウンドでの読み取りがオンの場合は、その言葉に触れているほかのメモをバックグラウンドの処理が見つけられるよう、言葉だけが最大 24 時間残り、そのあと消去されます。アプリが自分で `forget` を呼んだ場合、そのメモリはすぐに非表示になり、24 時間後に完全に削除されます。それまでは `dawnmere restore 12` で元に戻せます。言葉を含まないフィンガープリントだけは残るので、古いチャットから同じことがもう一度保存されることはありません。`dawnmere uninstall` でメモリ全体を削除することもできます（先に確認します）。
 
-Claude Code も独自のメモリファイル（`~/.claude/projects/` 以下）を保存しています。Dawnmere でメモを忘れさせても、それらは削除されません。そちらのメモも削除するか、Claude Code に忘れるよう頼んでください。
+Claude Code も独自のメモリファイル（`~/.claude/projects/` 以下）を保存しています。Dawnmere 自身がそれらを削除することはありません。忘れさせたメモがそうしたファイルから取り込まれたものなら、返答がそのファイルの名前を示し、そちらも削除するよう伝えます。Claude Code ではたいてい Claude が代わりに削除します。ほかのアプリやターミナルからの場合は、自分で削除してください。
 <!-- checked against v0.1.6 (406ee39/c3ed5b1): your own forget is a real delete (words kept up to 24 h when a model
      is on); an app's forget hides the memory, deletes it after 24 h, and `restore` brings it back until then. Before
      v0.1.6 every forget was a soft delete with `lflabs-memory purge` and `restore` (mem.py:1787-1790, 1954-1973). -->
@@ -255,15 +272,14 @@ dawnmere uninstall
 <a id="who-makes-it-and-the-lf-labs-names"></a>
 ## 開発元と「LF Labs」という名前
 
-Dawnmere は LF Labs（GitHub の [Hadeva-Dev](https://github.com/Hadeva-Dev) organization）が開発しています。プログラムの内部では LF Labs の名前を使っているため、次のものはすべて Dawnmere のものです。
+Dawnmere は LF Labs（GitHub の [LF-Labs-Inc](https://github.com/LF-Labs-Inc) organization）が開発しています。プログラムの内部では LF Labs の名前を使っているため、次のものはすべて Dawnmere のものです。
 
 | 項目 | 場所 |
 | --- | --- |
 | メモリ、設定、モデル | `~/Library/Application Support/LF Labs/Memory/`（読めるのはあなただけ） |
 | サービスのログ | `~/Library/Logs/LF Labs/memory.log` |
 | バックグラウンドサービス | `~/Library/LaunchAgents/com.lflabs.memory.plist` |
-| MCP サーバー ID と Claude Code プラグイン | `lflabs-memory`（プラグインは `lflabs-memory@lflabs`） |
-| プログラム | `~/.local/share/uv/tools/lflabs-memory-cli/`（`~/.local/bin/dawnmere` と `lflabs-memory` にリンク） |
+| プログラム | `~/.local/share/uv/tools/lflabs-memory-cli/`（`~/.local/bin/dawnmere` と、フックが実行するエンジンのコマンド `lflabs-memory` にリンク） |
 | Anthropic API キー（設定した場合） | ログインキーチェーンの "LF Labs Memory" |
 
 <!-- layout.py:9-16, 33-56; setup.py:462-463 (0700 data folder). -->
@@ -275,16 +291,16 @@ Dawnmere は LF Labs（GitHub の [Hadeva-Dev](https://github.com/Hadeva-Dev) or
 - **中国語と日本語の想起は言葉の一致で行います。** 中国語や日本語で保存したメモは、同じ言葉を一部使って質問したときにプロンプトへ追加されます。言い換えた質問は見つからないことがよくありますが、アプリから検索はできます。モデルを設定している場合、中国語や日本語の質問は英語でも検索されます（1回につき小さなモデル呼び出し1回）。入力して保存するには "remember that ..." と書きます。日本語なら "覚えておいて：..." でも保存できます。
 - **保存がいちばん確実なのは Claude Code です。** Codex では "remember that ..." と言ってください。Cursor ではモデルが `remember` を呼ぶ必要があります。Codex 自身のセッションファイルは、`dawnmere setup --codex-sessions` を実行した場合だけ読み取ります。
 - **チェックは自動なので、見逃すこともあります。** アプリが何を保存したかは `dawnmere export` で確認してください。
-- **初期ベータです。** リリースは手作業で、頻繁に出ます。アップデートの前に [リリースノート](https://github.com/Hadeva-Dev/dawnmere/releases) を読んでください。
+- **初期ベータです。** リリースは手作業で、頻繁に出ます。アップデートの前に [リリースノート](https://github.com/LF-Labs-Inc/dawnmere/releases) を読んでください。
 
 <!-- Intel: install.sh:37 comment. Releases by hand: RELEASING.md line 3. -->
 
 ## ライセンス
 
-このリポジトリにあるインストーラー、`dawnmere` コマンド、Claude Code プラグイン、コネクタは MIT ライセンスです（[LICENSE](LICENSE)）。[エンジン](https://github.com/Hadeva-Dev/lflabs-memory-engine) は [Functional Source License 1.1, MIT future license](https://github.com/Hadeva-Dev/lflabs-memory-engine/blob/main/LICENSE)（FSL-1.1-MIT）のもとでソースコードを公開しており、各バージョンはリリースから 2 年後に MIT になります。検索モデルにはそれぞれのライセンスが適用されます（`dawnmere doctor --licenses` と [THIRD_PARTY.md](THIRD_PARTY.md) を参照）。
+このリポジトリにあるインストーラー、`dawnmere` コマンド、Claude Code プラグイン、コネクタは MIT ライセンスです（[LICENSE](LICENSE)）。[エンジン](https://github.com/LF-Labs-Inc/dawnmere-engine) は [Functional Source License 1.1, MIT future license](https://github.com/LF-Labs-Inc/dawnmere-engine/blob/main/LICENSE)（FSL-1.1-MIT）のもとでソースコードを公開しており、各バージョンはリリースから 2 年後に MIT になります。検索モデルにはそれぞれのライセンスが適用されます（`dawnmere doctor --licenses` と [THIRD_PARTY.md](THIRD_PARTY.md) を参照）。
 
 ## 関連プロジェクト
 
-[memory-bench](https://github.com/Hadeva-Dev/memory-bench) は、アシスタントのメモリを評価するオープンなベンチマークで、同じチームが作っています。公開されているエンジンで測った Dawnmere の行があり、漏れの数と呼び出しの結果が並べて示されています。そこにあるメンテナーのもう一つの行は関連するシステムのもので、ベンチマークにもそう明記されています。
+[memory-bench](https://github.com/LF-Labs-Inc/memory-bench) は、アシスタントのメモリを評価するオープンなベンチマークで、同じチームが作っています。公開されているエンジンで測った Dawnmere の行があり、漏れの数と呼び出しの結果が並べて示されています。そこにあるメンテナーのもう一つの行は関連するシステムのもので、ベンチマークにもそう明記されています。
 
-バグを見つけたら、`dawnmere doctor --report` の出力を添えて [issue を作成](https://github.com/Hadeva-Dev/dawnmere/issues/new/choose)してください。セキュリティの問題は [SECURITY.md](SECURITY.md) の手順で報告してください。
+バグを見つけたら、`dawnmere doctor --report` の出力を添えて [issue を作成](https://github.com/LF-Labs-Inc/dawnmere/issues/new/choose)してください。セキュリティの問題は [SECURITY.md](SECURITY.md) の手順で報告してください。

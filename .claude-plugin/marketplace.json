@@ -1,18 +1,18 @@
 {
-  "name": "lflabs",
+  "name": "dawnmere",
   "owner": {
     "name": "LF Labs",
-    "url": "https://github.com/Hadeva-Dev"
+    "url": "https://github.com/LF-Labs-Inc"
   },
   "metadata": {
     "description": "Dawnmere: one memory shared across your AI apps."
   },
   "plugins": [
     {
-      "name": "lflabs-memory",
+      "name": "dawnmere",
       "source": "./plugin",
       "description": "One memory shared across your AI apps. Gives Claude Code the memory Codex, Cursor and your other AI apps share, kept by Dawnmere on your Mac.",
-      "version": "0.1.9"
+      "version": "0.1.10"
     }
   ]
 }

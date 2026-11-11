@@ -9,9 +9,10 @@ import time
 from dataclasses import asdict, dataclass
 from importlib import metadata
 
-from . import apps, backend, launchd, layout, models, settings, sockets
+from . import apps, backend, claude_settings, launchd, layout, models, settings, sockets
 from .brand import COMMAND
-from .layout import CONNECTOR, CONNECTOR_VERSION, ENGINE, ENGINE_DIST, SERVER, data_dir, engine_bin, home, short
+from .layout import (CONNECTOR, CONNECTOR_VERSION, ENGINE, ENGINE_DIST, OLD_SERVER, SERVER, data_dir, engine_bin, home,
+                     short)
 from .run import run
 
 SLOW = 1.5
@@ -145,7 +146,7 @@ def check_hook():
 def check_connector():
     got = sockets.ping_connector()
     if got:
-        return Check("connector", "ok", f"{sockets.PROTOCOL} on {short(sockets.connector_sock())}")
+        return Check("connector", "ok", f"answering on {short(sockets.connector_sock())}")
     return Check("connector", "fail", "nothing answers on the connector socket",
                  "Codex and Cursor cannot reach memory: is the background service running?")
 
@@ -250,9 +251,14 @@ def check_claude():
     if not apps.installed("claude-code"):
         return Check("Claude Code", "ok", "not installed")
     r = run(["claude", "plugin", "list"], timeout=30)
-    if r.ok and SERVER in r.out:
-        m = re.search(rf"{re.escape(SERVER)}\S*\s+(?:Version:\s*)?v?(\d[\w.]*)", r.out)  # 2.1.301 lists "Version: x"
-        plugin = f"plugin {SERVER}" + (f" {m.group(1)}" if m else "")
+    for pid in (claude_settings.PLUGIN_ID, claude_settings.OLD_PLUGIN_ID):
+        if not (r.ok and pid in r.out):
+            continue
+        name = pid.split("@")[0]
+        m = re.search(rf"{re.escape(pid)}\S*\s+(?:Version:\s*)?v?(\d[\w.]*)", r.out)  # 2.1.301 lists "Version: x"
+        plugin = f"plugin {name}" + (f" {m.group(1)}" if m else "")
+        if pid == claude_settings.OLD_PLUGIN_ID:  # installed before 0.1.10: it works, under its old name
+            return Check("Claude Code", "warn", f"{plugin} (its old name)", f"run {COMMAND} setup to rename it")
         if not apps.hook_engine():  # where the plugin's hook launcher looks, never PATH
             return Check("Claude Code", "warn", f"{plugin}, but its hooks cannot find the engine",
                          f"run {COMMAND} setup again")
@@ -261,11 +267,14 @@ def check_claude():
         text = (home() / ".claude/settings.json").read_text()
     except OSError:
         text = ""
-    if "hook-prompt" in text and "lflabs-memory" in text:  # setup's fallback: the tools come from `claude mcp add`
+    if "hook-prompt" in text and ENGINE in text:  # setup's fallback: the tools come from `claude mcp add`
         if shutil.which("claude") is None:
             return Check("Claude Code", "warn", "hooks only, no MCP tools (the claude command was not found)",
                          f"install Claude Code's claude command, then run {COMMAND} setup again")
         if not run(["claude", "mcp", "get", SERVER], timeout=30).ok:
+            if apps.old_claude_mcp():
+                return Check("Claude Code", "warn", f"MCP + hooks in ~/.claude/settings.json, the MCP entry under its "
+                             f"old name {OLD_SERVER}", f"run {COMMAND} setup to rename it")
             return Check("Claude Code", "warn", "hooks only, no MCP tools (claude mcp add failed)",
                          f"run {COMMAND} setup again")
         return Check("Claude Code", "ok", "MCP + hooks in ~/.claude/settings.json")
@@ -279,13 +288,23 @@ def _has(path, needle):
         return False
 
 
+def _old_name(app, row):
+    """row, or a warning when the app's MCP entry is still under its name from before 0.1.10 (it works; setup and update
+    rename it)."""
+    plan = apps.plan_rename(app)
+    if row.state != "ok" or plan is None or plan.state != "add":
+        return row
+    return Check(row.name, "warn", f"{row.note}; its entry is under the old name {OLD_SERVER}",
+                 f"run {COMMAND} setup to rename it")
+
+
 def check_codex():
     if not apps.installed("codex"):
         return Check("Codex", "ok", "not installed")
     mcp = _has(home() / ".codex/config.toml", f"{CONNECTOR}@")
     hook = _has(home() / ".codex/hooks.json", "hook-prompt")
     if mcp and hook:
-        return Check("Codex", "ok", "MCP + hook (Codex asks you to trust the hook once: /hooks)")
+        return _old_name("codex", Check("Codex", "ok", "MCP + hook (Codex asks you to trust the hook once: /hooks)"))
     if mcp:
         return Check("Codex", "warn", "MCP only: no prompt hook", f"run {COMMAND} setup")
     return Check("Codex", "warn", "not connected", f"run {COMMAND} setup")
@@ -299,8 +318,9 @@ def check_cursor():
     if mcp:
         from . import access
         level = access.current_level("cursor") or "work only"
-        return Check("Cursor", "ok" if hook else "warn", f"MCP, {level} (change it: {COMMAND} access cursor)" +
-                     ("" if hook else "; no session-start hook"), "" if hook else f"run {COMMAND} setup")
+        return _old_name("cursor", Check("Cursor", "ok" if hook else "warn", f"MCP, {level} (change it: {COMMAND} "
+                                         "access cursor)" + ("" if hook else "; no session-start hook"),
+                                         "" if hook else f"run {COMMAND} setup"))
     return Check("Cursor", "warn", "not connected", f"run {COMMAND} setup")
 
 
@@ -311,7 +331,7 @@ def check_mcp_only():
         if not apps.installed(app):
             continue
         if _has(home() / path, f"{CONNECTOR}@"):
-            rows.append(Check(label, "ok", "MCP, work only"))
+            rows.append(_old_name(app, Check(label, "ok", "MCP, work only")))
         else:
             rows.append(Check(label, "warn", "not connected", f"run {COMMAND} setup"))
     return rows
@@ -325,14 +345,14 @@ def check_command():
 
 
 def check_held():
-    """[a row] when the engine holds app saves back from prompts (`lflabs-memory held --count`), else []: they wait
-    for the user's confirm code, which `lflabs-memory held` shows."""
+    """[a row] when the engine holds app saves back from prompts (`held --count`), else []: they wait for the user's
+    confirm code, which `held` shows."""
     eng = engine_bin()
     r = run([eng, "held", "--count"], timeout=15) if eng else None
     n = int(r.out.strip()) if r and r.ok and r.out.strip().isdigit() else 0
     if not n:
         return []
-    return [Check("held back", "ok", f"{n} app save{'s' if n != 1 else ''} held back from prompts: {ENGINE} held "
+    return [Check("held back", "ok", f"{n} app save{'s' if n != 1 else ''} held back from prompts: {COMMAND} held "
                   "shows them and their confirm codes")]
 
 

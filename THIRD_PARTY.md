@@ -14,7 +14,7 @@ The font file does not ship in the package, and nothing renders a font at run ti
 
 Search and sensitivity labels run on three small models on your Mac. They are not in the wheel or the installer:
 `dawnmere setup` downloads them on first run from this repo's
-[models release](https://github.com/Hadeva-Dev/dawnmere/releases/tag/models-2026-10-28), and checks each file's size
+[models release](https://github.com/LF-Labs-Inc/dawnmere/releases/tag/models-2026-10-28), and checks each file's size
 and sha256 against the engine's `models.json` before using it. `dawnmere doctor --licenses` lists them.
 
 - **Embeddings:** [BAAI/bge-small-en-v1.5](https://huggingface.co/BAAI/bge-small-en-v1.5), converted to int8 ONNX.

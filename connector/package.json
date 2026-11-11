@@ -33,14 +33,14 @@
   ],
   "author": "LF Labs",
   "license": "MIT",
-  "homepage": "https://github.com/Hadeva-Dev/dawnmere/tree/main/connector#readme",
+  "homepage": "https://github.com/LF-Labs-Inc/dawnmere/tree/main/connector#readme",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/Hadeva-Dev/dawnmere.git",
+    "url": "git+https://github.com/LF-Labs-Inc/dawnmere.git",
     "directory": "connector"
   },
   "bugs": {
-    "url": "https://github.com/Hadeva-Dev/dawnmere/issues"
+    "url": "https://github.com/LF-Labs-Inc/dawnmere/issues"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "1.32.2",

@@ -6,8 +6,8 @@ from pathlib import Path
 
 from . import apps, claude_settings, edits, install_record, keychain, launchd, layout, prompt, sockets
 from .brand import COMMAND
-from .layout import (BACKUP_TAG, CLI_DIST, MARKETPLACE, SERVER, connector_sock, data_dir, engine_sock, home, logs_dir,
-                     short, uv_bin)
+from .layout import (BACKUP_TAG, CLI_DIST, MARKETPLACE, OLD_MARKETPLACE, OLD_SERVER, SERVER, connector_sock, data_dir,
+                     engine_sock, home, logs_dir, short, uv_bin)
 from .run import run
 
 
@@ -22,25 +22,35 @@ class Report:
 
 
 def _claude_plugin(record, rep):
-    """The plugin and its marketplace, or the fallback's MCP entry. Only what setup ran (or, with no record, what
-    `claude` says is there) is undone."""
+    """The plugin and its marketplace, or the fallback's MCP entry, under their names and those from before 0.1.10.
+    Only what setup ran (or, with no record, what `claude` says is there) is undone."""
     if not shutil.which("claude"):
         rep.row("Claude Code", "gone", "claude not found: nothing to remove there")
         return
     ran = [" ".join(c["argv"]) for c in (record or {}).get("commands", []) if c.get("ok")]
     listed = run(["claude", "plugin", "list"], timeout=30)
-    has_plugin = any("plugin install" in c for c in ran) or (record is None and SERVER in listed.out)
-    if has_plugin:
-        a = run(["claude", "plugin", "uninstall", SERVER, "--scope", "user"], timeout=60)
-        run(["claude", "plugin", "marketplace", "remove", MARKETPLACE], timeout=60)
+    has_plugin = False
+    for plugin, market in ((claude_settings.PLUGIN_ID, MARKETPLACE), (claude_settings.OLD_PLUGIN_ID, OLD_MARKETPLACE)):
+        if not (plugin in listed.out or any(f"plugin install {plugin}" in c for c in ran) or
+                (record is None and plugin == claude_settings.PLUGIN_ID and SERVER in listed.out)):
+            continue
+        has_plugin = True
+        a = run(["claude", "plugin", "uninstall", plugin, "--scope", "user"], timeout=60)
+        run(["claude", "plugin", "marketplace", "remove", market], timeout=60)
+        if a.ok or plugin == claude_settings.PLUGIN_ID:  # the old name, already gone: renamed, nothing to say
+            rep.row("Claude Code", "removed" if a.ok else "gone",
+                    f"plugin {plugin} removed" if a.ok else f"plugin {plugin} already removed")
+    # the fallback's MCP entry: SERVER when setup added it (or, with no record, when there is one); OLD_SERVER
+    # whenever it is ours (an install from before 0.1.10 that update did not rename)
+    added = any(f"mcp add --scope user --transport stdio {SERVER} " in c for c in ran)
+    mcp = [n for n, there in ((SERVER, added or (record is None and run(["claude", "mcp", "get", SERVER],
+                                                                        timeout=30).ok)),
+                              (OLD_SERVER, apps.old_claude_mcp())) if there]
+    for name in mcp:
+        a = run(["claude", "mcp", "remove", "--scope", "user", name], timeout=30)
         rep.row("Claude Code", "removed" if a.ok else "gone",
-                "plugin removed" if a.ok else "plugin already removed")
-    has_mcp = any("mcp add" in c for c in ran) or (record is None and run(
-        ["claude", "mcp", "get", SERVER], timeout=30).ok)
-    if has_mcp:
-        a = run(["claude", "mcp", "remove", "--scope", "user", SERVER], timeout=30)
-        rep.row("Claude Code", "removed" if a.ok else "gone",
-                f"MCP entry {SERVER} removed" if a.ok else f"MCP entry {SERVER} already removed")
+                f"MCP entry {name} removed" if a.ok else f"MCP entry {name} already removed")
+    has_mcp = bool(mcp)
     if not has_plugin and not has_mcp:
         rep.row("Claude Code", "gone", "no plugin or MCP entry")
     note = claude_settings.put_back()  # after the commands, which rewrite it too
@@ -78,7 +88,7 @@ def _file(entry, rep):
     if p.state == "gone":
         return rep.row(label, "gone", f"{short(path)}: {p.note}")
     if p.state == "error":
-        return rep.row(label, "error", f"{short(path)}: {p.note}; remove the {SERVER} entries by hand")
+        return rep.row(label, "error", f"{short(path)}: {p.note}; remove the {SERVER} and {OLD_SERVER} entries by hand")
     try:
         edits.write(path, p.new, p.old, backup=False)
     except edits.Skip as e:

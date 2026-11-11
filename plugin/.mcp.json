@@ -1,6 +1,6 @@
 {
   "mcpServers": {
-    "lflabs-memory": {
+    "dawnmere": {
       "command": "npx",
       "args": [
         "-y",
