@@ -42,7 +42,7 @@ pointing at the new one, so pick the name before publishing.
 7. **Make a GitHub release** with the bundle, so Claude Desktop users can download it: push the tag `v0.1.0`, and
    the repo's release workflow builds `dawnmere-connector.mcpb` and attaches it with the installer.
 8. **Official MCP Registry:** `brew install mcp-publisher`, `mcp-publisher login github` (a browser sign-in as a
-   member of LF-Labs-Inc, which proves the `io.github.Hadeva-Dev/` namespace), then `mcp-publisher publish` from
+   member of LF-Labs-Inc, which proves the `io.github.LF-Labs-Inc/` namespace), then `mcp-publisher publish` from
    `connector/`.
 
 ## Directories (text in `docs/LISTING.md`)

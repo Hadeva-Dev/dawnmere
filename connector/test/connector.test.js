@@ -83,7 +83,7 @@ describe("with the fake daemon", () => {
     assert.equal(req.protocol, "lflabs-memory/1");
     assert.equal(req.tool, "recall");
     assert.deepEqual(req.args, { query: "dark mode", k: 3 });
-    assert.deepEqual(req.client, { name: "cursor", key: "test-key-123", hint: "cursor-vscode", connector: "0.1.1" });
+    assert.deepEqual(req.client, { name: "cursor", key: "test-key-123", hint: "cursor-vscode", connector: "0.1.2" });
   });
 
   test("remember, recall, forget round trip", async () => {
@@ -202,7 +202,7 @@ describe("the command line", () => {
   });
 
   test("--version", async () => {
-    assert.equal((await run(process.execPath, [BIN, "--version"])).stdout.trim(), "0.1.1");
+    assert.equal((await run(process.execPath, [BIN, "--version"])).stdout.trim(), "0.1.2");
   });
 
   test("--help prints the usage on stdout and exits 0", async () => {

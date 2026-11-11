@@ -362,17 +362,16 @@ def test_the_old_orgs_marketplace_checkout_is_cleaned_up(home, mac):
 
 
 def test_no_old_org_url_is_left():
-    """Every link and source names LF-Labs-Inc; only the MCP Registry name (published under the new namespace at the
-    connector's next release) and the migration's own constants know the old one."""
-    allowed = {"connector/server.json", "connector/package.json", "connector/docs/GO-PUBLIC.md",
-               "cli/src/lflabs_memory_cli/layout.py", "cli/tests/test_rename.py"}
+    """Every link and source names LF-Labs-Inc, the MCP Registry name included (connector 0.1.2); only the
+    migration's own constants know the old one."""
+    allowed = {"cli/src/lflabs_memory_cli/layout.py", "cli/tests/test_rename.py"}
     files = subprocess.run(["git", "ls-files"], cwd=ROOT, capture_output=True, text=True).stdout.split()
     hits = [f for f in files if f not in allowed and (ROOT / f).is_file() and not f.endswith(("lock", ".png", ".gif"))
             and "hadeva" in (ROOT / f).read_text(errors="ignore").lower()]
     assert hits == []
     for f in ("connector/server.json", "connector/package.json"):
         text = (ROOT / f).read_text()
-        assert text.lower().count("hadeva") == 1 and '"io.github.Hadeva-Dev/dawnmere-connector"' in text
+        assert '"io.github.LF-Labs-Inc/dawnmere-connector"' in text
 
 
 def test_no_doctor_line_shows_an_old_name(mac, monkeypatch, tmp_path, connector):

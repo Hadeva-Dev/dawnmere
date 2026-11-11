@@ -983,7 +983,7 @@ def test_doctor_rows_for_other_mcp_apps(mac, monkeypatch, tmp_path, connector):
     code, text = run_doctor()
     assert re.search(r"Gemini CLI\s+warn\s+not connected", text) and "Windsurf" not in text
     (mac.home / ".gemini/settings.json").write_text(
-        '{"mcpServers": {"dawnmere": {"command": "npx", "args": ["-y", "dawnmere-connector@0.1.1"]}}}')
+        '{"mcpServers": {"dawnmere": {"command": "npx", "args": ["-y", "dawnmere-connector@0.1.2"]}}}')
     assert re.search(r"Gemini CLI\s+ok\s+MCP, work only", run_doctor()[1])
 
 
