@@ -485,7 +485,12 @@ def self_check(engine):
         sid = f"self-check-{secrets.token_hex(4)}"
         base = {"session_id": sid, "transcript_path": str(project / "t.jsonl"), "cwd": str(project),
                 "hook_event_name": "UserPromptSubmit"}
-        ok, took, _ = _hook(engine, "hook-prompt", {**base, "prompt": "what do we know about this project?"})
+        # The first prompt after an install pays once for what no later prompt does (the hook's first start, the
+        # models' first search): it is run, and the second is the one timed, as every prompt after setup will be.
+        ask = {**base, "prompt": "what do we know about this project?"}
+        ok, took, _ = _hook(engine, "hook-prompt", ask)
+        if ok:
+            ok, took, _ = _hook(engine, "hook-prompt", ask)
         if not ok:
             return False, took, "the prompt hook failed: see ~/Library/Logs/LF Labs/memory.log"
         fact = check_phrase()

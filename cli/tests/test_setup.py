@@ -1104,6 +1104,23 @@ def test_self_check_confirms_its_typed_save_like_the_next_prompt(box, monkeypatc
     assert not list((box.home / ".claude" / "projects").glob("-*-self-check-*")), "nothing of the check stays"
 
 
+def test_self_check_times_the_second_prompt_not_the_first(box, monkeypatch, capsys):
+    """The first prompt after an install is slow once (the hook's first start, the models' first search). Setup runs
+    it and times the next one, so its screen shows the speed every later prompt has, not "slow"."""
+    real, n = setup._hook, []
+
+    def hook(engine, sub, payload, client=None):
+        ok, took, out = real(engine, sub, payload, client)
+        if sub == "hook-prompt" and payload["prompt"].startswith("what do we know"):
+            n.append(1)
+            took = 2.42 if len(n) == 1 else 0.09
+        return ok, took, out
+    monkeypatch.setattr(setup, "_hook", hook)
+    code, out = run_setup()
+    shown = out + capsys.readouterr().out
+    assert code == 0 and len(n) == 2, shown
+    assert "recall in 0.09 s" in shown and "slow" not in shown
+
 
 class _Args:
     def __init__(self, yes):
