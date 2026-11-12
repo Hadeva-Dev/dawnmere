@@ -1,6 +1,6 @@
 [project]
 name = "lflabs-memory-cli"
-version = "0.1.11"
+version = "0.1.12"
 description = "Installer and setup CLI for LF Labs memory"
 license = "MIT"
 requires-python = ">=3.12,<3.14"
