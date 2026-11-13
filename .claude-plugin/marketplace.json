@@ -12,7 +12,7 @@
       "name": "dawnmere",
       "source": "./plugin",
       "description": "One memory shared across your AI apps. Gives Claude Code the memory Codex, Cursor and your other AI apps share, kept by Dawnmere on your Mac.",
-      "version": "0.1.12"
+      "version": "0.1.13"
     }
   ]
 }
