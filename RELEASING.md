@@ -60,10 +60,11 @@ The engine checkout sits next to this repo as `../lflabs-memory-engine`.
    A throwaway HOME on your own Mac is not separate from launchd: setup's `launchctl bootstrap gui/$UID` replaces
    whatever is registered as `com.lflabs.memory`, so it stops your real memory service, and the service it starts
    then reads your real HOME's `~/.claude` and uses your real connector socket. In the VM, with a UTF-8 locale like a
-   real Terminal:
+   real Terminal, signed in as the VM's own user with its real HOME (not a `mktemp -d` HOME there either: under
+   `/var/folders` the service's socket path is past macOS's 104-byte limit, so the service does not start, and the
+   connector socket follows the login user's HOME whatever HOME setup is given):
    ```bash
-   H=$(mktemp -d)
-   env -i HOME="$H" PATH=/usr/bin:/bin:/usr/sbin LC_ALL=en_US.UTF-8 LFLABS_MEMORY_NO_SETUP=1 \
+   env -i HOME="$HOME" PATH=/usr/bin:/bin:/usr/sbin LC_ALL=en_US.UTF-8 LFLABS_MEMORY_NO_SETUP=1 \
      sh -c 'curl -fsSL https://github.com/LF-Labs-Inc/dawnmere/releases/latest/download/install.sh | sh'
-   PATH="$H/.local/bin:$PATH" HOME="$H" dawnmere setup --yes --plain --backend none && PATH="$H/.local/bin:$PATH" HOME="$H" dawnmere doctor
+   PATH="$HOME/.local/bin:$PATH" dawnmere setup --yes --plain --backend none && PATH="$HOME/.local/bin:$PATH" dawnmere doctor
    ```
