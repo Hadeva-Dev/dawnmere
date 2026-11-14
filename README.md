@@ -306,7 +306,7 @@ When you forget a memory yourself (type "forget memory 12" in Claude Code or Cod
 in Terminal), its text, search entries, older versions and the facts drawn from it are deleted from the memory file
 and its backups when the reply finishes (typed in Codex, at your next prompt there). It cannot be brought back. If background reading is on, the words are kept for up to 24 hours so the
 background job can find other notes that mention them, then erased. When an app calls `forget` on its own, the memory
-is hidden at once and deleted for good after 24 hours; until then `dawnmere restore 12` brings it back. An
+is hidden at once and deleted for good after 24 hours; until then `dawnmere restore 12` brings it back, with everything that forget hid. An
 app's forget never takes your own copies of the note: they stay, and the reply names them. A
 fingerprint with no words stays, so the same thing is not saved again from an old chat. `dawnmere uninstall` can also
 delete the whole memory (it asks first).
